@@ -2269,7 +2269,7 @@ function DetalharMontagem($caminho, $asm) {
     # escala: a maior em que a isométrica cabe acima da lista (ou ao lado dela), com folga para os balões
     $i0 = EscalaInicial ($diag * 1.2) ($diag * 0.8)
     $i0 = [math]::Max(0, $i0 - 3)   # começa mais perto: a conferência abaixo usa o tamanho real da vista
-    $ok = $false
+    $ok = $false; $fb = -1
     for ($i = $i0; $i -lt $Escalas.Count; $i++) {
         DefinirEscala $dm $Escalas[$i][0] $Escalas[$i][1]
         $o = Contorno $v1
@@ -2278,8 +2278,16 @@ function DetalharMontagem($caminho, $asm) {
         Rebuild $dm
         $o = Contorno $v1
         $base = if ($o.x2 -gt $tabX1 - 0.01) { $baseMin + 0.012 } else { $AreaB + 0.02 }
+        Log ("   [dbg] 1:{0}: vista ({1:N0};{2:N0})-({3:N0};{4:N0}) mm, base {5:N0}, lista x1 {6:N0}" -f ($Escalas[$i][1] / $Escalas[$i][0]), ($o.x1 * 1000), ($o.y1 * 1000), ($o.x2 * 1000), ($o.y2 * 1000), ($base * 1000), ($tabX1 * 1000)) "DarkGray"
         # folga em volta para as fileiras de balões (em cima e embaixo da vista)
         if ($o.x1 -ge $AreaL + 0.02 -and $o.x2 -le $AreaR - 0.02 -and $o.y1 -ge $base + 0.010 -and $o.y2 -le $AreaT - 0.022) { $ok = $true; Log "   Escala $($Escalas[$i][0]):$($Escalas[$i][1])"; break }
+        # reserva: cabe na folha, mesmo com pouca folga para os balões
+        if ($fb -lt 0 -and $o.x1 -ge $AreaL + 0.005 -and $o.x2 -le $AreaR - 0.005 -and $o.y1 -ge $base -and $o.y2 -le $AreaT - 0.008) { $fb = $i }
+    }
+    if (-not $ok -and $fb -ge 0) {
+        DefinirEscala $dm $Escalas[$fb][0] $Escalas[$fb][1]
+        $o = Contorno $v1; MoverPara $v1 ((($AreaL + $AreaR) / 2) - $o.w / 2) ($AreaT - 0.010); Rebuild $dm
+        $ok = $true; Log "   Escala $($Escalas[$fb][0]):$($Escalas[$fb][1]) (pouca folga para os balões)"
     }
     if (-not $ok) { Log "   Aviso: a vista não coube perfeitamente; confira a disposição." "Yellow" }
     else {
