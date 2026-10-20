@@ -2238,24 +2238,19 @@ function OrganizarBaloes($dm, $v, $notas) {
     foreach ($lado in 1, -1) {
         $fila = @($its | Where-Object { [math]::Sign($_.d + 1e-9) -eq $lado } | Sort-Object t)
         if ($fila.Count -eq 0) { continue }
-        $off = $(if ($lado -gt 0) { $dsup } else { $dinf }) + 0.008
-        # cada balão fica na altura (ao longo da peça) da sua própria peça; só afasta o vizinho quando encostaria.
-        # Assim as linhas de chamada saem paralelas e curtas, em escadinha (padrão ProEstamp)
-        $tks = @(); $prev = -1e9
-        foreach ($it in $fila) {
-            # dois balões vizinhos não encostam se a distância ao longo da peça passar a largura (na horizontal) ou a altura (na vertical)
-            $porW = $it.w / [math]::Max(0.05, [math]::Abs($ux)); $porH = ($it.h + 0.0015) / [math]::Max(0.05, [math]::Abs($uy))
-            $minimo = [math]::Min($porW, $porH) + 0.002
-            $tk = [math]::Max($it.t, $prev + $minimo); $tks += $tk; $prev = $tk
+        $off = $(if ($lado -gt 0) { $dsup } else { $dinf }) + 0.010
+        $t1 = ($fila | Measure-Object -Property t -Minimum).Minimum; $t2 = ($fila | Measure-Object -Property t -Maximum).Maximum
+        $passo = 0.0
+        if ($fila.Count -gt 1) {
+            $larg = ($fila | Measure-Object -Property w -Maximum).Maximum
+            $passo = [math]::Max(($t2 - $t1) / ($fila.Count - 1), $larg * [math]::Abs($ux) * 0.9 + 0.006)
+            $meio = ($t1 + $t2) / 2; $t1 = $meio - $passo * ($fila.Count - 1) / 2
         }
-        $textoDireita = (($lado * $nx) -ge 0)
         for ($k = 0; $k -lt $fila.Count; $k++) {
             $it = $fila[$k]
-            $tk = $tks[$k]
+            $tk = $t1 + $k * $passo
             $px = $cx + $tk * $ux + $lado * $off * $nx; $py = $cy + $tk * $uy + $lado * $off * $ny
-            # texto do lado de fora: à direita da ponta da linha (lado direito da peça) ou à esquerda
-            if ($textoDireita) { $x1 = $px + 0.001 } else { $x1 = $px - $it.w - 0.001 }
-            $y1 = $py - $it.h / 2
+            if ($lado -gt 0) { $x1 = $px - $it.w; $y1 = $py } else { $x1 = $px; $y1 = $py - $it.h }
             $x1 = [math]::Max($AreaL + 0.004, [math]::Min($AreaR - 0.004 - $it.w, $x1))
             $y1 = [math]::Max($AreaB + 0.004, [math]::Min($AreaT - 0.004 - $it.h, $y1))
             # não pode ficar em cima da lista de materiais: sobe para logo acima dela
@@ -2379,7 +2374,7 @@ function DetalharMontagem($caminho, $asm) {
         try {
             Selecionar $dm $v | Out-Null
             $op = X $dm "CreateAutoBalloonOptions"
-            try { XS $op "IgnoreMultiple" $false } catch { }   # um balão para cada peça, mesmo repetida (padrão ProEstamp)
+            try { XS $op "IgnoreMultiple" $true } catch { }
             try { XS $op "Style" (K "swBalloonStyle_e" @("swBS_None") 0) } catch { }
             try { XS $op "UpperTextContent" (K "swBalloonTextContent_e" @("swBalloonTextCustomProperties") 3) } catch { }
             try { XS $op "UpperText" "SW-Nome de arquivo(File Name)" } catch { }
