@@ -2374,7 +2374,7 @@ function DetalharMontagem($caminho, $asm) {
         try {
             Selecionar $dm $v | Out-Null
             $op = X $dm "CreateAutoBalloonOptions"
-            try { XS $op "IgnoreMultiple" $true } catch { }
+            try { XS $op "IgnoreMultiple" $false } catch { }   # um balão para cada peça, mesmo repetida (padrão ProEstamp)
             try { XS $op "Style" (K "swBalloonStyle_e" @("swBS_None") 0) } catch { }
             try { XS $op "UpperTextContent" (K "swBalloonTextContent_e" @("swBalloonTextCustomProperties") 3) } catch { }
             try { XS $op "UpperText" "SW-Nome de arquivo(File Name)" } catch { }

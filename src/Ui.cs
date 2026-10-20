@@ -15,8 +15,8 @@ using Microsoft.Win32;
 [assembly: AssemblyTitle("Monitor")]
 [assembly: AssemblyDescription("BOM dos projetos SolidWorks com status de PDF/DXF")]
 [assembly: AssemblyProduct("Monitor")]
-[assembly: AssemblyVersion("2.8.3.0")]
-[assembly: AssemblyFileVersion("2.8.3.0")]
+[assembly: AssemblyVersion("2.8.4.0")]
+[assembly: AssemblyFileVersion("2.8.4.0")]
 
 namespace MonitorSW
 {
@@ -886,7 +886,17 @@ namespace MonitorSW
             projList.Dock = DockStyle.Fill;
             Theme.Style(projList);
             projList.Resize += (s, a) => { int w = projList.ClientSize.Width - 4; if (w > 80) projList.Columns[0].Width = w; };
-            projList.SelectedIndexChanged += (s, a) => { if (projList.SelectedItems.Count > 0) { current = projList.SelectedItems[0].Tag as Project; FillGrid(); if (current != null) ShowPreview(current.MainPath, current.Name); } };
+            projList.SelectedIndexChanged += (s, a) =>
+            {
+                if (projList.SelectedItems.Count == 0) return;
+                var novo = projList.SelectedItems[0].Tag as Project;
+                bool trocou = novo != null && novo != current;
+                current = novo;
+                // trocou de montagem: a busca anterior (ou "Todo o servidor") escondia os itens da montagem nova
+                if (trocou && search.Text.Trim().Length > 0) { srvTimer.Stop(); search.Text = ""; ApplySearchMode(); }
+                else FillGrid();
+                if (current != null) ShowPreview(current.MainPath, current.Name);
+            };
 
             grid.Dock = DockStyle.Fill;
             grid.ReadOnly = true;
@@ -2109,6 +2119,8 @@ namespace MonitorSW
         {
             if (ServerMode) { lock (prevMem) prevMem.Clear(); lblStatus.Text = "Conferindo de novo os itens achados no servidor…"; RunServerSearch(); if (prevModel != null) RequestPreview(); return; }
             lock (prevMem) prevMem.Clear();
+            // texto de busca na caixa filtra a lista: avisa (senão parece que a montagem está vazia)
+            if (search.Text.Trim().Length > 0 && grid.Rows.Count == 0) { srvTimer.Stop(); search.Text = ""; ApplySearchMode(); }
             lblStatus.Text = "Atualizando " + (current != null ? current.Name : "projetos") + "… confere desenho, PDF e DXF de todos os itens.";
             var only = current;
             System.Threading.ThreadPool.QueueUserWorkItem(_ =>
@@ -3399,11 +3411,13 @@ namespace MonitorSW
                 if (!engine.Cfg.Projects.Any(x => engine.Cfg.Map(x).Equals(f, StringComparison.OrdinalIgnoreCase))) engine.Cfg.Projects.Add(engine.Cfg.Unmap(f));
             engine.Cfg.Save();
             engine.SyncProjects();
-            lock (engine.Sync) current = engine.Projects.FirstOrDefault(x => x.MainPath.Equals(picked[0], StringComparison.OrdinalIgnoreCase));
+            lock (engine.Sync) current = engine.Projects.FirstOrDefault(x => x.MainPath.Equals(picked[0], StringComparison.OrdinalIgnoreCase))
+                ?? engine.Projects.FirstOrDefault(x => Path.GetFileName(x.MainPath).Equals(Path.GetFileName(picked[0]), StringComparison.OrdinalIgnoreCase));
+            if (search.Text.Trim().Length > 0) { srvTimer.Stop(); search.Text = ""; ApplySearchMode(); }   // busca antiga escondia os itens
             RefreshAll();
+            engine.ForceRefresh(current);   // a montagem aberta é conferida primeiro (não espera as outras)
             if (current != null) ShowPreview(current.MainPath, current.Name);
             lblStatus.Text = "Lendo o projeto... a BOM aparece em alguns segundos.";
-            engine.Kick();
         }
 
         // janela normal do Windows (Explorer): mostra tudo que existe no servidor
