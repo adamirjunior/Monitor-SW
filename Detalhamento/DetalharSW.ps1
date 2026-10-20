@@ -2122,6 +2122,18 @@ function DetalharPeca($caminho, $peca) {
 # ---------------------------------------------------------------- submontagem de solda
 # template da lista de materiais de solda: o configurado no .ini; senão um salvo na pasta do gerador;
 # senão cria agora a partir do desenho de referência (13011773 na mesma pasta da montagem, ou DesenhoReferenciaSolda no .ini)
+# deixa o desenho como documento ativo do SolidWorks (balões automáticos só funcionam no documento ativo).
+# O título de desenho vem como "Desenho3 - Folha1": o ActivateDoc quer só "Desenho3".
+function AtivarDesenho($d) {
+    $t = Titulo $d
+    foreach ($nome in @(($t -replace '\s+-\s+[^-]+$', ''), $t)) {
+        try { $e = 0; X $sw "ActivateDoc2" $nome $true ([ref]$e) | Out-Null } catch { }
+        try { X $sw "ActivateDoc" $nome | Out-Null } catch { }
+        try { $at = XG $sw "ActiveDoc"; if ($at -and (Titulo $at) -eq $t) { return $true } } catch { }
+    }
+    Log "   (não consegui deixar o desenho ativo: $t)" "DarkYellow"
+    return $false
+}
 function TemplateSolda($caminhoAsm) {
     if ($TabelaSolda -and (Test-Path $TabelaSolda)) { return $TabelaSolda }
     $tpl = Join-Path $Pasta "ListaSolda_ProEstamp.sldbomtbt"
@@ -2178,7 +2190,7 @@ function DetalharMontagem($caminho, $asm) {
     $nLinhas = 8; $tabW = 0.155; $tabH = 0.0
     try {
         $tpl = TemplateSolda $caminho
-        try { X $sw "ActivateDoc" (Titulo $dm) | Out-Null } catch { }   # volta para o desenho novo (o de referência pode ter sido aberto)
+        AtivarDesenho $dm   # volta para o desenho novo (o de referência pode ter sido aberto)
         if ($tpl -eq "") { Log "   Aviso: sem template da lista de solda; usando a lista padrão do SolidWorks." "Yellow" } else { Log "   Lista de materiais pelo template: $tpl" "DarkGray" }
         $tab = X $v1 "InsertBomTable4" $false 0.2917 0.0345 $AnchorBR $BomParts (NomeConfig $asm) $tpl $false $NumNone $false
         if (-not $tab) { Log "   (InsertBomTable4 devolveu vazio)" "DarkYellow" }
@@ -2217,6 +2229,7 @@ function DetalharMontagem($caminho, $asm) {
         MoverPara $v1 $o.x1 $topo
     }
 
+    AtivarDesenho $dm
     foreach ($v in @($v1)) {
         if (-not $v) { continue }
         try {
@@ -2226,7 +2239,9 @@ function DetalharMontagem($caminho, $asm) {
             try { XS $op "Style" (K "swBalloonStyle_e" @("swBS_None") 0) } catch { }
             try { XS $op "UpperTextContent" (K "swBalloonTextContent_e" @("swBalloonTextCustomProperties") 3) } catch { }
             try { XS $op "UpperText" "SW-Nome de arquivo(File Name)" } catch { }
-            X $dm "AutoBalloon5" $op | Out-Null
+            $bl = X $dm "AutoBalloon5" $op
+            $nb = 0; if ($bl) { $nb = @($bl).Count }
+            if ($nb -eq 0) { Log "   Aviso: o SolidWorks não colocou nenhum balão (desenho não estava ativo?)" "Yellow" } else { Log "   Balões com o Nº DA PEÇA: $nb" }
         } catch { Log "   Aviso: não coloquei balões ($($_.Exception.Message))" "Yellow" }
     }
     Rebuild $dm
