@@ -1397,7 +1397,7 @@ function ResolverSobreposicoes($dm, $vistas, [string[]]$tiposMoveis, $extras = @
         $n = $it[0]; $minha = [string](X $it[1] "GetName2")
         $r = RetNota $n; if (-not $r) { Log "   [dbg] sem retângulo para um texto do tipo $($it[2])" "DarkGray"; continue }
         # nota de dobra só desvia de outros textos e anda pouco (tem que ficar junto da linha de dobra)
-        $obst = if ($it[2] -eq "dobra") { @($fixosTexto) } else { @($fixos) }
+        $obst = @(); if ($it[2] -eq "dobra") { $obst += $fixosTexto } else { $obst += $fixos }   # sempre lista (1 item só virava objeto solto e o += quebrava)
         $maxDist = if ($it[2] -eq "dobra") { 3 } else { 8 }
         if ($it[2] -ne "dobra") { foreach ($k in $outl.Keys) { $obst += $outl[$k] } }   # chamada de furo e balão também não cobrem a própria vista
         $folga = if ($it[2] -eq "furo") { 0.003 } else { 0.0015 }
@@ -2120,6 +2120,37 @@ function DetalharPeca($caminho, $peca) {
 }
 
 # ---------------------------------------------------------------- submontagem de solda
+# template da lista de materiais de solda: o configurado no .ini; senão um salvo na pasta do gerador;
+# senão cria agora a partir do desenho de referência (13011773 na mesma pasta da montagem, ou DesenhoReferenciaSolda no .ini)
+function TemplateSolda($caminhoAsm) {
+    if ($TabelaSolda -and (Test-Path $TabelaSolda)) { return $TabelaSolda }
+    $tpl = Join-Path $Pasta "ListaSolda_ProEstamp.sldbomtbt"
+    if (Test-Path $tpl) { return $tpl }
+    $ref = C "DesenhoReferenciaSolda" ""
+    if (-not $ref -or -not (Test-Path $ref)) { $ref = Join-Path (Split-Path -Parent $caminhoAsm) "13011773.SLDDRW" }
+    if (-not (Test-Path $ref)) { Log "   (desenho de referência da lista de solda não encontrado: $ref)" "DarkYellow"; return "" }
+    $jaAberto = $null; try { $jaAberto = X $sw "GetOpenDocumentByName" $ref } catch { }
+    $d = AbrirDoc $ref $DocDRW
+    if (-not $d) { return "" }
+    $tipoBom = K "swTableAnnotationType_e" @("swTableAnnotation_BillOfMaterials") 2
+    $salvou = $false
+    try {
+        $v = X $d "GetFirstView"
+        while ($v -and -not $salvou) {
+            $tas = $null; try { $tas = X $v "GetTableAnnotations" } catch { }
+            foreach ($t in @($tas)) {
+                if (-not $t) { continue }
+                $tp = -1; try { $tp = [int](XG $t "Type") } catch { }
+                if ($tp -eq $tipoBom) { try { $salvou = [bool](X $t "SaveAsTemplate" $tpl) } catch { Log "   (SaveAsTemplate: $($_.Exception.Message))" "DarkYellow" }; if ($salvou) { break } }
+            }
+            $v = X $v "GetNextView"
+        }
+    } catch { Log "   (lendo a lista do desenho de referência: $($_.Exception.Message))" "DarkYellow" }
+    if (-not $jaAberto) { Fechar $d }
+    if ($salvou -and (Test-Path $tpl)) { Log "   Template da lista de solda criado a partir de $(Split-Path -Leaf $ref): $tpl" "Green"; return $tpl }
+    Log "   (não consegui salvar o template da lista a partir de $(Split-Path -Leaf $ref))" "DarkYellow"
+    return ""
+}
 function DetalharMontagem($caminho, $asm) {
     $cod = Codigo $caminho
     $destDir = PastaDestino $caminho
@@ -2139,45 +2170,54 @@ function DetalharMontagem($caminho, $asm) {
     $refAsm = Titulo $asm
     $v1 = VistaModelo $dm $refAsm @("*Isométrica", "*Isometric") 0.08 0.14
     if (-not $v1) { $refAsm = $caminho; $v1 = VistaModelo $dm $caminho @("*Isométrica", "*Isometric") 0.08 0.14 }
-    $v2 = VistaModelo $dm $refAsm @("*Trimétrica", "*Trimetric") 0.22 0.14
+    # padrão ProEstamp (ex.: 13011773): uma isométrica grande, balões com o Nº DA PEÇA e a lista de materiais embaixo à direita
+    $v2 = $null
     if (-not $v1) { throw "não consegui criar a vista isométrica" }
-    foreach ($v in @($v1, $v2)) { if ($v) { Modo $v $DispShaded $true } }
+    Modo $v1 $DispShaded $true
 
-    $nLinhas = 8
+    $nLinhas = 8; $tabW = 0.155; $tabH = 0.0
     try {
-        $tpl = $TabelaSolda
-        if ($tpl -eq "" -or -not (Test-Path $tpl)) { $tpl = ""; Log "   Aviso: TemplateListaSolda não configurado; usando a lista padrão do SolidWorks." "Yellow" }
+        $tpl = TemplateSolda $caminho
+        try { X $sw "ActivateDoc" (Titulo $dm) | Out-Null } catch { }   # volta para o desenho novo (o de referência pode ter sido aberto)
+        if ($tpl -eq "") { Log "   Aviso: sem template da lista de solda; usando a lista padrão do SolidWorks." "Yellow" } else { Log "   Lista de materiais pelo template: $tpl" "DarkGray" }
         $tab = X $v1 "InsertBomTable4" $false 0.2917 0.0345 $AnchorBR $BomParts (NomeConfig $asm) $tpl $false $NumNone $false
         if (-not $tab) { Log "   (InsertBomTable4 devolveu vazio)" "DarkYellow" }
         if ($tab) {
             try { $nLinhas = [int](XG $tab "RowCount") } catch { }
-            Log "   Lista de materiais: $nLinhas linha(s)"
+            # tamanho real da tabela (soma das larguras das colunas e alturas das linhas)
+            try { $w = 0.0; $nc = [int](XG $tab "ColumnCount"); for ($c = 0; $c -lt $nc; $c++) { $w += [double](X $tab "GetColumnWidth" $c) }; if ($w -gt 0.02) { $tabW = $w } } catch { }
+            try { $h = 0.0; for ($r = 0; $r -lt $nLinhas; $r++) { $h += [double](X $tab "GetRowHeight" $r) }; if ($h -gt 0.005) { $tabH = $h } } catch { }
+            Log ("   Lista de materiais: {0} linha(s), {1:N0} x {2:N0} mm" -f $nLinhas, ($tabW * 1000), ($tabH * 1000))
         }
     } catch { Log "   Aviso: não inseri a lista de materiais ($($_.Exception.Message))" "Yellow" }
-    $baseMin = 0.0345 + ($nLinhas * 0.0051) + 0.006
+    if ($tabH -le 0) { $tabH = $nLinhas * 0.0051 }
+    $baseMin = 0.0345 + $tabH + 0.008
+    $tabX1 = 0.2917 - $tabW
 
-    $i0 = EscalaInicial ($diag * 1.4) $diag
+    # escala: a maior em que a isométrica cabe acima da lista (ou ao lado dela), com folga para os balões
+    $i0 = EscalaInicial ($diag * 1.2) ($diag * 0.8)
+    if ($i0 -gt 0) { $i0-- }
     $ok = $false
     for ($i = $i0; $i -lt $Escalas.Count; $i++) {
         DefinirEscala $dm $Escalas[$i][0] $Escalas[$i][1]
-        # vista secundária menor (55% da escala da folha), no canto superior direito; principal grande à esquerda
-        if ($v2) { try { XS $v2 "UseSheetScale" $false } catch { try { XS $v2 "UseSheetScale" 0 } catch { } }; try { XS $v2 "ScaleDecimal" (0.55 * $Escalas[$i][0] / $Escalas[$i][1]) } catch { }; Rebuild $dm }
-        MoverPara $v1 ($AreaL + 0.035) ($AreaT - 0.015)
-        if ($v2) { $o2 = Contorno $v2; MoverPara $v2 ($AreaR - 0.035 - $o2.w) ($AreaT - 0.015) }
+        $o = Contorno $v1
+        $cx = (($AreaL + $AreaR) / 2) - $o.w / 2
+        MoverPara $v1 $cx ($AreaT - 0.020)
         Rebuild $dm
-        $os = @(@($v1, $v2) | Where-Object { $_ } | ForEach-Object { Contorno $_ })
-        $cabe = $true
-        $tabX1 = 0.2917 - 0.155
-        foreach ($o in $os) {
-            $base = if ($o.x2 -gt $tabX1) { $baseMin } else { $AreaB + 0.02 }
-            if (-not (DentroDaArea $o $base) -or $o.x2 -gt $AreaR - 0.03 -or $o.x1 -lt $AreaL + 0.03 -or $o.y2 -gt $AreaT - 0.012) { $cabe = $false }
-        }
-        if ($os.Count -gt 1 -and (($os[0].x2 + 0.045) -gt $os[1].x1) -and ($os[0].y1 -lt $os[1].y2)) { $cabe = $false }   # folga p/ balões
-        if ($cabe) { $ok = $true; Log "   Escala $($Escalas[$i][0]):$($Escalas[$i][1])"; break }
+        $o = Contorno $v1
+        $base = if ($o.x2 -gt $tabX1 - 0.01) { $baseMin + 0.012 } else { $AreaB + 0.02 }
+        if ($o.x1 -ge $AreaL + 0.03 -and $o.x2 -le $AreaR - 0.03 -and $o.y1 -ge $base -and $o.y2 -le $AreaT - 0.015) { $ok = $true; Log "   Escala $($Escalas[$i][0]):$($Escalas[$i][1])"; break }
     }
-    if (-not $ok) { Log "   Aviso: as vistas não couberam perfeitamente; confira a disposição." "Yellow" }
+    if (-not $ok) { Log "   Aviso: a vista não coube perfeitamente; confira a disposição." "Yellow" }
+    else {
+        # centraliza na altura livre acima da lista
+        $o = Contorno $v1
+        $base = if ($o.x2 -gt $tabX1 - 0.01) { $baseMin + 0.012 } else { $AreaB + 0.02 }
+        $topo = $base + ((($AreaT - 0.015) - $base) + $o.h) / 2
+        MoverPara $v1 $o.x1 $topo
+    }
 
-    foreach ($v in @($v1, $v2)) {
+    foreach ($v in @($v1)) {
         if (-not $v) { continue }
         try {
             Selecionar $dm $v | Out-Null
@@ -2190,7 +2230,7 @@ function DetalharMontagem($caminho, $asm) {
         } catch { Log "   Aviso: não coloquei balões ($($_.Exception.Message))" "Yellow" }
     }
     Rebuild $dm
-    $retTabela = [pscustomobject]@{ x1 = 0.2917 - 0.155; y1 = 0.0345; x2 = 0.2917; y2 = $baseMin }
+    $retTabela = [pscustomobject]@{ x1 = $tabX1; y1 = 0.0345; x2 = 0.2917; y2 = $baseMin }
     ResolverSobreposicoes $dm @($v1, $v2) @("balao") @($retTabela)
     TrocarDesenhista $dm
     Rebuild $dm
