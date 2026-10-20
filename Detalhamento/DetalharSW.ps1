@@ -2133,40 +2133,54 @@ function PontoBalao($n) {
     return $null
 }
 function OrganizarBaloes($dm, $v, $notas) {
+    # "escadinha": os balões de cada lado da peça ficam numa linha paralela à diagonal da isométrica,
+    # na ordem das peças e com espaçamento igual entre eles (as linhas de chamada saem paralelas, sem cruzar)
     $o = Contorno $v
+    $ax = $o.x1; $ay = $o.y1
+    $dx = $o.x2 - $o.x1; $dy = $o.y2 - $o.y1
+    $L = [math]::Sqrt($dx * $dx + $dy * $dy); if ($L -lt 1e-6) { return }
+    $ux = $dx / $L; $uy = $dy / $L          # ao longo da diagonal
+    $nx = -$uy; $ny = $ux                    # perpendicular (para cima/esquerda)
     $its = @()
     foreach ($n in $notas) {
         if (-not $n) { continue }
         $r = RetNota $n; if (-not $r) { continue }
         $p = PontoBalao $n; if (-not $p) { continue }
-        # lado da diagonal (canto inferior esquerdo -> superior direito, como a isométrica de peça comprida)
-        $lado = (($o.x2 - $o.x1) * ($p[1] - $o.y1)) - (($o.y2 - $o.y1) * ($p[0] - $o.x1))
-        $its += ,[pscustomobject]@{ n = $n; r = $r; px = $p[0]; py = $p[1]; w = ($r.x2 - $r.x1); h = ($r.y2 - $r.y1); cima = ($lado -gt 0) }
+        $rx = $p[0] - $ax; $ry = $p[1] - $ay
+        $t = $rx * $ux + $ry * $uy; $d = $rx * $nx + $ry * $ny
+        $its += ,[pscustomobject]@{ n = $n; r = $r; t = $t; d = $d; w = ($r.x2 - $r.x1); h = ($r.y2 - $r.y1) }
     }
     if ($its.Count -eq 0) { return }
-    $gap = 0.004; $x0 = $AreaL + 0.006; $x9 = $AreaR - 0.006
     $mov = 0
-    foreach ($cima in $true, $false) {
-        $fila = @($its | Where-Object { $_.cima -eq $cima } | Sort-Object px)
+    foreach ($lado in 1, -1) {
+        $fila = @($its | Where-Object { [math]::Sign($_.d + 1e-9) -eq $lado } | Sort-Object t)
         if ($fila.Count -eq 0) { continue }
-        $tot = ($fila | Measure-Object -Property w -Sum).Sum + $gap * ($fila.Count - 1)
-        $niveis = if ($tot -gt ($x9 - $x0)) { 2 } else { 1 }
-        for ($nv = 0; $nv -lt $niveis; $nv++) {
-            $sub = @(); for ($k = $nv; $k -lt $fila.Count; $k += $niveis) { $sub += $fila[$k] }
-            # cada um centrado no seu ponto, empurrando para a direita para não encostar no anterior
-            $xs = @(); $prev = -1e9
-            foreach ($it in $sub) { $x = [math]::Max($it.px - $it.w / 2, $prev + $gap); $x = [math]::Max($x, $x0); $xs += $x; $prev = $x + $it.w }
-            # passou da margem direita: puxa tudo de volta para a esquerda
-            $exc = $prev - $x9
-            if ($exc -gt 0) { for ($k = $xs.Count - 1; $k -ge 0; $k--) { $lim = if ($k -eq $xs.Count - 1) { $x9 - $sub[$k].w } else { $xs[$k + 1] - $gap - $sub[$k].w }; $xs[$k] = [math]::Min($xs[$k], $lim) } }
-            for ($k = 0; $k -lt $sub.Count; $k++) {
-                $it = $sub[$k]
-                $y1 = if ($cima) { $o.y2 + 0.003 + $nv * ($it.h + 0.002) } else { $o.y1 - 0.003 - $it.h - $nv * ($it.h + 0.002) }
-                try { MoverNota $it.n ($xs[$k] - $it.r.x1) ($y1 - $it.r.y1); $mov++ } catch { }
-            }
+        # distância da linha dos balões até a diagonal: além do ponto mais afastado desse lado + folga
+        $dmax = ($fila | ForEach-Object { [math]::Abs($_.d) } | Measure-Object -Maximum).Maximum
+        $off = $dmax + 0.012
+        # posições ao longo da diagonal: espaçamento igual, cobrindo o trecho das peças (com um mínimo entre eles)
+        $t1 = ($fila | Measure-Object -Property t -Minimum).Minimum; $t2 = ($fila | Measure-Object -Property t -Maximum).Maximum
+        $passoMin = 0.030
+        if ($fila.Count -gt 1) {
+            $passo = [math]::Max(($t2 - $t1) / ($fila.Count - 1), $passoMin)
+            $meio = ($t1 + $t2) / 2; $t1 = $meio - $passo * ($fila.Count - 1) / 2
+            $t1 = [math]::Max($t1, 0.02 * $L); if ($t1 + $passo * ($fila.Count - 1) -gt 0.98 * $L) { $t1 = [math]::Max(0.0, 0.98 * $L - $passo * ($fila.Count - 1)) }
+        } else { $passo = 0 }
+        for ($k = 0; $k -lt $fila.Count; $k++) {
+            $it = $fila[$k]
+            $tk = $t1 + $k * $passo
+            $px = $ax + $tk * $ux + $lado * $off * $nx; $py = $ay + $tk * $uy + $lado * $off * $ny
+            # texto: do lado de cima fica à esquerda/acima do ponto; do lado de baixo, à direita/abaixo
+            if ($lado -gt 0) { $x1 = $px - $it.w; $y1 = $py } else { $x1 = $px; $y1 = $py - $it.h }
+            $x1 = [math]::Max($AreaL + 0.004, [math]::Min($AreaR - 0.004 - $it.w, $x1))
+            $y1 = [math]::Max($AreaB + 0.004, [math]::Min($AreaT - 0.004 - $it.h, $y1))
+            try {
+                MoverNota $it.n ($x1 - $it.r.x1) ($y1 - $it.r.y1); $mov++
+                if ($mov -eq 1) { $r2 = RetNota $it.n; Log ("   [dbg] 1º balão: era ({0:N1};{1:N1}) mm, pedido ({2:N1};{3:N1}), ficou ({4:N1};{5:N1})" -f ($it.r.x1 * 1000), ($it.r.y1 * 1000), ($x1 * 1000), ($y1 * 1000), ($r2.x1 * 1000), ($r2.y1 * 1000)) "DarkGray" }
+            } catch { Log "   (mover balão: $($_.Exception.Message))" "DarkYellow" }
         }
     }
-    Log "   $mov balão(ões) alinhados em fileiras (em cima e embaixo da vista)" "DarkGray"
+    Log "   $mov balão(ões) em escadinha, paralelos à vista" "DarkGray"
 }
 # deixa o desenho como documento ativo do SolidWorks (balões automáticos só funcionam no documento ativo).
 # O título de desenho vem como "Desenho3 - Folha1": o ActivateDoc quer só "Desenho3".
@@ -2260,7 +2274,7 @@ function DetalharMontagem($caminho, $asm) {
         DefinirEscala $dm $Escalas[$i][0] $Escalas[$i][1]
         $o = Contorno $v1
         $cx = (($AreaL + $AreaR) / 2) - $o.w / 2
-        MoverPara $v1 $cx ($AreaT - 0.020)
+        MoverPara $v1 $cx ($AreaT - 0.026)
         Rebuild $dm
         $o = Contorno $v1
         $base = if ($o.x2 -gt $tabX1 - 0.01) { $baseMin + 0.012 } else { $AreaB + 0.02 }
