@@ -1,0 +1,47 @@
+﻿DETALHAMENTO AUTOMÁTICO - SolidWorks 2016 (padrão ProEstamp, gabarito CUP-400 0155023)
+==========================================================================================
+
+O QUE FAZ
+- DETALHAR.bat: arraste peças (.SLDPRT), submontagens (.SLDASM) ou uma pasta sobre ele
+  (ou dê dois cliques e escolha os arquivos). Para cada item ele cria o .SLDDRW no template
+  DETALHAMENTO (folha A4 com o carimbo ProEstamp, que puxa DESCRIÇÃO, ACABAMENTO, PESO, APROVADO,
+  processos etc. das propriedades da peça) e gera PDF e DXF conforme as regras do Monitor SW:
+    * Peça com LASER na descrição -> desenho + PDF + DXF
+    * Peça de usinagem/outras     -> desenho + PDF
+    * Submontagem de solda        -> desenho + PDF
+- EXPORTAR_PDF_DXF.bat: arraste desenhos (.SLDDRW) já prontos. Ele gera de novo o PDF e,
+  se a peça for laser, o DXF. Use quando o desenho foi alterado e o PDF/DXF ficou desatualizado.
+
+PADRÃO (copiado dos detalhamentos do CUP-400)
+- Peça: vista frontal no canto superior esquerdo, vista lateral à direita e superior embaixo
+  (1º diedro), isométrica sombreada no canto superior direito. A escala é escolhida sozinha:
+  a maior escala normal (1:1, 1:2, 1:5...) em que tudo cabe acima do carimbo sem se sobrepor.
+- Laser com chapa metálica: também coloca a vista planificada (com notas "PARA CIMA 90° R...").
+- DXF: só a planificação em 1:1, sem carimbo, com a vista da espessura e a nota da descrição
+  (ex.: "LASER 1020 - ESP 3.75mm"), igual aos DXF do 02037194 e do 02123584.
+  Chapa feita sem recurso de chapa metálica: usa a vista na direção da espessura.
+- Solda: isométrica e trimétrica sombreadas com balões mostrando o código da peça e a lista de
+  materiais no canto inferior direito (ITEM | PEÇA | DESCRIÇÃO | ACABAMENTO | QDT. | ACAB.MANUAL).
+- Cotas: importa as cotas do modelo marcadas para desenho. ELAS PRECISAM DE REVISÃO.
+
+PRIMEIRO TESTE (o servidor não é alterado)
+- Em detalhamento.ini está PastaSaida=TESTE. Tudo o que for gerado vai para a pasta TESTE aqui dentro.
+- Com o SolidWorks aberto, arraste sobre DETALHAR.bat as peças de gabarito:
+    X:\SOLIDWORKS\02 (COMPONENTES DE ESTAMPO)\0203 (CALÇO)\02037194.SLDPRT     (laser dobrada)
+    X:\SOLIDWORKS\02 (COMPONENTES DE ESTAMPO)\0212 (BANCADAS)\02123584.SLDPRT  (laser grande)
+    X:\SOLIDWORKS\02 (COMPONENTES DE ESTAMPO)\0203 (CALÇO)\02033093.SLDPRT     (torno CNC)
+    X:\SOLIDWORKS\13 ( SUBMONTAGEM )\1301 ( SUBMONTAGEM SOLDA )\13011854.SLDASM (solda)
+- Compare o que saiu em TESTE com os PDFs originais. O log.txt e o relatorio_<data>.csv mostram
+  o que aconteceu (o Claude consegue ler esses arquivos para corrigir o script).
+
+USO NORMAL (depois de aprovado)
+- Deixe PastaSaida vazio: os arquivos vão para a mesma pasta da peça no servidor.
+- Com Sobrescrever=não, desenhos que já existem nunca são recriados.
+- Se a peça já tem PDF com APR (revisão), o EXPORTAR não sobrescreve o PDF vigente; avisa no log.
+
+LIMITAÇÕES
+- A disposição e a escala são automáticas; as cotas importadas costumam sair redundantes ou
+  amontoadas. Revise antes de liberar para a produção.
+- Furos, roscas e notas de processo continuam manuais.
+- A lista de solda fica no padrão do SolidWorks até você informar TemplateListaSolda no .ini
+  (salve a lista do 13011854 como template uma vez).

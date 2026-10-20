@@ -1,0 +1,3 @@
+$ErrorActionPreference='Stop'
+Add-Type -Path /home/claude/MonitorSW/src/Core.cs -ReferencedAssemblies System.Xml.ReaderWriter,System.IO.Compression,System.Linq,System.Collections,System.Console,System.Threading,System.Threading.Thread,System.Runtime,System.Text.Encoding.Extensions,System.Text.RegularExpressions
+foreach($t in @(@('0227021 APR-001.PDF','0227021'),@('13011008 APR-002.pdf','13011008'),@('13011008-APR 3.PDF','13011008'),@('02270210 APR-001.PDF','0227021'),@('0227021.PDF','0227021'),@('0227021 APR-001 (2).PDF','0227021'))){ "{0,-28} -> {1}" -f $t[0],[MonitorSW.Util]::AprNumber($t[0],$t[1]) }

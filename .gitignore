@@ -1,0 +1,15 @@
+# binários gerados (o build.ps1 recria)
+out/
+*.exe
+# dados da empresa / do servidor: nunca vão para o GitHub
+*.tsv
+*.csv
+log.txt
+relatorio_*.csv
+indice/
+relatorios/
+*.SLDPRT
+*.SLDASM
+*.SLDDRW
+*.PDF
+*.DXF
