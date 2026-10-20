@@ -2122,6 +2122,52 @@ function DetalharPeca($caminho, $peca) {
 # ---------------------------------------------------------------- submontagem de solda
 # template da lista de materiais de solda: o configurado no .ini; senão um salvo na pasta do gerador;
 # senão cria agora a partir do desenho de referência (13011773 na mesma pasta da montagem, ou DesenhoReferenciaSolda no .ini)
+# balões da solda em fileiras alinhadas: os que ficam "acima" da diagonal da vista vão para uma fileira em cima,
+# os outros para uma fileira embaixo; cada fileira em ordem do ponto de ligação (linhas de chamada sem cruzar),
+# com espaço entre eles; se não couber numa fileira, alterna em duas alturas
+function PontoBalao($n) {
+    $an = AnnOf $n
+    try { $lp = XD (X $an "GetLeaderPointsAtIndex" 0); if ($lp -and $lp.Count -ge 2) { return @($lp[0], $lp[1]) } } catch { }
+    try { $ap = XD (X $n "GetAttachPos"); if ($ap -and $ap.Count -ge 2) { return @($ap[0], $ap[1]) } } catch { }
+    $r = RetNota $n; if ($r) { return @((($r.x1 + $r.x2) / 2), (($r.y1 + $r.y2) / 2)) }
+    return $null
+}
+function OrganizarBaloes($dm, $v, $notas) {
+    $o = Contorno $v
+    $its = @()
+    foreach ($n in $notas) {
+        if (-not $n) { continue }
+        $r = RetNota $n; if (-not $r) { continue }
+        $p = PontoBalao $n; if (-not $p) { continue }
+        # lado da diagonal (canto inferior esquerdo -> superior direito, como a isométrica de peça comprida)
+        $lado = (($o.x2 - $o.x1) * ($p[1] - $o.y1)) - (($o.y2 - $o.y1) * ($p[0] - $o.x1))
+        $its += ,[pscustomobject]@{ n = $n; r = $r; px = $p[0]; py = $p[1]; w = ($r.x2 - $r.x1); h = ($r.y2 - $r.y1); cima = ($lado -gt 0) }
+    }
+    if ($its.Count -eq 0) { return }
+    $gap = 0.004; $x0 = $AreaL + 0.006; $x9 = $AreaR - 0.006
+    $mov = 0
+    foreach ($cima in $true, $false) {
+        $fila = @($its | Where-Object { $_.cima -eq $cima } | Sort-Object px)
+        if ($fila.Count -eq 0) { continue }
+        $tot = ($fila | Measure-Object -Property w -Sum).Sum + $gap * ($fila.Count - 1)
+        $niveis = if ($tot -gt ($x9 - $x0)) { 2 } else { 1 }
+        for ($nv = 0; $nv -lt $niveis; $nv++) {
+            $sub = @(); for ($k = $nv; $k -lt $fila.Count; $k += $niveis) { $sub += $fila[$k] }
+            # cada um centrado no seu ponto, empurrando para a direita para não encostar no anterior
+            $xs = @(); $prev = -1e9
+            foreach ($it in $sub) { $x = [math]::Max($it.px - $it.w / 2, $prev + $gap); $x = [math]::Max($x, $x0); $xs += $x; $prev = $x + $it.w }
+            # passou da margem direita: puxa tudo de volta para a esquerda
+            $exc = $prev - $x9
+            if ($exc -gt 0) { for ($k = $xs.Count - 1; $k -ge 0; $k--) { $lim = if ($k -eq $xs.Count - 1) { $x9 - $sub[$k].w } else { $xs[$k + 1] - $gap - $sub[$k].w }; $xs[$k] = [math]::Min($xs[$k], $lim) } }
+            for ($k = 0; $k -lt $sub.Count; $k++) {
+                $it = $sub[$k]
+                $y1 = if ($cima) { $o.y2 + 0.003 + $nv * ($it.h + 0.002) } else { $o.y1 - 0.003 - $it.h - $nv * ($it.h + 0.002) }
+                try { MoverNota $it.n ($xs[$k] - $it.r.x1) ($y1 - $it.r.y1); $mov++ } catch { }
+            }
+        }
+    }
+    Log "   $mov balão(ões) alinhados em fileiras (em cima e embaixo da vista)" "DarkGray"
+}
 # deixa o desenho como documento ativo do SolidWorks (balões automáticos só funcionam no documento ativo).
 # O título de desenho vem como "Desenho3 - Folha1": o ActivateDoc quer só "Desenho3".
 function AtivarDesenho($d) {
@@ -2208,7 +2254,7 @@ function DetalharMontagem($caminho, $asm) {
 
     # escala: a maior em que a isométrica cabe acima da lista (ou ao lado dela), com folga para os balões
     $i0 = EscalaInicial ($diag * 1.2) ($diag * 0.8)
-    if ($i0 -gt 0) { $i0-- }
+    $i0 = [math]::Max(0, $i0 - 3)   # começa mais perto: a conferência abaixo usa o tamanho real da vista
     $ok = $false
     for ($i = $i0; $i -lt $Escalas.Count; $i++) {
         DefinirEscala $dm $Escalas[$i][0] $Escalas[$i][1]
@@ -2218,14 +2264,15 @@ function DetalharMontagem($caminho, $asm) {
         Rebuild $dm
         $o = Contorno $v1
         $base = if ($o.x2 -gt $tabX1 - 0.01) { $baseMin + 0.012 } else { $AreaB + 0.02 }
-        if ($o.x1 -ge $AreaL + 0.03 -and $o.x2 -le $AreaR - 0.03 -and $o.y1 -ge $base -and $o.y2 -le $AreaT - 0.015) { $ok = $true; Log "   Escala $($Escalas[$i][0]):$($Escalas[$i][1])"; break }
+        # folga em volta para as fileiras de balões (em cima e embaixo da vista)
+        if ($o.x1 -ge $AreaL + 0.02 -and $o.x2 -le $AreaR - 0.02 -and $o.y1 -ge $base + 0.010 -and $o.y2 -le $AreaT - 0.022) { $ok = $true; Log "   Escala $($Escalas[$i][0]):$($Escalas[$i][1])"; break }
     }
     if (-not $ok) { Log "   Aviso: a vista não coube perfeitamente; confira a disposição." "Yellow" }
     else {
         # centraliza na altura livre acima da lista
         $o = Contorno $v1
-        $base = if ($o.x2 -gt $tabX1 - 0.01) { $baseMin + 0.012 } else { $AreaB + 0.02 }
-        $topo = $base + ((($AreaT - 0.015) - $base) + $o.h) / 2
+        $base = if ($o.x2 -gt $tabX1 - 0.01) { $baseMin + 0.022 } else { $AreaB + 0.03 }
+        $topo = $base + ((($AreaT - 0.022) - $base) + $o.h) / 2
         MoverPara $v1 $o.x1 $topo
     }
 
@@ -2242,11 +2289,11 @@ function DetalharMontagem($caminho, $asm) {
             $bl = X $dm "AutoBalloon5" $op
             $nb = 0; if ($bl) { $nb = @($bl).Count }
             if ($nb -eq 0) { Log "   Aviso: o SolidWorks não colocou nenhum balão (desenho não estava ativo?)" "Yellow" } else { Log "   Balões com o Nº DA PEÇA: $nb" }
+            if ($nb -gt 0) { Rebuild $dm; try { OrganizarBaloes $dm $v @($bl) } catch { Log "   (organizar balões: $($_.Exception.Message))" "DarkYellow" } }
         } catch { Log "   Aviso: não coloquei balões ($($_.Exception.Message))" "Yellow" }
     }
     Rebuild $dm
-    $retTabela = [pscustomobject]@{ x1 = $tabX1; y1 = 0.0345; x2 = 0.2917; y2 = $baseMin }
-    ResolverSobreposicoes $dm @($v1, $v2) @("balao") @($retTabela)
+    # balões já organizados em fileiras (OrganizarBaloes); não passam mais pelo "afastar" genérico
     TrocarDesenhista $dm
     Rebuild $dm
     SalvarComo $dm $drwPath $SaveSilent
