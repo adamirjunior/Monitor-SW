@@ -62,9 +62,10 @@ $TabelaSolda   = C "TemplateListaSolda" ""
 $NotaDxf       = Sim (C "NotaDescricaoNoDxf" "sim")
 $VistaLateralDxf = Sim (C "VistaEspessuraNoDxf" "sim")
 $FecharDesenho = Sim (C "FecharDesenhoAoTerminar" "sim")
+$script:dxfDesenhos = @()
 # chamado pelo Monitor (botão Gerar detalhamento)
 if ($Destino -eq "servidor") { $PastaSaida = "" }
-if ($Modo -eq "gerar") { $Sobrescrever = [bool]$Recriar }
+if ($Modo -eq "gerar") { $Sobrescrever = [bool]$Recriar; $FecharDesenho = $false }   # pelo Monitor: o desenho gerado fica aberto no SolidWorks
 $script:FazPdf = $true; $script:FazDxf = "auto"
 
 # area util da folha A4 paisagem (metros) - acima do carimbo
@@ -455,8 +456,26 @@ function ToleranciaDxf($d, $vistas, $altCota) {
     }
     if ($n -gt 0) { Log "   (DXF: ±0,1 em $n cota(s))" "DarkGray" }
 }
+# abre o DXF gerado no AutoCAD (só quando gerado pelo Monitor)
+function AbrirAutoCAD($arq) {
+    if ($Modo -ne "gerar" -or -not (Test-Path $arq)) { return }
+    $exe = $null
+    try {
+        foreach ($k in Get-ChildItem "HKLM:\SOFTWARE\Autodesk\AutoCAD" -ErrorAction Stop) {
+            foreach ($r in Get-ChildItem $k.PSPath -ErrorAction SilentlyContinue) {
+                $loc = (Get-ItemProperty $r.PSPath -ErrorAction SilentlyContinue).AcadLocation
+                if ($loc -and (Test-Path (Join-Path $loc "acad.exe"))) { $exe = Join-Path $loc "acad.exe" }
+            }
+        }
+    } catch { }
+    try {
+        if ($exe) { Start-Process -FilePath $exe -ArgumentList ('"' + $arq + '"') } else { Start-Process -FilePath $arq }
+        Log "   DXF aberto no $(if ($exe) { 'AutoCAD' } else { 'programa padrão do Windows' })" "DarkGray"
+    } catch { Log "   (não consegui abrir o DXF: $($_.Exception.Message))" "DarkYellow" }
+}
 function GerarDxf($caminhoPeca, $peca, $destinoDxf, $desc) {
     $d = NovoDesenho
+    $script:dxfDesenhos += $d
     try {
         $sh = X $d "GetCurrentSheet"
         $semFormato = $false
@@ -2114,7 +2133,7 @@ function DetalharPeca($caminho, $peca) {
     if ($script:FazPdf) { if (PdfProtegido $destDir $cod) { $pdfMsg = " (PDF mantido: existe APR)" } else { SalvarComo $dm $pdf ($SaveSilent + $SaveCopy); Log "   PDF: $pdf" "Green"; $pdfMsg = " + PDF" } }
     $dxfMsg = ""
     $fazDxf = if ($script:FazDxf -eq "auto") { $laser } else { [bool]$script:FazDxf }
-    if ($fazDxf) { $dxf = Join-Path $destDir "$cod.DXF"; GerarDxf $caminho $peca $dxf $desc; Log "   DXF: $dxf" "Green"; $dxfMsg = " + DXF" }
+    if ($fazDxf) { $dxf = Join-Path $destDir "$cod.DXF"; GerarDxf $caminho $peca $dxf $desc; Log "   DXF: $dxf" "Green"; AbrirAutoCAD $dxf; $dxfMsg = " + DXF" }
     if ($FecharDesenho) { Fechar $dm }
     Relatorio $caminho "peça" "detalhar" "ok" ("desenho" + $pdfMsg + $dxfMsg)
 }
@@ -2419,7 +2438,7 @@ function Exportar($drwPath) {
         $peca = AbrirDoc $prt $DocPART
         if ($peca) {
             $desc = Prop $peca $PropDesc
-            if (EhLaser $desc) { $dxf = Join-Path $destDir "$cod.DXF"; GerarDxf $prt $peca $dxf $desc; Log "   DXF: $dxf" "Green"; $msg = "PDF + DXF" }
+            if (EhLaser $desc) { $dxf = Join-Path $destDir "$cod.DXF"; GerarDxf $prt $peca $dxf $desc; Log "   DXF: $dxf" "Green"; AbrirAutoCAD $dxf; $msg = "PDF + DXF" }
         }
     }
     Relatorio $drwPath "desenho" "exportar" "ok" $msg
@@ -2476,7 +2495,7 @@ function Gerar($arq) {
         if (-not $peca) { throw "não consegui abrir a peça" }
         $desc = Prop $peca $PropDesc
         $dxf = Join-Path $destDir "$cod.DXF"
-        GerarDxf $arq $peca $dxf $desc; Log "   DXF: $dxf" "Green"; $feito += "DXF"
+        GerarDxf $arq $peca $dxf $desc; Log "   DXF: $dxf" "Green"; AbrirAutoCAD $dxf; $feito += "DXF"
     }
     Relatorio $arq "" "gerar" "ok" ($feito -join " + ")
 }
@@ -2530,7 +2549,11 @@ foreach ($arq in $lista) {
         Log ("   ERRO: " + $_.Exception.Message + " (linha " + $_.InvocationInfo.ScriptLineNumber + ")") "Red"
         Relatorio $arq "" $Modo "erro" $_.Exception.Message
     } finally {
-        if ($FecharDesenho) { foreach ($d in $script:novosDesenhos) { try { X $sw "CloseDoc" (Titulo $d) | Out-Null } catch { } } }
+        foreach ($d in $script:novosDesenhos) {
+            $ehDxf = $script:dxfDesenhos -contains $d   # desenho auxiliar do DXF sempre fecha
+            if ($FecharDesenho -or $ehDxf) { try { X $sw "CloseDoc" (Titulo $d) | Out-Null } catch { } }
+        }
+        $script:dxfDesenhos = @()
         $script:novosDesenhos = @()
         FecharAbertos
     }
