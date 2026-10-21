@@ -2327,6 +2327,33 @@ function TamanhoTabela($ht) {
     if ($w -le 0.01) { $w = 0.11 }; if ($h -le 0.005) { $h = 0.08 }
     return [pscustomobject]@{ w = $w; h = $h }
 }
+# deixa a tabela de furos mais "achatada" (como no 02124106): texto menor e linhas mais baixas,
+# até caber na altura/largura máxima; devolve o tamanho final
+function AchatarTabela($dm, $ht, $maxW, $maxH) {
+    $t = $ht
+    try { $null = XG $t "ColumnCount" } catch { try { $t = @(X $ht "GetTableAnnotations")[0] } catch { } }
+    $tam = TamanhoTabela $t
+    if ($tam.w -le $maxW -and $tam.h -le $maxH) { return $tam }
+    $h0 = 0.0
+    try { $tf = X $t "GetTextFormat"; $h0 = [double](XG $tf "CharHeight") } catch { }
+    if ($h0 -le 0) { $h0 = 0.0025 }
+    $alt = $h0
+    for ($k = 0; $k -lt 6; $k++) {
+        $fat = [math]::Min($maxH / $tam.h, $maxW / $tam.w)
+        if ($fat -ge 0.99) { break }
+        $alt = [math]::Max(0.0015, $alt * [math]::Max(0.6, $fat * 0.97))
+        try { $tf = X $t "GetTextFormat"; XS $tf "CharHeight" $alt; X $t "SetTextFormat" $false $tf | Out-Null } catch { Log "   [dbg] SetTextFormat: $($_.Exception.Message)" "DarkGray" }
+        # linhas e colunas acompanham o texto
+        try { $nr = [int](XG $t "RowCount"); for ($r = 0; $r -lt $nr; $r++) { $hr = [double](X $t "GetRowHeight" $r); X $t "SetRowHeight" $r ($hr * $alt / [math]::Max($h0, 1e-6) * 1.02) 0 | Out-Null } } catch { }
+        try { $nc = [int](XG $t "ColumnCount"); for ($c = 0; $c -lt $nc; $c++) { $wc = [double](X $t "GetColumnWidth" $c); X $t "SetColumnWidth" $c ($wc * [math]::Max($alt / $h0, 0.75)) 0 | Out-Null } } catch { }
+        $h0 = $alt
+        Rebuild $dm
+        $tam = TamanhoTabela $t
+        if ($alt -le 0.0015) { break }
+    }
+    Log ("   Tabela de furos achatada: texto {0:N1} mm, {1:N0} x {2:N0} mm" -f ($alt * 1000), ($tam.w * 1000), ($tam.h * 1000)) "DarkGray"
+    return $tam
+}
 function DetalharUsinagemTabela($dm, $front, $caminho, $peca) {
     # projeções em volta da principal
     $proj = @()
@@ -2352,6 +2379,7 @@ function DetalharUsinagemTabela($dm, $front, $caminho, $peca) {
     # 1) tabela de furos no canto inferior direito
     $ht = InserirTabelaFuros $dm $front
     $tam = if ($ht) { TamanhoTabela $ht } else { [pscustomobject]@{ w = 0.0; h = 0.0 } }
+    if ($ht) { Log ("   Tabela de furos (original): {0:N0} x {1:N0} mm" -f ($tam.w * 1000), ($tam.h * 1000)) "DarkGray"; $tam = AchatarTabela $dm $ht 0.100 0.090 }
     $mesa = [pscustomobject]@{ x1 = 0.2917 - $tam.w; y1 = 0.0345; x2 = 0.2917; y2 = 0.0345 + $tam.h }
     if ($ht) { Log ("   Tabela de furos: {0:N0} x {1:N0} mm" -f ($tam.w * 1000), ($tam.h * 1000)) }
 
