@@ -15,8 +15,8 @@ using Microsoft.Win32;
 [assembly: AssemblyTitle("Monitor")]
 [assembly: AssemblyDescription("BOM dos projetos SolidWorks com status de PDF/DXF")]
 [assembly: AssemblyProduct("Monitor")]
-[assembly: AssemblyVersion("2.8.5.0")]
-[assembly: AssemblyFileVersion("2.8.5.0")]
+[assembly: AssemblyVersion("2.8.6.0")]
+[assembly: AssemblyFileVersion("2.8.6.0")]
 
 namespace MonitorSW
 {
@@ -1966,7 +1966,7 @@ namespace MonitorSW
             try
             {
                 var psi = new ProcessStartInfo("powershell.exe", args);
-                psi.UseShellExecute = true;
+                psi.UseShellExecute = true; psi.WindowStyle = ProcessWindowStyle.Minimized;   // janela do gerador só na barra de tarefas
                 psi.WorkingDirectory = Path.GetDirectoryName(script);
                 p = Process.Start(psi);
             }

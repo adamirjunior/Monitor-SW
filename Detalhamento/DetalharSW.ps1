@@ -468,6 +468,17 @@ function AbrirAutoCAD($arq) {
             }
         }
     } catch { }
+    # AutoCAD já aberto: só abre o arquivo nele (não abre outro AutoCAD)
+    try {
+        $acad = [Runtime.InteropServices.Marshal]::GetActiveObject("AutoCAD.Application")
+        if ($acad) {
+            $docs = [SwCom]::Get($acad, "Documents")
+            [SwCom]::Call($docs, "Open", [object[]]@($arq, $false)) | Out-Null
+            try { [SwCom]::Set($acad, "Visible", $true) } catch { }
+            Log "   DXF aberto no AutoCAD que já estava aberto" "DarkGray"
+            return
+        }
+    } catch { }
     try {
         if ($exe) { Start-Process -FilePath $exe -ArgumentList ('"' + $arq + '"') } else { Start-Process -FilePath $arq }
         Log "   DXF aberto no $(if ($exe) { 'AutoCAD' } else { 'programa padrão do Windows' })" "DarkGray"
