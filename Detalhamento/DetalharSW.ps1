@@ -456,9 +456,38 @@ function ToleranciaDxf($d, $vistas, $altCota) {
     }
     if ($n -gt 0) { Log "   (DXF: ±0,1 em $n cota(s))" "DarkGray" }
 }
-# abre o DXF gerado no AutoCAD (só quando gerado pelo Monitor)
+# abre o DXF gerado no AutoCAD (só quando gerado pelo Monitor). Se o AutoCAD já estiver aberto, abre o arquivo NELE
+# (não inicia outro AutoCAD) e enquadra o desenho (zoom extensão, como o duplo clique no scroll)
+function AcadAberto {
+    foreach ($pid0 in @("AutoCAD.Application", "AutoCAD.Application.25", "AutoCAD.Application.24", "AutoCAD.Application.23", "AutoCAD.Application.22", "AutoCAD.Application.21", "AutoCAD.Application.20")) {
+        try { $a = [Runtime.InteropServices.Marshal]::GetActiveObject($pid0); if ($a) { return $a } } catch { }
+    }
+    return $null
+}
+function AcadAbrirArquivo($acad, $arq) {
+    $docs = [SwCom]::Get($acad, "Documents")
+    $doc = $null
+    # já aberto (gerou de novo a mesma peça): fecha sem salvar e abre a versão nova
+    try {
+        $n = [int][SwCom]::Get($docs, "Count")
+        for ($i = 0; $i -lt $n; $i++) {
+            $d = [SwCom]::Call($docs, "Item", [object[]]@($i))
+            if ([string]([SwCom]::Get($d, "FullName")) -ieq $arq) { [SwCom]::Call($d, "Close", [object[]]@($false)) | Out-Null; break }
+        }
+    } catch { }
+    $doc = [SwCom]::Call($docs, "Open", [object[]]@($arq, $false))
+    try { [SwCom]::Call($doc, "Activate", [object[]]@()) | Out-Null } catch { }
+    try { [SwCom]::Set($acad, "Visible", $true) } catch { }
+    try { [SwCom]::Call($acad, "ZoomExtents", [object[]]@()) | Out-Null } catch { try { [SwCom]::Call($doc, "SendCommand", [object[]]@("_.ZOOM _E ")) | Out-Null } catch { } }
+}
 function AbrirAutoCAD($arq) {
     if ($Modo -ne "gerar" -or -not (Test-Path $arq)) { return }
+    $arq = (Resolve-Path $arq).Path
+    $acad = AcadAberto
+    if ($acad) {
+        try { AcadAbrirArquivo $acad $arq; Log "   DXF aberto no AutoCAD que já estava aberto (enquadrado)" "DarkGray"; return }
+        catch { Log "   (AutoCAD aberto, mas não consegui abrir o DXF nele: $($_.Exception.Message))" "DarkYellow" }
+    } else { Log "   (nenhum AutoCAD aberto encontrado: vou abrir um)" "DarkGray" }
     $exe = $null
     try {
         foreach ($k in Get-ChildItem "HKLM:\SOFTWARE\Autodesk\AutoCAD" -ErrorAction Stop) {
@@ -468,21 +497,16 @@ function AbrirAutoCAD($arq) {
             }
         }
     } catch { }
-    # AutoCAD já aberto: só abre o arquivo nele (não abre outro AutoCAD)
-    try {
-        $acad = [Runtime.InteropServices.Marshal]::GetActiveObject("AutoCAD.Application")
-        if ($acad) {
-            $docs = [SwCom]::Get($acad, "Documents")
-            [SwCom]::Call($docs, "Open", [object[]]@($arq, $false)) | Out-Null
-            try { [SwCom]::Set($acad, "Visible", $true) } catch { }
-            Log "   DXF aberto no AutoCAD que já estava aberto" "DarkGray"
-            return
-        }
-    } catch { }
     try {
         if ($exe) { Start-Process -FilePath $exe -ArgumentList ('"' + $arq + '"') } else { Start-Process -FilePath $arq }
         Log "   DXF aberto no $(if ($exe) { 'AutoCAD' } else { 'programa padrão do Windows' })" "DarkGray"
-    } catch { Log "   (não consegui abrir o DXF: $($_.Exception.Message))" "DarkYellow" }
+    } catch { Log "   (não consegui abrir o DXF: $($_.Exception.Message))" "DarkYellow"; return }
+    # espera o AutoCAD subir (até ~90 s) para enquadrar
+    for ($t = 0; $t -lt 45; $t++) {
+        Start-Sleep -Seconds 2
+        $acad = AcadAberto
+        if ($acad) { try { Start-Sleep -Seconds 3; [SwCom]::Call($acad, "ZoomExtents", [object[]]@()) | Out-Null; Log "   (DXF enquadrado)" "DarkGray" } catch { }; break }
+    }
 }
 function GerarDxf($caminhoPeca, $peca, $destinoDxf, $desc) {
     $d = NovoDesenho
