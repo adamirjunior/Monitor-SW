@@ -15,8 +15,8 @@ using Microsoft.Win32;
 [assembly: AssemblyTitle("Monitor")]
 [assembly: AssemblyDescription("BOM dos projetos SolidWorks com status de PDF/DXF")]
 [assembly: AssemblyProduct("Monitor")]
-[assembly: AssemblyVersion("2.8.4.0")]
-[assembly: AssemblyFileVersion("2.8.4.0")]
+[assembly: AssemblyVersion("2.8.5.0")]
+[assembly: AssemblyFileVersion("2.8.5.0")]
 
 namespace MonitorSW
 {
@@ -467,6 +467,19 @@ namespace MonitorSW
                     MessageBox.Show("O Monitor já está aberto.\nProcure o ícone \"SW\" perto do relógio do Windows.", "Monitor", MessageBoxButtons.OK, MessageBoxIcon.Information);
                     return;
                 }
+                // erro inesperado: não derruba o Monitor; grava os detalhes em erros.log (pasta do Monitor) para corrigir
+                Application.SetUnhandledExceptionMode(UnhandledExceptionMode.CatchException);
+                Application.ThreadException += (s, ev) =>
+                {
+                    try
+                    {
+                        string f = Path.Combine(Util.AppDir, "erros.log");
+                        File.AppendAllText(f, DateTime.Now.ToString("dd/MM/yy HH:mm:ss") + " | " + Environment.MachineName + " | " + Users.Me + " | " +
+                            Assembly.GetExecutingAssembly().GetName().Version + "\r\n" + ev.Exception + "\r\n\r\n", Encoding.UTF8);
+                    }
+                    catch { }
+                    try { MessageBox.Show("Aconteceu um erro inesperado, mas o Monitor continua funcionando.\n\n" + ev.Exception.Message + "\n\n(Detalhes gravados em erros.log)", "Monitor", MessageBoxButtons.OK, MessageBoxIcon.Warning); } catch { }
+                };
                 Application.EnableVisualStyles();
                 Application.SetCompatibleTextRenderingDefault(false);
                 string cfgPath = Path.Combine(Util.AppDir, "config.ini");
