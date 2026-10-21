@@ -2126,6 +2126,7 @@ function DetalharPeca($caminho, $peca) {
     TrocarDesenhista $dm
     Rebuild $dm
 
+    AtivarDesenho $dm | Out-Null; try { X $dm "ViewZoomtofit2" | Out-Null } catch { }   # folha inteira na tela para conferir
     SalvarComo $dm $drwPath $SaveSilent
     Log "   Desenho: $drwPath" "Green"
     $pdf = Join-Path $destDir "$cod.PDF"
@@ -2407,6 +2408,7 @@ function DetalharMontagem($caminho, $asm) {
     # balões já organizados em fileiras (OrganizarBaloes); não passam mais pelo "afastar" genérico
     TrocarDesenhista $dm
     Rebuild $dm
+    AtivarDesenho $dm | Out-Null; try { X $dm "ViewZoomtofit2" | Out-Null } catch { }   # folha inteira na tela para conferir
     SalvarComo $dm $drwPath $SaveSilent
     Log "   Desenho: $drwPath" "Green"
     $pdf = Join-Path $destDir "$cod.PDF"
