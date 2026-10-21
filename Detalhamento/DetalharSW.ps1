@@ -392,6 +392,58 @@ function TirarMarcasCentro($d, $vistas) {
     if ($n -gt 0) { Log "   (DXF: $n marca(s)/linha(s) de centro removida(s))" "DarkGray" }
 }
 # depois de salvo: cotas e texto na mesma camada/cor das linhas do corte (camada 0, cor 7)
+# o DXF do SolidWorks vem com a extensão/vista da folha inteira (0..1000): abre longe da peça.
+# Calcula a extensão real das entidades e grava no cabeçalho ($EXTMIN/$EXTMAX) e na vista ativa (*Active),
+# assim o arquivo já abre enquadrado em qualquer programa (como o duplo clique no scroll)
+function VistaDxf($arq) {
+    try {
+        $enc = [Text.Encoding]::Default
+        $L = [IO.File]::ReadAllLines($arq, $enc)
+        $inv = [Globalization.CultureInfo]::InvariantCulture
+        $x1 = 1e18; $y1 = 1e18; $x2 = -1e18; $y2 = -1e18
+        $sec = ""; $tipo = ""; $cx = $null; $cy = $null
+        for ($i = 0; $i -lt $L.Count - 1; $i += 2) {
+            $c = $L[$i].Trim(); $v = $L[$i + 1].Trim()
+            if ($c -eq "0" -and $v -eq "SECTION") { $sec = "?"; continue }
+            if ($c -eq "2" -and $sec -eq "?") { $sec = $v; continue }
+            if ($c -eq "0" -and $v -eq "ENDSEC") { $sec = ""; continue }
+            if ($sec -ne "ENTITIES") { continue }
+            if ($c -eq "0") { $tipo = $v; $cx = $null; $cy = $null; continue }
+            $d = 0.0
+            if (-not [double]::TryParse($v, [Globalization.NumberStyles]::Float, $inv, [ref]$d)) { continue }
+            switch ($c) {
+                { $_ -eq "10" -or $_ -eq "11" } { if ($d -lt $x1) { $x1 = $d }; if ($d -gt $x2) { $x2 = $d }; if ($c -eq "10") { $cx = $d } }
+                { $_ -eq "20" -or $_ -eq "21" } { if ($d -lt $y1) { $y1 = $d }; if ($d -gt $y2) { $y2 = $d }; if ($c -eq "20") { $cy = $d } }
+                "40" { if (($tipo -eq "CIRCLE" -or $tipo -eq "ARC") -and $cx -ne $null -and $cy -ne $null) { $x1 = [math]::Min($x1, $cx - $d); $x2 = [math]::Max($x2, $cx + $d); $y1 = [math]::Min($y1, $cy - $d); $y2 = [math]::Max($y2, $cy + $d) } }
+            }
+        }
+        if ($x2 -le $x1 -or $y2 -le $y1) { return }
+        $w = $x2 - $x1; $h = $y2 - $y1
+        $mx = ($x1 + $x2) / 2; $my = ($y1 + $y2) / 2
+        $alt = [math]::Max($h, $w / 1.8) * 1.15   # altura da vista com folga (tela mais larga que alta)
+        $f = { param($n) ([double]$n).ToString("0.######", $inv) }
+        $out = New-Object System.Collections.Generic.List[string]
+        $sec = ""; $alvo = ""; $vp = $false
+        for ($i = 0; $i -lt $L.Count - 1; $i += 2) {
+            $c = $L[$i].Trim(); $v = $L[$i + 1]; $vt = $v.Trim()
+            if ($c -eq "0" -and $vt -eq "SECTION") { $sec = "?" } elseif ($c -eq "2" -and $sec -eq "?") { $sec = $vt } elseif ($c -eq "0" -and $vt -eq "ENDSEC") { $sec = "" }
+            if ($sec -eq "HEADER" -and $c -eq "9") { $alvo = $vt }
+            elseif ($sec -eq "HEADER") {
+                if ($alvo -eq '$EXTMIN') { if ($c -eq "10") { $v = & $f $x1 } elseif ($c -eq "20") { $v = & $f $y1 } }
+                elseif ($alvo -eq '$EXTMAX') { if ($c -eq "10") { $v = & $f $x2 } elseif ($c -eq "20") { $v = & $f $y2 } }
+            }
+            if ($sec -eq "TABLES") {
+                if ($c -eq "0") { $vp = $false }
+                if ($c -eq "2" -and $vt -ieq "*Active") { $vp = $true }
+                elseif ($vp) { if ($c -eq "12") { $v = & $f $mx } elseif ($c -eq "22") { $v = & $f $my } elseif ($c -eq "40") { $v = & $f $alt } }
+            }
+            $out.Add($L[$i]); $out.Add($v)
+        }
+        if ($L.Count % 2 -eq 1) { $out.Add($L[$L.Count - 1]) }
+        [IO.File]::WriteAllLines($arq, $out, $enc)
+        Log ("   (DXF: abre enquadrado na peça - {0:N0} x {1:N0} mm)" -f $w, $h) "DarkGray"
+    } catch { Log "   (DXF: não consegui ajustar a vista inicial: $($_.Exception.Message))" "DarkYellow" }
+}
 function CorDxf($arq) {
     try {
         $enc = [Text.Encoding]::Default
@@ -630,6 +682,7 @@ function GerarDxf($caminhoPeca, $peca, $destinoDxf, $desc) {
         Rebuild $d
         SalvarComo $d $destinoDxf ($SaveSilent + $SaveCopy)
         CorDxf $destinoDxf
+        VistaDxf $destinoDxf
     } finally {
         Fechar $d
     }
