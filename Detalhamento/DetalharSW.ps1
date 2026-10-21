@@ -478,7 +478,15 @@ function AcadAbrirArquivo($acad, $arq) {
     $doc = [SwCom]::Call($docs, "Open", [object[]]@($arq, $false))
     try { [SwCom]::Call($doc, "Activate", [object[]]@()) | Out-Null } catch { }
     try { [SwCom]::Set($acad, "Visible", $true) } catch { }
-    try { [SwCom]::Call($acad, "ZoomExtents", [object[]]@()) | Out-Null } catch { try { [SwCom]::Call($doc, "SendCommand", [object[]]@("_.ZOOM _E ")) | Out-Null } catch { } }
+    AcadEnquadrar $acad $doc
+}
+# enquadra pelo desenho de verdade: recalcula a extensão (o cabeçalho do DXF pode trazer a extensão da folha inteira)
+# e dá zoom de extensão como o duplo clique no scroll
+function AcadEnquadrar($acad, $doc) {
+    if (-not $doc) { try { $doc = [SwCom]::Get($acad, "ActiveDocument") } catch { } }
+    $ok = $false
+    if ($doc) { try { [SwCom]::Call($doc, "SendCommand", [object[]]@("_.REGEN _.ZOOM _E ")) | Out-Null; $ok = $true } catch { } }
+    if (-not $ok) { try { [SwCom]::Call($acad, "ZoomExtents", [object[]]@()) | Out-Null } catch { } }
 }
 function AbrirAutoCAD($arq) {
     if ($Modo -ne "gerar" -or -not (Test-Path $arq)) { return }
@@ -505,7 +513,7 @@ function AbrirAutoCAD($arq) {
     for ($t = 0; $t -lt 45; $t++) {
         Start-Sleep -Seconds 2
         $acad = AcadAberto
-        if ($acad) { try { Start-Sleep -Seconds 3; [SwCom]::Call($acad, "ZoomExtents", [object[]]@()) | Out-Null; Log "   (DXF enquadrado)" "DarkGray" } catch { }; break }
+        if ($acad) { try { Start-Sleep -Seconds 4; AcadEnquadrar $acad $null; Log "   (DXF enquadrado)" "DarkGray" } catch { }; break }
     }
 }
 function GerarDxf($caminhoPeca, $peca, $destinoDxf, $desc) {
