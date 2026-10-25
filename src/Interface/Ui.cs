@@ -15,30 +15,50 @@ using Microsoft.Win32;
 [assembly: AssemblyTitle("Monitor")]
 [assembly: AssemblyDescription("BOM dos projetos SolidWorks com status de PDF/DXF")]
 [assembly: AssemblyProduct("Monitor")]
-[assembly: AssemblyVersion("2.9.0.0")]
-[assembly: AssemblyFileVersion("2.9.0.0")]
+[assembly: AssemblyVersion("2.10.0.0")]
+[assembly: AssemblyFileVersion("2.10.0.0")]
 
 namespace MonitorSW
 {
-    // ------------------------------------------------------------ tema escuro
+    // ------------------------------------------------------------ tema (escuro / claro; escolha em Opções › Tema, por usuário)
     static class Theme
     {
-        public static readonly Color Bg       = Color.FromArgb(14, 16, 20);    // fundo geral
-        public static readonly Color Surface  = Color.FromArgb(20, 23, 29);    // paineis / tabela
-        public static readonly Color Surface2 = Color.FromArgb(28, 32, 40);    // cabecalhos, barra
-        public static readonly Color Hover    = Color.FromArgb(38, 43, 54);
-        public static readonly Color Border   = Color.FromArgb(40, 45, 56);
-        public static readonly Color Text     = Color.FromArgb(228, 231, 236);
-        public static readonly Color Muted    = Color.FromArgb(132, 140, 154);
-        public static readonly Color Accent   = Color.FromArgb(77, 141, 255);
-        public static readonly Color Sel      = Color.FromArgb(34, 56, 96);
-        public static readonly Color AsmRow   = Color.FromArgb(24, 29, 38);
-        public static readonly Color PendRow  = Color.FromArgb(56, 26, 30);
-        public static readonly Color MissRow  = Color.FromArgb(56, 40, 20);
-        public static readonly Color PendText = Color.FromArgb(255, 128, 128);
-        public static readonly Color WarnText = Color.FromArgb(255, 184, 108);
-        public static readonly Color OkText   = Color.FromArgb(92, 211, 138);
-        public static readonly Color LaserTxt = Color.FromArgb(240, 160, 90);
+        public static readonly bool Escuro = LerEscolha();
+        public static readonly Color Bg       = Escuro ? Color.FromArgb(14, 16, 20)    : Color.FromArgb(243, 244, 246);  // fundo geral
+        public static readonly Color Surface  = Escuro ? Color.FromArgb(20, 23, 29)    : Color.FromArgb(255, 255, 255);  // paineis / tabela
+        public static readonly Color Surface2 = Escuro ? Color.FromArgb(28, 32, 40)    : Color.FromArgb(232, 235, 240);  // cabecalhos, barra
+        public static readonly Color Hover    = Escuro ? Color.FromArgb(38, 43, 54)    : Color.FromArgb(218, 224, 232);
+        public static readonly Color Border   = Escuro ? Color.FromArgb(40, 45, 56)    : Color.FromArgb(206, 212, 220);
+        public static readonly Color Text     = Escuro ? Color.FromArgb(228, 231, 236) : Color.FromArgb(28, 32, 38);
+        public static readonly Color Muted    = Escuro ? Color.FromArgb(132, 140, 154) : Color.FromArgb(98, 106, 118);
+        public static readonly Color Accent   = Escuro ? Color.FromArgb(77, 141, 255)  : Color.FromArgb(37, 99, 235);
+        public static readonly Color Sel      = Escuro ? Color.FromArgb(34, 56, 96)    : Color.FromArgb(200, 222, 255);
+        public static readonly Color SelText  = Escuro ? Color.White                   : Color.FromArgb(16, 24, 40);
+        public static readonly Color AsmRow   = Escuro ? Color.FromArgb(24, 29, 38)    : Color.FromArgb(236, 241, 248);
+        public static readonly Color PendRow  = Escuro ? Color.FromArgb(56, 26, 30)    : Color.FromArgb(255, 226, 228);
+        public static readonly Color MissRow  = Escuro ? Color.FromArgb(56, 40, 20)    : Color.FromArgb(255, 238, 212);
+        public static readonly Color PendText = Escuro ? Color.FromArgb(255, 128, 128) : Color.FromArgb(196, 36, 36);
+        public static readonly Color WarnText = Escuro ? Color.FromArgb(255, 184, 108) : Color.FromArgb(184, 96, 0);
+        public static readonly Color OkText   = Escuro ? Color.FromArgb(92, 211, 138)  : Color.FromArgb(20, 135, 66);
+        public static readonly Color LaserTxt = Escuro ? Color.FromArgb(240, 160, 90)  : Color.FromArgb(196, 88, 16);
+        public static readonly Color Purple   = Escuro ? Color.FromArgb(185, 140, 255) : Color.FromArgb(118, 66, 200);
+        public static readonly Color PurpleBg = Escuro ? Color.FromArgb(44, 34, 64)    : Color.FromArgb(240, 232, 255);
+        public static readonly Color Solda    = Escuro ? Color.FromArgb(200, 140, 255) : Color.FromArgb(128, 70, 210);
+
+        static string Arquivo { get { return Path.Combine(Util.UserDir, "tema.txt"); } }
+
+        static bool LerEscolha()
+        {
+            try { return !File.Exists(Arquivo) || !File.ReadAllText(Arquivo).Trim().Equals("claro", StringComparison.OrdinalIgnoreCase); }
+            catch { return true; }   // padrão: escuro
+        }
+
+        public static void GravarEscolha(bool escuro)
+        {
+            Directory.CreateDirectory(Util.UserDir);
+            File.WriteAllText(Arquivo, escuro ? "escuro" : "claro");
+        }
+
         public static readonly Font UiFont    = new Font("Segoe UI", 9.5f);
         public static readonly Font UiBold    = new Font("Segoe UI Semibold", 9.5f);
         public static readonly Font Title     = new Font("Segoe UI Semibold", 11f);
@@ -51,6 +71,7 @@ namespace MonitorSW
         // barra de titulo escura (Windows 10 1809+ / 11); em versoes antigas nao faz nada
         public static void DarkTitle(Form f)
         {
+            if (!Escuro) return;
             try
             {
                 int on = 1;
@@ -62,6 +83,7 @@ namespace MonitorSW
         // barras de rolagem escuras quando o Windows suporta
         public static void DarkScroll(Control c)
         {
+            if (!Escuro) return;
             EventHandler h = (s, a) => { try { SetWindowTheme(c.Handle, "DarkMode_Explorer", null); } catch { } };
             if (c.IsHandleCreated) h(c, EventArgs.Empty); else c.HandleCreated += h;
         }
@@ -638,8 +660,8 @@ namespace MonitorSW
         Project current;
         readonly Dictionary<Project, HashSet<string>> collapsed = new Dictionary<Project, HashSet<string>>();
 
-        static readonly Color Purple = Color.FromArgb(185, 140, 255);
-        static readonly Color PurpleBg = Color.FromArgb(44, 34, 64);
+        static readonly Color Purple = Theme.Purple;
+        static readonly Color PurpleBg = Theme.PurpleBg;
         static readonly Color RedBg = Theme.PendRow;
         static readonly Color OrangeBg = Theme.MissRow;
         static readonly Color AsmBg = Theme.AsmRow;
@@ -852,6 +874,13 @@ namespace MonitorSW
                 if (r != null) { Users.Current = r; atualizaUser(); lblStatus.Text = "Login e senha de " + r.Nome + " gravados."; }
             }));
             toolsMenu.Items.Add(mCfg);
+            var mTema = new ToolStripMenuItem("Tema");
+            var miEscuro = Mi("Escuro", (s, a) => TrocarTema(true));
+            var miClaro = Mi("Claro", (s, a) => TrocarTema(false));
+            miEscuro.Checked = Theme.Escuro; miClaro.Checked = !Theme.Escuro;
+            mTema.DropDownItems.Add(miEscuro);
+            mTema.DropDownItems.Add(miClaro);
+            toolsMenu.Items.Add(mTema);
             DarkMenus(toolsMenu);
             ts.Items.Add(tools);
             ts.Items.Add(filterBtn);
@@ -935,7 +964,7 @@ namespace MonitorSW
             grid.DefaultCellStyle.BackColor = Theme.Surface;
             grid.DefaultCellStyle.ForeColor = Theme.Text;
             grid.DefaultCellStyle.SelectionBackColor = Theme.Sel;
-            grid.DefaultCellStyle.SelectionForeColor = Color.White;
+            grid.DefaultCellStyle.SelectionForeColor = Theme.SelText;
             grid.DefaultCellStyle.Padding = new Padding(4, 0, 4, 0);
             grid.DefaultCellStyle.Font = Theme.UiFont;
             Theme.DarkScroll(grid);
@@ -2400,6 +2429,26 @@ namespace MonitorSW
             base.OnFormClosing(e);
         }
 
+        // grava o tema escolhido e reabre o Monitor (as cores são aplicadas quando as telas são montadas)
+        void TrocarTema(bool escuro)
+        {
+            if (escuro == Theme.Escuro) return;
+            if (MessageBox.Show(this, "O Monitor vai reiniciar para aplicar o tema " + (escuro ? "escuro" : "claro") + ".\n\nContinuar?", "Tema",
+                MessageBoxButtons.OKCancel, MessageBoxIcon.Question) != DialogResult.OK) return;
+            try { Theme.GravarEscolha(escuro); }
+            catch (Exception ex) { MessageBox.Show(this, "Não foi possível gravar o tema:\n" + ex.Message, "Tema", MessageBoxButtons.OK, MessageBoxIcon.Warning); return; }
+            try
+            {
+                var args = Environment.GetCommandLineArgs().Skip(1).Where(x => !x.Equals("/bandeja", StringComparison.OrdinalIgnoreCase)).Select(x => "\"" + x + "\"").ToArray();
+                var psi = new ProcessStartInfo(Application.ExecutablePath, string.Join(" ", args));
+                psi.UseShellExecute = false;
+                psi.WorkingDirectory = Path.GetDirectoryName(Application.ExecutablePath);
+                Process.Start(psi);
+            }
+            catch (Exception ex) { MessageBox.Show(this, "Tema gravado. Feche e abra o Monitor para aplicar.\n\n" + ex.Message, "Tema", MessageBoxButtons.OK, MessageBoxIcon.Information); return; }
+            ExitApp();
+        }
+
         void ExitApp()
         {
             exiting = true;
@@ -2932,7 +2981,7 @@ namespace MonitorSW
             {
                 Color laser = Theme.LaserTxt, ok = Theme.OkText, bad = Theme.PendText, mute = Theme.Muted;
                 string proc = it.Process ?? "";
-                Color pcol = proc.StartsWith("Laser") ? laser : proc == "Solda" ? Color.FromArgb(200, 140, 255) : proc == "Usinagem" ? Theme.Accent : proc == "Comercial" ? mute : Theme.Text;
+                Color pcol = proc.StartsWith("Laser") ? laser : proc == "Solda" ? Theme.Solda : proc == "Usinagem" ? Theme.Accent : proc == "Comercial" ? mute : Theme.Text;
                 AddProcBox("PROCESSO", proc.Length > 0 ? proc : "–", pcol, 130);
                 AddProcBox("EXIGE", string.IsNullOrEmpty(it.Need) ? "–" : it.Need, it.NeedDxf ? laser : it.NeedPdf ? Theme.Accent : mute, 110);
                 AddProcBox("PDF", ReqText(it.NeedPdf, it.PdfSt), ReqColor(it.NeedPdf, it.PdfSt), 96);
