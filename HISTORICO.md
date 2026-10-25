@@ -45,7 +45,7 @@ Formato: `- AAAA-MM-DD — o que mudou — motivo / pedido do usuário`. Itens *
 - 2026-10-21 — DXF grava a extensão real ($EXTMIN/$EXTMAX e vista *Active) para abrir enquadrado; abre no AutoCAD JÁ ABERTO (não abre outro), substitui se o arquivo já estiver aberto, REGEN + ZOOM E. Usuário confirmou: "deu certo".
 
 ## Monitor SW (programa)
-- 2026-10-25 — 2.10: Opções › Tema (Escuro / Claro), escolha por usuário em `%LOCALAPPDATA%MonitorSW	ema.txt`; ao trocar, o Monitor reinicia para aplicar — pedido do usuário (tema claro e escuro).
+- 2026-10-25 — 2.10: Opções › Tema (Escuro / Claro), escolha por usuário em `%LOCALAPPDATA%\MonitorSW\tema.txt`; ao trocar, o Monitor reinicia para aplicar — pedido do usuário (tema claro e escuro).
 - 2026-10-25 — 2.9.0: projeto do Visual Studio (`Monitor.sln`, .NET 4.8), código em `src/Nucleo`, `src/Interface`, `src/Modulos`; `publicar.ps1`. Servidor `X:\MonitorSW` só com o que roda (sem código-fonte); fonte no GitHub privado e em `Documentos\Monitor-SW`.
 - 2026-10-21 — 2.8.6: gerador minimizado. 2.8.5: erro inesperado não derruba o Monitor, grava `erros.log`.
 - 2026-10-20 — 2.8.4: trocar/abrir montagem limpa a busca que escondia os itens.
