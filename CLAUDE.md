@@ -35,5 +35,8 @@
 - Antes de alterar algo, ler `HISTORICO.md` (decisões e itens REJEITADO que não podem voltar).
 - TODA alteração termina, nesta ordem: (1) linha nova em `HISTORICO.md` na seção do tipo/área
   (`- AAAA-MM-DD — o que mudou — motivo / pedido do usuário`; se o usuário recusar algo, registrar como **REJEITADO**;
-  se ficar algo por testar, marcar **PENDENTE**), (2) commit com mensagem clara, (3) `git push`.
+  se ficar algo por testar, marcar **PENDENTE**), (2) commit com mensagem clara, (3) `git push`,
+  (4) publicar no servidor para o usuário ver: `powershell -ExecutionPolicy Bypass -File .\publicar.ps1 -SemAssinar`
+  (só o gerador mudou: acrescentar `-SoGerador`). O Monitor aberto troca sozinho para a versão nova em ~20 s.
+  Só pular a publicação se o usuário pedir para testar antes.
 - Sem push a outra sessão do Claude (claude.ai ou outro PC) não fica sabendo da mudança.
