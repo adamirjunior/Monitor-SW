@@ -13,3 +13,8 @@ relatorios/
 *.SLDDRW
 *.PDF
 *.DXF
+# arquivos temporarios do Visual Studio
+obj/
+bin/
+.vs/
+*.user
