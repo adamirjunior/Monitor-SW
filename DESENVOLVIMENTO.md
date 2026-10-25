@@ -2,7 +2,7 @@
 
 ## 1. Instalar (uma vez)
 1. **Visual Studio 2022 Community** — carga de trabalho **"Desenvolvimento para desktop com .NET"**
-   e, em Componentes individuais, **"Pacote de direcionamento do .NET Framework 4.5"** (ou 4.8).
+   e, em Componentes individuais, **"Pacote de direcionamento do .NET Framework 4.8"**.
 2. **Git for Windows** (o Visual Studio já traz, mas o terminal fica melhor com ele).
 3. **Visual Studio Code** + extensões **PowerShell** e **Claude Code** — para editar o gerador e pedir alterações ao Claude no próprio PC.
 

@@ -4,7 +4,7 @@
 - Código-fonte fica SÓ no GitHub (privado) e no PC do desenvolvedor. O servidor recebe só o que roda.
 
 ## Estrutura
-- `Monitor.sln` + `src/Monitor.csproj` — abre no Visual Studio 2022 (.NET Framework 4.5, C# 5).
+- `Monitor.sln` + `src/Monitor.csproj` — abre no Visual Studio 2022 (.NET Framework 4.8, C# 5).
 - `src/Nucleo/` — leitura do servidor, índice, gravação de propriedades no SolidWorks (Core, Indexer, SwWriter).
 - `src/Interface/` — telas WinForms (Ui, Preview). Versão em `src/Interface/Ui.cs` (AssemblyVersion/AssemblyFileVersion) — subir a cada entrega.
 - `src/Modulos/` — funções independentes (Conferencia, Xlsx, Email). Função nova = arquivo novo aqui.
