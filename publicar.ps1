@@ -17,13 +17,16 @@ function Passo($t) { Write-Host "`n== $t" -ForegroundColor Cyan }
 
 if (-not (Test-Path $Servidor)) { throw "Servidor nao encontrado: $Servidor" }
 
-# 1) verifica o gerador (sintaxe) antes de qualquer copia
-Passo 'Verificando DetalharSW.ps1'
+# 1) verifica o gerador e todos os modulos (sintaxe) antes de qualquer copia
+Passo 'Verificando DetalharSW.ps1 e Modulos'
 $gerador = Join-Path $raiz 'Detalhamento\DetalharSW.ps1'
-$tok = $null; $err = $null
-[System.Management.Automation.Language.Parser]::ParseFile($gerador, [ref]$tok, [ref]$err) | Out-Null
-if ($err.Count) { $err | % { Write-Host $_ -ForegroundColor Red }; throw 'DetalharSW.ps1 com erro de sintaxe - nada foi publicado.' }
-Write-Host 'OK'
+$modulos = @(Get-ChildItem (Join-Path $raiz 'Detalhamento\Modulos') -Recurse -Filter *.ps1)
+foreach ($f in @($gerador) + @($modulos | % FullName)) {
+    $tok = $null; $err = $null
+    [System.Management.Automation.Language.Parser]::ParseFile($f, [ref]$tok, [ref]$err) | Out-Null
+    if ($err.Count) { $err | % { Write-Host $_ -ForegroundColor Red }; throw "$f com erro de sintaxe - nada foi publicado." }
+}
+Write-Host ("OK (gerador + {0} modulos)" -f $modulos.Count)
 
 # 2) compila em Release com o MSBuild do Visual Studio
 $exe = $null
@@ -44,7 +47,7 @@ if (-not $SemAssinar) {
     $cert = Get-ChildItem Cert:\CurrentUser\My -CodeSigningCert -ErrorAction SilentlyContinue | Sort-Object NotAfter -Descending | Select-Object -First 1
     if ($cert) {
         Passo "Assinando com $($cert.Subject)"
-        $alvos = @($gerador); if ($exe) { $alvos += $exe }
+        $alvos = @($gerador) + @($modulos | % FullName); if ($exe) { $alvos += $exe }
         foreach ($a in $alvos) { Set-AuthenticodeSignature $a $cert -HashAlgorithm SHA256 | Out-Null; Write-Host "assinado: $a" }
     } else { Write-Host "`n(sem certificado de assinatura - publicando sem assinar)" -ForegroundColor Yellow }
 }
@@ -60,9 +63,18 @@ $copias = @(
     @{ de = (Join-Path $raiz 'Detalhamento\LEIA-ME.txt'); para = $det }
 )
 # detalhamento.ini e templates: so copia se ainda nao existir no servidor (as configuracoes do servidor mandam)
-foreach ($f in Get-ChildItem (Join-Path $raiz 'Detalhamento') -Include *.ini,*.sldbomtbt,*.sldholtbt -Recurse) {
+foreach ($f in Get-ChildItem (Join-Path $raiz 'Detalhamento') -Include *.ini,*.sldbomtbt,*.sldholtbt) {
     if (-not (Test-Path (Join-Path $det $f.Name))) { $copias += @{ de = $f.FullName; para = $det } }
 }
+# modulos do gerador (Nucleo\ e Tipos\): espelha a pasta inteira
+$modDest = Join-Path $det 'Modulos'
+foreach ($m in $modulos) {
+    $rel = $m.FullName.Substring((Join-Path $raiz 'Detalhamento\Modulos').Length + 1)
+    $alvo = Join-Path $modDest $rel
+    New-Item -ItemType Directory -Force (Split-Path $alvo) | Out-Null
+    Copy-Item $m.FullName $alvo -Force
+}
+Write-Host ("copiado: Modulos ({0} arquivos)" -f $modulos.Count)
 foreach ($c in $copias) { if (Test-Path $c.de) { Copy-Item $c.de $c.para -Force; Write-Host ("copiado: " + (Split-Path $c.de -Leaf)) } }
 if ($exe) {
     # o Monitor aberto nos PCs troca sozinho para a versao nova em ~20 s

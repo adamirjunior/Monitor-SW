@@ -1,0 +1,297 @@
+﻿# Chapa.ps1 - chapa plana/dobrada e laser: cotas de laser, espessura, dobras, abas
+# Carregado pelo DetalharSW.ps1 (dot-source). Não rodar sozinho.
+
+function CotasLaser($dm, $front, $left, $top, $flat) {
+    $tgl = K "swUserPreferenceToggle_e" @("swInputDimValOnCreate") 10
+    $antes = $null
+    try { $antes = X $sw "GetUserPreferenceToggle" $tgl; X $sw "SetUserPreferenceToggle" $tgl $false | Out-Null } catch { }
+    try { CotasLaserInterno $dm $front $left $top $flat } finally { if ($null -ne $antes) { try { X $sw "SetUserPreferenceToggle" $tgl ([bool]$antes) | Out-Null } catch { } } }
+}
+# caixa real da peça na folha (o contorno da vista tem folga igual dos dois lados)
+function CaixaReal($v) {
+    $o = Contorno $v
+    $r = [pscustomobject]@{ x1 = $o.x1; x2 = $o.x2; y1 = $o.y1; y2 = $o.y2 }
+    try {
+        $a = DadosXf $v; $esc = [double](XG $v "ScaleDecimal")
+        $rx = @(); $ry = @()
+        foreach ($vx in (Entidades $v "swViewEntityType_Vertex" 3)) { try { $q = Rot $a ([double[]](XD (X $vx "GetPoint"))); $rx += $q[0]; $ry += $q[1] } catch { } }
+        if ($rx.Count -ge 2) {
+            $w = (($rx | Measure-Object -Maximum).Maximum - ($rx | Measure-Object -Minimum).Minimum) * $esc
+            $h = (($ry | Measure-Object -Maximum).Maximum - ($ry | Measure-Object -Minimum).Minimum) * $esc
+            $fx = (($o.x2 - $o.x1) - $w) / 2; $fy = (($o.y2 - $o.y1) - $h) / 2
+            if ($fx -gt 0 -and $fx -lt 0.05) { $r.x1 = $o.x1 + $fx; $r.x2 = $o.x2 - $fx }
+            if ($fy -gt 0 -and $fy -lt 0.05) { $r.y1 = $o.y1 + $fy; $r.y2 = $o.y2 - $fy }
+        }
+    } catch { }
+    return $r
+}
+function ValorCota($dd) { try { return [math]::Abs([double](XG (X $dd "GetDimension2" 0) "SystemValue")) } catch { return -1 } }
+function ApagarCota($dm, $dd) {
+    try { X $dm "ClearSelection2" $true | Out-Null; $an = X $dd "GetAnnotation"; $ok = $false; try { $ok = X $an "Select2" $false 0 } catch { }; if (-not $ok) { try { X $an "Select3" $false ([SwCom]::NullDisp()) | Out-Null } catch { } }; X $dm "EditDelete" | Out-Null } catch { }
+}
+# cota da ESPESSURA da chapa: procura duas arestas retas paralelas separadas pela espessura (aba vista de lado)
+function CotaEspessura($dm, $vistas) {
+    $T = [double]$script:espessura
+    if ($T -le 0) { return 0 }
+    foreach ($v in @($vistas)) {
+        if (-not $v) { continue }
+        try {
+            $a = DadosXf $v
+            $lin = @()
+            foreach ($e in (Entidades $v "swViewEntityType_Edge" 1)) {
+                try {
+                    $c = X $e "GetCurve"; if (-not (X $c "IsLine")) { continue }
+                    $p1 = Rot $a ([double[]](XD (X (X $e "GetStartVertex") "GetPoint"))); $p2 = Rot $a ([double[]](XD (X (X $e "GetEndVertex") "GetPoint")))
+                    if ([math]::Abs($p1[0] - $p2[0]) -lt 1e-6) { $lin += ,@($e, "v", $p1[0], [math]::Min($p1[1], $p2[1]), [math]::Max($p1[1], $p2[1])) }
+                    elseif ([math]::Abs($p1[1] - $p2[1]) -lt 1e-6) { $lin += ,@($e, "h", $p1[1], [math]::Min($p1[0], $p2[0]), [math]::Max($p1[0], $p2[0])) }
+                } catch { }
+            }
+            $best = $null; $bestOv = 0
+            for ($i = 0; $i -lt $lin.Count; $i++) { for ($j = $i + 1; $j -lt $lin.Count; $j++) {
+                $A = $lin[$i]; $B = $lin[$j]
+                if ($A[1] -ne $B[1]) { continue }
+                if ([math]::Abs([math]::Abs($A[2] - $B[2]) - $T) -gt 0.00003) { continue }
+                $ov = [math]::Min($A[4], $B[4]) - [math]::Max($A[3], $B[3])
+                if ($ov -gt $bestOv) { $bestOv = $ov; $best = @($A, $B) }
+            } }
+            if (-not $best) { continue }
+            X $dm "ClearSelection2" $true | Out-Null
+            SelecionarEntidade $dm $v $best[0][0] $false | Out-Null; SelecionarEntidade $dm $v $best[1][0] $true | Out-Null
+            if ((QtdSelecionados $dm) -ne 2) { continue }
+            $o = Contorno $v
+            $dd = $null
+            if ($best[0][1] -eq "v") { $dd = X $dm "AddHorizontalDimension2" ([double](($o.x1 + $o.x2) / 2)) ([double]($o.y1 - $DistCota)) 0.0 }
+            else { $dd = X $dm "AddVerticalDimension2" ([double]($o.x2 + $DistCota)) ([double](($o.y1 + $o.y2) / 2)) 0.0 }
+            X $dm "ClearSelection2" $true | Out-Null
+            if ($dd) { $script:vistaPerfil = $v; Log ("   Cota da espessura ({0:N2} mm) na vista {1}" -f ($T * 1000), (X $v "GetName2")) "DarkGray"; return 1 }
+        } catch { }
+    }
+    Log "   (não achei onde cotar a espessura da chapa)" "DarkYellow"
+    return 0
+}
+# chapa dobrada: cota de cada linha de dobra até a extremidade MAIS PRÓXIMA (o operador mede depois de dobrar).
+# A direção de cada linha vem da nota "PARA CIMA/BAIXO" presa a ela (a nota fica no sentido da linha, na folha);
+# a linha é a entidade em que a nota está presa. Cria a cota até os dois lados e deixa só a menor.
+function AnexosDaNota($an) {
+    foreach ($m in "GetAttachedEntities3", "GetAttachedEntities2", "GetAttachedEntities") {
+        try { $r = X $an $m; if ($r) { $l = @($r) | Where-Object { $_ }; if ($l.Count -gt 0) { return ,$l } } } catch { }
+    }
+    return ,@()
+}
+function CotasLinhasDobra($dm, $v) {
+    if (-not $v) { return 0 }
+    $a = DadosXf $v; $esc = 1.0; try { $esc = [double](XG $v "ScaleDecimal") } catch { }
+    $pts = @()
+    foreach ($vx in (Entidades $v "swViewEntityType_Vertex" 3)) { try { $pts += ,@($vx, (Rot $a ([double[]](XD (X $vx "GetPoint"))))) } catch { } }
+    if ($pts.Count -lt 2) { return 0 }
+    # linhas de dobra da vista (para quando a nota não disser a qual linha está presa)
+    $bls = @(); try { $bls = @(X $v "GetBendLines") | Where-Object { $_ } } catch { }
+    $itens = @()
+    foreach ($nt in @(X $v "GetNotes")) {
+        if (-not $nt) { continue }
+        $t = [string](X $nt "GetText")
+        if ($t -notmatch "(?i)PARA (CIMA|BAIXO)") { continue }
+        $an = X $nt "GetAnnotation"
+        $ang = 0.0; try { $ang = [double](XG $nt "Angle") } catch { }
+        $vertical = ([math]::Abs([math]::Sin($ang)) -gt 0.7)
+        $linha = $null
+        foreach ($e in (AnexosDaNota $an)) { $linha = $e; break }
+        if (-not $linha) { Log "   [dbg] nota de dobra sem linha presa: usando a lista de linhas de dobra" "DarkGray" }
+        $itens += ,@($linha, $vertical)
+    }
+    if ($itens.Count -eq 0 -and $bls.Count -eq 0) { return 0 }
+    # nota sem entidade presa: usa as linhas de dobra na mesma ordem
+    for ($i = 0; $i -lt $itens.Count; $i++) { if (-not $itens[$i][0] -and $i -lt $bls.Count) { $itens[$i][0] = $bls[$i] } }
+    $cr = CaixaReal $v; $o = Contorno $v
+    $n = 0; $kH = 0; $kV = 0; $passo = 0.008
+    foreach ($it in $itens) {
+        $bl = $it[0]; $vertical = $it[1]
+        if (-not $bl) { continue }
+        try {
+            $eixo = if ($vertical) { 0 } else { 1 }        # linha em pé -> cota horizontal (eixo X da folha)
+            $ord = @($pts | Sort-Object { $_[1][$eixo] })
+            $ext = @($ord[0], $ord[-1])
+            $metodo = if ($vertical) { "AddHorizontalDimension2" } else { "AddVerticalDimension2" }
+            $res = @()
+            foreach ($lado in 0, 1) {
+                X $dm "ClearSelection2" $true | Out-Null
+                if (-not (SelecionarEntidade $dm $v $bl $false)) { continue }
+                SelecionarEntidade $dm $v $ext[$lado][0] $true | Out-Null
+                if ((QtdSelecionados $dm) -ne 2) { continue }
+                $dd = $null
+                try {
+                    if ($vertical) { $dd = X $dm $metodo ([double](($o.x1 + $o.x2) / 2)) ([double]($o.y1 - $DistCota - $kH * $passo)) 0.0 }
+                    else { $dd = X $dm $metodo ([double]($o.x2 + $DistCota + $kV * $passo)) ([double](($o.y1 + $o.y2) / 2)) 0.0 }
+                } catch { }
+                if ($dd) { $res += ,@($dd, (ValorCota $dd), $lado) }
+            }
+            X $dm "ClearSelection2" $true | Out-Null
+            $bons = @($res | Where-Object { $_[1] -gt 0.0001 } | Sort-Object { $_[1] })
+            foreach ($r in $res) { if ($bons.Count -eq 0 -or $r[0] -ne $bons[0][0]) { ApagarCota $dm $r[0] } }   # fica só a da extremidade mais próxima
+            if ($bons.Count -eq 0) { continue }
+            $fica = $bons[0]; $val = $fica[1] * $esc
+            try {
+                $an2 = X $fica[0] "GetAnnotation"
+                if ($vertical) {
+                    $tx = if ($fica[2] -eq 0) { $cr.x1 + $val / 2 } else { $cr.x2 - $val / 2 }
+                    X $an2 "SetPosition" ([double]$tx) ([double]($o.y1 - $DistCota - $kH * $passo)) 0.0 | Out-Null; $kH++
+                } else {
+                    $ty = if ($fica[2] -eq 0) { $cr.y1 + $val / 2 } else { $cr.y2 - $val / 2 }
+                    X $an2 "SetPosition" ([double]($o.x2 + $DistCota + $kV * $passo)) ([double]$ty) 0.0 | Out-Null; $kV++
+                }
+            } catch { }
+            Log ("   Linha de dobra {0}: {1:N2} mm até a extremidade mais próxima" -f $(if ($vertical) { "em pé" } else { "deitada" }), ($fica[1] * 1000)) "DarkGray"
+            $n++
+        } catch { Log "   (cota da linha de dobra: $($_.Exception.Message))" "DarkYellow" }
+    }
+    X $dm "ClearSelection2" $true | Out-Null
+    return $n
+}
+# chapa dobrada, vista de perfil (onde aparece a espessura): cota de cada aba (distância entre as faces externas),
+# para conferir com paquímetro depois de dobrar. Só quando há mais de 2 faces na direção (2 faces = cota total).
+function CotasAbas($dm, $v) {
+    if (-not $v) { return 0 }
+    $T = [double]$script:espessura; if ($T -le 0) { return 0 }
+    $a = DadosXf $v; $o = Contorno $v; $cr = CaixaReal $v; $n = 0
+    $esc = 1.0; try { $esc = [double](XG $v "ScaleDecimal") } catch { }
+    $lin = @()
+    foreach ($e in (Entidades $v "swViewEntityType_Edge" 1)) {
+        try {
+            $c = X $e "GetCurve"; if (-not (X $c "IsLine")) { continue }
+            $p1 = Rot $a ([double[]](XD (X (X $e "GetStartVertex") "GetPoint"))); $p2 = Rot $a ([double[]](XD (X (X $e "GetEndVertex") "GetPoint")))
+            if ([math]::Abs($p1[0] - $p2[0]) -lt 1e-6) { $lin += ,@($e, 0, $p1[0], [math]::Abs($p1[1] - $p2[1])) }
+            elseif ([math]::Abs($p1[1] - $p2[1]) -lt 1e-6) { $lin += ,@($e, 1, $p1[1], [math]::Abs($p1[0] - $p2[0])) }
+        } catch { }
+    }
+    foreach ($eixo in 0, 1) {
+        # posições distintas (a mais longa de cada posição); descarta a face interna de cada aba (a que fica a 1 espessura de outra, para dentro)
+        $pos = @()
+        foreach ($l in (@($lin | Where-Object { $_[1] -eq $eixo }) | Sort-Object { -$_[3] })) { if (-not ($pos | Where-Object { [math]::Abs($_[2] - $l[2]) -lt 0.00005 })) { $pos += ,$l } }
+        $pos = @($pos | Sort-Object { $_[2] })
+        if ($pos.Count -lt 2) { continue }
+        $min = $pos[0][2]; $max = $pos[-1][2]
+        $ext = @()
+        foreach ($p in $pos) {
+            $par = $pos | Where-Object { [math]::Abs([math]::Abs($_[2] - $p[2]) - $T) -lt 0.00003 } | Select-Object -First 1
+            if ($par) { $interna = if ([math]::Abs($p[2] - $min) -lt [math]::Abs($p[2] - $max)) { $p[2] -gt $par[2] } else { $p[2] -lt $par[2] }; if ($interna -and $p[2] -ne $min -and $p[2] -ne $max) { continue } }
+            $ext += ,$p
+        }
+        if ($ext.Count -lt 3) { continue }   # só 2 faces: a cota total já mostra
+        $k = 0
+        for ($i = 0; $i -lt $ext.Count - 1; $i++) {
+            $A = $ext[$i]; $B = $ext[$i + 1]
+            if ([math]::Abs($B[2] - $A[2]) -lt $T * 1.5) { continue }   # é a própria espessura
+            X $dm "ClearSelection2" $true | Out-Null
+            SelecionarEntidade $dm $v $A[0] $false | Out-Null; SelecionarEntidade $dm $v $B[0] $true | Out-Null
+            if ((QtdSelecionados $dm) -ne 2) { continue }
+            $meio = (($A[2] + $B[2]) / 2 - $min) * $esc
+            $dd = $null
+            try {
+                if ($eixo -eq 0) { $dd = X $dm "AddHorizontalDimension2" ([double]($cr.x1 + $meio)) ([double]($o.y1 - $DistCota - 0.008)) 0.0 }
+                else { $dd = X $dm "AddVerticalDimension2" ([double]($o.x2 + $DistCota + 0.008)) ([double]($cr.y1 + $meio)) 0.0 }
+            } catch { }
+            if ($dd) { $n++; $k++ }
+        }
+    }
+    X $dm "ClearSelection2" $true | Out-Null
+    if ($n -gt 0) { Log "   $n cota(s) de aba (distância entre dobras) na vista de perfil" "DarkGray" }
+    return $n
+}
+# notas "PARA CIMA/BAIXO 90° R..." do mesmo tamanho das cotas e centralizadas entre as extremidades da peça
+function AjustarNotasDobra($dm, $v) {
+    if (-not $v) { return }
+    try {
+        $alt = 0.0
+        try {
+            foreach ($an in @(X $v "GetAnnotations")) { if ($an -and [int](X $an "GetType") -eq $AnnDim) { $alt = [double](XG (X $an "GetTextFormat" 0) "CharHeight"); break } }
+        } catch { }
+        if ($alt -le 0) { $alt = 0.0025 }
+        $alt = $alt * 0.8   # um pouco menor que o número das cotas
+        $cr = CaixaReal $v; $m = 0
+        foreach ($nt in @(X $v "GetNotes")) {
+            if (-not $nt) { continue }
+            $t = [string](X $nt "GetText")
+            if ($t -notmatch "(?i)PARA (CIMA|BAIXO)") { continue }
+            $an = X $nt "GetAnnotation"
+            try { $tf = X $an "GetTextFormat" 0; XS $tf "CharHeight" $alt; X $an "SetTextFormat" 0 $false $tf | Out-Null } catch { }
+            Rebuild $dm
+            $ang = 0.0; try { $ang = [double](XG $nt "Angle") } catch { }
+            $empe = ([math]::Abs([math]::Sin($ang)) -gt 0.7)
+            $ex = XD (X $nt "GetExtent"); $p = XD (X $an "GetPosition")
+            if (-not $ex -or -not $p) { continue }
+            $mx = ($ex[0] + $ex[3]) / 2; $my = ($ex[1] + $ex[4]) / 2
+            if ($empe) { $dyy = (($cr.y1 + $cr.y2) / 2) - $my; X $an "SetPosition" $p[0] ($p[1] + $dyy) 0.0 | Out-Null }
+            else { $dxx = (($cr.x1 + $cr.x2) / 2) - $mx; X $an "SetPosition" ($p[0] + $dxx) $p[1] 0.0 | Out-Null }
+            $m++
+        }
+        if ($m -gt 0) { Log ("   $m nota(s) de dobra com {0:N1} mm e centralizadas na peça" -f ($alt * 1000)) "DarkGray" }
+    } catch { Log "   (notas de dobra: $($_.Exception.Message))" "DarkYellow" }
+}
+function CotasLaserInterno($dm, $front, $left, $top, $flat) {
+    $n = 0
+    if ($front) { $n += CotaTotal $dm $front $true $true }
+    if ($left) { $n += CotaTotal $dm $left $true $false }
+    # vista de baixo: na chapa plana leva comprimento + espessura; nas outras, só a profundidade (se não houver lateral)
+    if ($top -and $script:planaAtual) { $n += CotaTotal $dm $top $true $true }
+    elseif ($top -and -not $left) { $n += CotaTotal $dm $top $false $true }
+    if ($flat) { $n += CotaTotal $dm $flat $true $true }
+    # chapa dobrada: espessura + linha de dobra até a extremidade mais próxima + notas de dobra harmonizadas
+    if ($flat) {
+        $script:vistaPerfil = $null
+        $n += CotaEspessura $dm @($front, $left, $top)
+        # (cotas de cada aba e da linha de dobra até a extremidade: desligadas a pedido - informação demais)
+        # raio de dobra nas vistas dobradas (um de cada tamanho)
+        $nr = 0
+        foreach ($vv in @($script:vistaPerfil, $front, $left, $top)) {
+            if (-not $vv -or $nr -gt 0) { continue }
+            try {
+                $pm = @(); foreach ($vx in (Entidades $vv "swViewEntityType_Vertex" 3)) { try { $pm += ,([double[]](XD (X $vx "GetPoint"))) } catch { } }
+                if ($pm.Count -gt 0) { EscolherModoXf $vv $pm | Out-Null }
+                $nr = CotasRaios $dm $vv $true
+            } catch { }
+        }
+        if ($nr -gt 0) { Log "   $nr raio(s) de dobra cotado(s)" "DarkGray" }
+        $n += $nr
+
+        Rebuild $dm
+        AjustarNotasDobra $dm $flat
+    }
+    # peça de laser: furos saem do DXF, não leva chamada de furo (só peças usinadas, que usam as cotas do modelo)
+    Log "   Cotas de laser/dobra: $n cotas (sem chamada de furo)"
+    Rebuild $dm
+    ResolverSobreposicoes $dm @($front, $left, $top, $flat, $script:isoAtual) @("dobra", "furo")
+}
+
+
+# centraliza o conjunto de vistas na área útil (com folga para as cotas em volta)
+# afasta notas de dobra que ficaram uma em cima da outra (considera texto deitado ou em pé)
+function EspalharNotasDobra($dm, $v) {
+    if (-not $v) { return }
+    try {
+        $notas = @(X $v "GetNotes") | Where-Object { $_ }
+        $itens = @()
+        foreach ($n in $notas) {
+            $t = [string](X $n "GetText")
+            if ($t -notmatch "(?i)PARA (CIMA|BAIXO)") { continue }
+            $an = X $n "GetAnnotation"; $p = XD (X $an "GetPosition")
+            $ang = 0.0; try { $ang = [double](XG $n "Angle") } catch { }
+            $empe = ([math]::Abs([math]::Sin($ang)) -gt 0.7)
+            $L = 0.045; $H = 0.0045
+            $w = if ($empe) { $H } else { $L }; $h = if ($empe) { $L } else { $H }
+            $itens += ,@($an, $p, $w, $h, $empe)
+        }
+        $mov = 0
+        for ($i = 1; $i -lt $itens.Count; $i++) {
+            for ($k = 0; $k -lt $i; $k++) {
+                $a = $itens[$k]; $b = $itens[$i]
+                $sobre = ([math]::Abs($a[1][0] - $b[1][0]) -lt ($a[2] + $b[2]) / 2) -and ([math]::Abs($a[1][1] - $b[1][1]) -lt ($a[3] + $b[3]) / 2)
+                if ($sobre) {
+                    if ($b[4]) { $nx = $b[1][0]; $ny = $a[1][1] - $b[3] - 0.004 } else { $nx = $a[1][0] + $b[2] + 0.004; $ny = $b[1][1] }
+                    X $b[0] "SetPosition" $nx $ny 0.0 | Out-Null
+                    $itens[$i][1] = @($nx, $ny, 0.0); $mov++
+                }
+            }
+        }
+        if ($mov -gt 0) { Log "   $mov nota(s) de dobra afastada(s)" "DarkGray" }
+    } catch { Log "   (não consegui afastar as notas de dobra: $($_.Exception.Message))" "DarkYellow" }
+}

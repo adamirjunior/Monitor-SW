@@ -9,19 +9,24 @@
 - `src/Interface/` — telas WinForms (Ui, Preview). Versão em `src/Interface/Ui.cs` (AssemblyVersion/AssemblyFileVersion) — subir a cada entrega.
 - `src/Modulos/` — funções independentes (Conferencia, Xlsx, Email). Função nova = arquivo novo aqui.
 - `src/Recursos/` — ícone e outros recursos.
-- `Detalhamento/` — gerador `DetalharSW.ps1` (PowerShell 5.1 + API do SolidWorks 2016), .bat, ini e templates.
+- `Detalhamento/` — gerador (PowerShell 5.1 + API do SolidWorks 2016), .bat, ini e templates.
+  - `DetalharSW.ps1` só carrega os módulos e percorre os arquivos.
+  - `Modulos/Nucleo/` — funções comuns; `Classificar.ps1` decide o TIPO da peça antes de detalhar.
+  - `Modulos/Tipos/` — um arquivo por tipo (Metalon, Chapa, UsinadaTabelaFuros, Solda, Peca = roteador/fluxo padrão).
+  - Regra de ouro: alteração pedida para um tipo mexe SÓ no arquivo daquele tipo. Se precisar mudar algo
+    de `Nucleo/`, avisar que afeta todos os tipos. Ver `Detalhamento/Modulos/LEIA-ME.md`.
 - `tools/testes/` — scripts de teste (nunca vão para o servidor).
 
 ## Compilar
 - No PC: Visual Studio (Ctrl+Shift+B) ou `.\publicar.ps1` (Release em `out\Release\Monitor.exe`).
 - Na nuvem (Claude): `/opt/pwsh/pwsh build.ps1` (Roslyn) -> `out/Monitor.exe`; compila todos os .cs de `src/`.
-- Gerador: conferir sintaxe com `[System.Management.Automation.Language.Parser]::ParseFile` (0 erros).
+- Gerador: conferir sintaxe de `DetalharSW.ps1` e de todos os `Modulos/**/*.ps1` com `[System.Management.Automation.Language.Parser]::ParseFile` (0 erros). Arquivos .ps1 em UTF-8 COM BOM (PowerShell 5.1).
 
 ## Publicar no servidor (X:\MonitorSW)
 - `.\publicar.ps1` no PC: verifica o gerador, compila, assina (se houver certificado) e copia só:
-  `Monitor_atualizacao.exe` (atualiza sozinho em ~20 s), `Detalhamento\DetalharSW.ps1`, .bat, LEIA-ME e
+  `Monitor_atualizacao.exe` (atualiza sozinho em ~20 s), `Detalhamento\DetalharSW.ps1` + `Detalhamento\Modulos\`, .bat, LEIA-ME e
   ini/templates que ainda não existam lá. `.\publicar.ps1 -SoGerador` publica só o gerador.
-- Entrega feita pelo Claude pelo PC conectado: pasta NOVA em /mnt/user-data/outputs + device_commit_files com
-  expectedMtimeMs, só `Monitor_atualizacao.exe` e `Detalhamento\DetalharSW.ps1`. NUNCA enviar .cs ao servidor.
+- Publicação preferida: no PC, `git pull` em `Documentos\Monitor-SW` e `.\publicar.ps1` (ou `-SoGerador`).
+  NUNCA enviar .cs, .csproj, .sln, CLAUDE.md ou scripts de build ao servidor.
 - Toda atualização também vai para o GitHub: `git add -A && git commit -m "<versão>: <o que mudou>" && git push`.
 - Nunca versionar dados da empresa (tsv/csv do servidor, logs, índice, arquivos SolidWorks/PDF/DXF) nem o .exe.
