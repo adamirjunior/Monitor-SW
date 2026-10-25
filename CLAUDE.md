@@ -30,3 +30,10 @@
   NUNCA enviar .cs, .csproj, .sln, CLAUDE.md ou scripts de build ao servidor.
 - Toda atualização também vai para o GitHub: `git add -A && git commit -m "<versão>: <o que mudou>" && git push`.
 - Nunca versionar dados da empresa (tsv/csv do servidor, logs, índice, arquivos SolidWorks/PDF/DXF) nem o .exe.
+
+## Histórico (memória comum entre as sessões)
+- Antes de alterar algo, ler `HISTORICO.md` (decisões e itens REJEITADO que não podem voltar).
+- TODA alteração termina, nesta ordem: (1) linha nova em `HISTORICO.md` na seção do tipo/área
+  (`- AAAA-MM-DD — o que mudou — motivo / pedido do usuário`; se o usuário recusar algo, registrar como **REJEITADO**;
+  se ficar algo por testar, marcar **PENDENTE**), (2) commit com mensagem clara, (3) `git push`.
+- Sem push a outra sessão do Claude (claude.ai ou outro PC) não fica sabendo da mudança.
