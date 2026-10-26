@@ -169,6 +169,7 @@ const REGRAS = [
   ["laser", "Furos sem rosca e sem usinagem: não cotar (1.1 e 1.2)", "teste", "2026-10-26", ""],
   ["laser", "Laser com usinagem usa a tratativa de usinada (1.1.1)", "ok", "2026-10-26", "Peça2: cotas de posição e chamadas de furo."],
   ["laser", "1.1.1 e 1.2.1: <span class=\"aviso\">Remover cotas desnecessárias para processo laser</span>", "teste", "2026-10-26", "Junto com o aviso de acabamento, na mesma coluna."],
+  ["laser", "1.2.1: detalhar oblongos (rasgos) — raio, centro a centro e posição a partir das bordas", "teste", "2026-10-26", "Na vista onde o oblongo aparece de frente (ex.: lateral da aba dobrada)."],
   ["laser", "Com usinagem e mais de 8 furos: tabela de furos", "part", "2026-10-26", "Pronto no 1.1.1; no 1.2.1 ainda não."],
   ["laser", "Com usinagem e furos alinhados: cota em um só furo do padrão", "pend", "", ""],
   ["laser", "Ponto 0 (marcação CNC) no canto superior esquerdo da frontal", "pend", "", "Exemplo 0214215."],
@@ -194,6 +195,7 @@ const REGRAS = [
   ["perfil", "Barras e cantoneiras com a lógica do metalon", "teste", "2026-10-26", "Cantoneira (perfil em L) precisa de teste."]
 ];
 const ALTERACOES = [
+  ["2026-10-26", "Oblongo no 1.2.1", "Gerador", ["Chapa dobrada com usinagem: oblongos cotados (raio, centro a centro, posição)"]],
   ["2026-10-26", "DXF sempre enquadrado", "Gerador", ["Raio de dobra a 45° pelo lado de fora: testado", "Todo DXF abre enquadrado no AutoCAD, também quando o AutoCAD ainda estava fechado"]],
   ["2026-10-26", "Raio de dobra pelo lado de fora", "Gerador", ["Cota a 45° saía espelhada (para dentro da dobra); agora a chamada vai pelo lado de fora da dobra"]],
   ["2026-10-26", "Raio de dobra a 45°", "Gerador", ["Chamada do raio passa pelo ponto do meio do arco (a 45° numa dobra de 90°); o 1º ajuste ainda saía pela ponta"]],

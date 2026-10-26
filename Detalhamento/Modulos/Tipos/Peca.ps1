@@ -142,7 +142,13 @@ function DetalharPeca($caminho, $peca) {
             try { ChamadasFuro $dm $front | Out-Null } catch { Log "   Aviso: chamadas de furo falharam ($($_.Exception.Message))" "Yellow" }
         }
         # 1.2.1: dobrada com usinagem -> posição dos furos também
-        if ($usinagem) { try { CotasPosicaoFuros $dm $front | Out-Null } catch { Log "   Aviso: cotas dos furos falharam ($($_.Exception.Message))" "Yellow" } }
+        if ($usinagem) {
+            try { CotasPosicaoFuros $dm $front | Out-Null } catch { Log "   Aviso: cotas dos furos falharam ($($_.Exception.Message))" "Yellow" }
+            # oblongos (rasgos) em qualquer vista dobrada: raio, comprimento e posição
+            $nob = 0
+            foreach ($vo in @($front, $left, $top)) { if ($vo) { try { $script:xfCache = @{}; $script:xfModo = @{}; $nob += CotasOblongo $dm $vo } catch { Log "   (oblongo: $($_.Exception.Message))" "DarkYellow" } } }
+            if ($nob -gt 0) { Log "   Oblongo(s): $nob cota(s)" "DarkGray" }
+        }
     } elseif ($InserirCotas -and $usinPrisma) {
         try { CotasUsinagem $dm $front $top } catch { Log "   Aviso: cotas de usinagem falharam ($($_.Exception.Message))" "Yellow" }
     } elseif ($InserirCotas) {

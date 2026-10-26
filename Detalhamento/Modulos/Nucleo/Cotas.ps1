@@ -431,3 +431,87 @@ function CentralizarTextosCotas($dm) {
     } catch { Log "   (não consegui centralizar o texto das cotas: $($_.Exception.Message))" "DarkYellow" }
     if ($n -gt 0) { Rebuild $dm; Log "   Texto de $n cota(s) centralizado na linha de cota" "DarkGray" }
 }
+
+# ---------------------------------------------------------------- oblongos (rasgos) vistos de frente
+# par de arcos de meia-volta com o mesmo raio e centros diferentes = oblongo. Devolve @(arco1, arco2, raio, centro1, centro2)
+function OblongosDaVista($v) {
+    $a = DadosXf $v
+    $arcos = @()
+    foreach ($e in (Entidades $v "swViewEntityType_Edge" 1)) {
+        try {
+            $c = X $e "GetCurve"; if (-not (X $c "IsCircle")) { continue }
+            $gp = [double[]](XD (X $e "GetCurveParams2"))
+            $cp = [double[]](XD (XG $c "CircleParams"))
+            $eixo = Rot $a @($cp[3], $cp[4], $cp[5])
+            if ([math]::Abs($eixo[0]) -gt 0.05 -or [math]::Abs($eixo[1]) -gt 0.05) { continue }   # visto de frente
+            $corda = [math]::Sqrt([math]::Pow($gp[0] - $gp[3], 2) + [math]::Pow($gp[1] - $gp[4], 2) + [math]::Pow($gp[2] - $gp[5], 2))
+            if ([math]::Abs($corda - 2 * $cp[6]) -gt 0.0002) { continue }   # meia-volta: as pontas ficam a 2R
+            $arcos += ,@($e, $cp)
+        } catch { }
+    }
+    $res = @(); $usado = @{}
+    for ($i = 0; $i -lt $arcos.Count; $i++) {
+        if ($usado[$i]) { continue }
+        for ($j = $i + 1; $j -lt $arcos.Count; $j++) {
+            if ($usado[$j]) { continue }
+            $p = $arcos[$i][1]; $q = $arcos[$j][1]
+            $d = [math]::Sqrt([math]::Pow($p[0] - $q[0], 2) + [math]::Pow($p[1] - $q[1], 2) + [math]::Pow($p[2] - $q[2], 2))
+            if ([math]::Abs($p[6] - $q[6]) -lt 0.00002 -and $d -gt 0.0003) {
+                $res += ,@($arcos[$i][0], $arcos[$j][0], $p[6], [double[]]@($p[0], $p[1], $p[2]), [double[]]@($q[0], $q[1], $q[2]))
+                $usado[$i] = $true; $usado[$j] = $true; break
+            }
+        }
+    }
+    return ,$res
+}
+# oblongo: raio (largura), distância entre centros (comprimento) e posição do 1º centro a partir das bordas da vista
+function CotasOblongo($dm, $v) {
+    if (-not $v) { return 0 }
+    $pm = @(); $vts = @()
+    foreach ($vx in (Entidades $v "swViewEntityType_Vertex" 3)) { try { $pt = [double[]](XD (X $vx "GetPoint")); $pm += ,$pt; $vts += ,@($vx, $pt) } catch { } }
+    if ($pm.Count -gt 0) { EscolherModoXf $v $pm | Out-Null }
+    $obl = OblongosDaVista $v
+    if ($obl.Count -eq 0) { return 0 }
+    $o = Contorno $v; $n = 0
+    $vf = @($vts | ForEach-Object { ,@($_[0], (NaFolha $v $_[1])) })
+    foreach ($ob in $obl) {
+        $c1 = NaFolha $v $ob[3]; $c2 = NaFolha $v $ob[4]
+        $horiz = [math]::Abs($c2[0] - $c1[0]) -ge [math]::Abs($c2[1] - $c1[1])
+        # 1) raio do oblongo (largura = 2R), puxado para fora do lado do 1º arco
+        try {
+            X $dm "ClearSelection2" $true | Out-Null
+            if (SelecionarEntidade $dm $v $ob[0] $false) {
+                $ux = $c1[0] - $c2[0]; $uy = $c1[1] - $c2[1]; $lu = [math]::Sqrt($ux * $ux + $uy * $uy); if ($lu -lt 1e-7) { $lu = 1 }
+                $tx = $c1[0] + $ux / $lu * 0.010; $ty = $c1[1] + $uy / $lu * 0.010 + 0.004
+                if (X $dm "AddRadialDimension2" ([double]$tx) ([double]$ty) 0.0) { $n++ }
+            }
+        } catch { }
+        # 2) comprimento: centro a centro
+        try {
+            X $dm "ClearSelection2" $true | Out-Null
+            SelecionarEntidade $dm $v $ob[0] $false | Out-Null; SelecionarEntidade $dm $v $ob[1] $true | Out-Null
+            if ((QtdSelecionados $dm) -eq 2) {
+                if ($horiz) { $r = X $dm "AddHorizontalDimension2" ([double](($c1[0] + $c2[0]) / 2)) ([double]([math]::Max($c1[1], $c2[1]) + 0.008)) 0.0 }
+                else { $r = X $dm "AddVerticalDimension2" ([double]([math]::Max($c1[0], $c2[0]) + 0.008)) ([double](($c1[1] + $c2[1]) / 2)) 0.0 }
+                if ($r) { $n++ }
+            }
+        } catch { }
+        # 3) posição: do canto inferior esquerdo da vista até o centro do arco mais à esquerda/baixo
+        $cb = if (($c1[0] + $c1[1]) -le ($c2[0] + $c2[1])) { @($ob[0], $c1) } else { @($ob[1], $c2) }
+        foreach ($eixo in 0, 1) {
+            $borda = @($vf | Sort-Object { $_[1][$eixo] })[0]
+            if (-not $borda) { continue }
+            try {
+                X $dm "ClearSelection2" $true | Out-Null
+                SelecionarEntidade $dm $v $borda[0] $false | Out-Null; SelecionarEntidade $dm $v $cb[0] $true | Out-Null
+                if ((QtdSelecionados $dm) -ne 2) { continue }
+                if ($eixo -eq 0) { $r = X $dm "AddHorizontalDimension2" ([double](($borda[1][0] + $cb[1][0]) / 2)) ([double]($o.y1 - $DistCota)) 0.0 }
+                else { $r = X $dm "AddVerticalDimension2" ([double]($o.x1 - $DistCota)) ([double](($borda[1][1] + $cb[1][1]) / 2)) 0.0 }
+                if ($r) { $n++ }
+            } catch { }
+        }
+        Log ("   Oblongo R{0:N2} na vista {1}: raio, centro a centro e posição" -f ($ob[2] * 1000), (X $v "GetName2")) "DarkGray"
+    }
+    X $dm "ClearSelection2" $true | Out-Null
+    return $n
+}
