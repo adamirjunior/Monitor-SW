@@ -238,20 +238,24 @@ function CotasLaserInterno($dm, $front, $left, $top, $flat) {
     # chapa dobrada: espessura + linha de dobra até a extremidade mais próxima + notas de dobra harmonizadas
     if ($flat) {
         $script:vistaPerfil = $null
-        $n += CotaEspessura $dm @($front, $left, $top)
-        # (cotas de cada aba e da linha de dobra até a extremidade: desligadas a pedido - informação demais)
-        # RAIO DE DOBRA (não raio de furo/rasgo): na vista que mostra a dobra de perfil
-        $nr = 0
-        foreach ($vv in @($script:vistaPerfil, $top, $left, $front)) {
+        # 1) RAIO DE DOBRA (não raio de furo/rasgo): na vista que mostra a dobra de perfil
+        $nr = 0; $vistaRaio = $null
+        foreach ($vv in @($top, $left, $front)) {
             if (-not $vv -or $nr -gt 0) { continue }
             try {
                 $pm = @(); foreach ($vx in (Entidades $vv "swViewEntityType_Vertex" 3)) { try { $pm += ,([double[]](XD (X $vx "GetPoint"))) } catch { } }
                 if ($pm.Count -gt 0) { EscolherModoXf $vv $pm | Out-Null }
                 $nr = CotaRaioDobra $dm $vv
+                if ($nr -gt 0) { $vistaRaio = $vv }
             } catch { }
         }
         if ($nr -gt 0) { Log "   $nr raio(s) de dobra cotado(s)" "DarkGray" }
         $n += $nr
+        # 2) ESPESSURA na MESMA vista do raio de dobra (se não der lá, tenta as outras)
+        $ordem = @($vistaRaio) + @(@($front, $left, $top) | Where-Object { $_ -and $_ -ne $vistaRaio })
+        $n += CotaEspessura $dm @($ordem | Where-Object { $_ })
+        # 3) linha de dobra até a aresta mais próxima (na planificada) - pedido do usuário em 26/10
+        try { $nl = CotasLinhasDobra $dm $flat; $n += $nl; if ($nl -gt 0) { Log "   $nl cota(s) de linha de dobra até a aresta mais próxima" "DarkGray" } } catch { Log "   (linha de dobra: $($_.Exception.Message))" "DarkYellow" }
 
         Rebuild $dm
         AjustarNotasDobra $dm $flat

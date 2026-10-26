@@ -7,6 +7,7 @@ Formato: `- AAAA-MM-DD — o que mudou — motivo / pedido do usuário`. Itens *
 ---
 
 ## Gerador — regras gerais
+- 2026-10-26 — Janelinha "Gerando detalhamento" (sempre por cima, canto inferior direito) com barra animada, nome da peça e etapa atual (última linha do log), em todos os detalhamentos; fica vermelha se der erro — pedido do usuário. **PENDENTE testar.**
 - 2026-10-26 — Janela do PowerShell do gerador (pelo Monitor) fecha sozinha SEMPRE, mesmo com erro (antes esperava Enter) — pedido do usuário. **PENDENTE testar.**
 - 2026-10-26 — Avisos vermelhos do desenho sempre em uma coluna (mesma borda esquerda, um embaixo do outro) no topo esquerdo da folha; novo aviso no 1.1.1 e 1.2.1: "Remover cotas desnecessárias para processo laser" — pedido do usuário. **PENDENTE testar.**
 - 2026-10-26 — Pelo botão do Monitor valem as saídas que o usuário marcou (desenho/PDF/DXF); a regra "laser = desenho + PDF + DXF" só vale arrastando no DETALHAR.bat — teste da Peça2 gerou DXF sem marcar. Balões vermelhos no cantinho superior esquerdo da FOLHA (acima da área das vistas; AvisoPosicaoX/Y no ini). Texto de todas as cotas centralizado na linha de cota (CenterText) — cota 60 da Peça2 saiu deslocada. **PENDENTE testar.**
@@ -33,6 +34,8 @@ Formato: `- AAAA-MM-DD — o que mudou — motivo / pedido do usuário`. Itens *
 - Quebras: `InsertBreak` com coordenadas "modelo x escala a partir do centro" (InsertBreak2 não existe; InsertBreakVertical fazia linha errada).
 
 ## Tipo: chapa (plana / dobrada / laser)
+- 2026-10-26 — 1.2/1.2.1: espessura cotada na MESMA vista do raio de dobra; distância da LINHA DE DOBRA até a aresta mais próxima (planificada) RELIGADA a pedido do usuário (o rejeitado era cotar cada aba / todas as medidas das dobras). **PENDENTE testar.**
+- 2026-10-26 — DXF: limite de espessura da furação passou de 4,76 para 5 mm (até 5 mm igual a antes); acima de 5 mm com furos, 2º aviso vermelho "Avaliar furações pequenas em relação a espessura - Requer CNC". **PENDENTE testar.**
 - 2026-10-26 — Espessura na descrição colada no texto ("CHAPA LASER 3mm1020", "ESP3MM") não era lida: regex sem exigir fim de palavra depois de MM/ESP. **PENDENTE testar.**
 - 2026-10-26 — LASER: antes de detalhar (e ao gerar só o DXF) confere a espessura da DESCRIÇÃO (ESP./ESPESSURA/E=, senão a menor medida com MM, maiúscula ou minúscula) com a do 3D (chapa metálica ou menor medida da chapa plana), tolerância 0,05 mm; diferente ou faltando = aviso e bloqueio, para obrigar a descrição a seguir o 3D — pedido do usuário. **PENDENTE testar.**
 - 2026-10-26 — TESTADO pelo usuário: oblongo no 1.2.1, avisos vermelhos em coluna, aviso "Remover cotas desnecessárias para processo laser".
@@ -43,7 +46,7 @@ Formato: `- AAAA-MM-DD — o que mudou — motivo / pedido do usuário`. Itens *
 - 2026-10-26 — 1.2: cota o RAIO DE DOBRA (arco interno que tem um arco concêntrico com raio + espessura) na vista de perfil da dobra; antes cotava o raio do rasgo (R4,17) na lateral — pedido do usuário. **PENDENTE testar.**
 - Antes de 2026-10-20 — Chapa plana: principal olha na direção da espessura (face maior) mesmo se não desenhada no plano frontal; principal + lateral + baixo mostrando a espessura.
 - Chapa dobrada: planificada, espessura e raio.
-- **REJEITADO** — cotas das linhas de dobra ("gerou muita informação"): removidas.
+- **REJEITADO** — cotas de cada aba / todas as medidas das dobras ("gerou muita informação"). (A cota da linha de dobra até a aresta mais próxima foi religada em 26/10 a pedido.)
 - DXF de laser: escala 1:1 (corrigido "4950"/1:5 com DIMLFAC=1), cotas totais com ±0,1, sem marcas de centro, tudo na camada 0 cor 7.
 
 ## Tipo: torneada / redonda

@@ -20,7 +20,7 @@ $RelFile = Join-Path $Pasta ("relatorio_" + (Get-Date -Format "yyyy-MM-dd") + ".
 
 # ---------------------------------------------------------------- módulos
 # Nucleo\ = funções comuns; Tipos\ = um arquivo por tipo de peça. A ordem importa (configuração e COM primeiro).
-foreach ($mod in @('Nucleo\Config', 'Nucleo\SwCom', 'Nucleo\Utilidades', 'Nucleo\Dxf', 'Nucleo\Carimbo', 'Nucleo\Cotas', 'Nucleo\Layout', 'Nucleo\Regras', 'Nucleo\Classificar', 'Tipos\Chapa', 'Tipos\Metalon', 'Tipos\UsinadaTabelaFuros', 'Tipos\Solda', 'Tipos\Peca', 'Nucleo\Fluxo')) {
+foreach ($mod in @('Nucleo\Config', 'Nucleo\Janela', 'Nucleo\SwCom', 'Nucleo\Utilidades', 'Nucleo\Dxf', 'Nucleo\Carimbo', 'Nucleo\Cotas', 'Nucleo\Layout', 'Nucleo\Regras', 'Nucleo\Classificar', 'Tipos\Chapa', 'Tipos\Metalon', 'Tipos\UsinadaTabelaFuros', 'Tipos\Solda', 'Tipos\Peca', 'Nucleo\Fluxo')) {
     $arqMod = Join-Path $Pasta ("Modulos\" + $mod + ".ps1")
     if (-not (Test-Path $arqMod)) { throw "Módulo não encontrado: $arqMod" }
     . $arqMod
@@ -49,8 +49,11 @@ foreach ($a in $Arquivos) {
 Log "==================== $Modo : $($lista.Count) arquivo(s) ====================" "Cyan"
 if ($PastaSaida -ne "") { Log "Saída de TESTE: $PastaSaida (o servidor não é alterado)" "Cyan" }
 
-$nOk = 0; $nErro = 0
+$nOk = 0; $nErro = 0; $nItem = 0
+AbrirJanelaStatus   # janelinha "Gerando detalhamento" com animação
 foreach ($arq in $lista) {
+    $nItem++
+    StatusPeca ([IO.Path]::GetFileNameWithoutExtension($arq) + $(if ($lista.Count -gt 1) { "  ($nItem de $($lista.Count))" } else { "" }))
     Log ">> $arq" "White"
     try {
         if (EhIgnorado $arq) { Log "   Item comercial (pasta ignorada). Pulando." "DarkGray"; continue }
@@ -85,6 +88,7 @@ foreach ($arq in $lista) {
     }
 }
 Log "Concluído: $nOk ok, $nErro com erro. Log: $LogFile" "Cyan"
+FecharJanelaStatus ($nErro -gt 0)
 if ($Modo -eq "gerar") {
     # janela fecha sozinha sempre (o Monitor mostra o resultado/erro no aviso e o detalhe fica no log.txt)
     if ($nErro -gt 0) { Write-Host ""; Write-Host "Deu erro (veja o aviso do Monitor ou o log.txt). Fechando..." -ForegroundColor Yellow; Start-Sleep -Seconds 3 }

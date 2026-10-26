@@ -378,7 +378,12 @@ function GerarDxf($caminhoPeca, $peca, $destinoDxf, $desc) {
             if ($espD -le 0) { $bb = XD (X $peca "GetPartBox" $true); $espD = [math]::Min([math]::Abs($bb[3] - $bb[0]), [math]::Min([math]::Abs($bb[4] - $bb[1]), [math]::Abs($bb[5] - $bb[2]))) }
             $avD = @()
             if (TemUsinagemCnc $peca) { $avD += "Avaliar sobremetal - Recurso Offset" }
-            if (($fuD.Roscados + $fuD.Rebaixos) -gt 0 -and $espD -gt $EspessuraLimiteCnc + 0.000001) { $avD += "Avaliar furação no CNC - Espessura > 4,76mm" }
+            $limTxt = ("{0:0.##}" -f ($EspessuraLimiteCnc * 1000)).Replace(".", ",")
+            $grossa = $espD -gt $EspessuraLimiteCnc + 0.000001
+            if (($fuD.Roscados + $fuD.Rebaixos) -gt 0 -and $grossa) { $avD += "Avaliar furação no CNC - Espessura > ${limTxt}mm" }
+            # chapa acima do limite (5 mm) com qualquer furo: 2º aviso - furos pequenos do laser precisam de CNC
+            $nCirc = 0; try { foreach ($ed in (Entidades $v "swViewEntityType_Edge" 1)) { try { $cc = X $ed "GetCurve"; if ((X $cc "IsCircle") -and -not (X $ed "GetStartVertex")) { $nCirc++ } } catch { } } } catch { }
+            if ($grossa -and ($nCirc + $fuD.Roscados + $fuD.Rebaixos + $fuD.Simples) -gt 0) { $avD += "Avaliar furações pequenas em relação a espessura - Requer CNC" }
             if (@($fuD.DiamRoscas | Where-Object { $_ -lt $FatorDiametroRosca * $espD }).Count -gt 0) { $avD += "Avaliar furação no CNC - Diâmetro pequeno" }
             if ($fuD.Roscados -gt 0 -and @($fuD.DiamRoscas).Count -eq 0) { Log "   (DXF: rosca sem diâmetro legível - regra do diâmetro pequeno não conferida)" "DarkYellow" }
             $o = Contorno $v

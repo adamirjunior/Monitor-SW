@@ -5,6 +5,7 @@ function Log([string]$msg, [string]$cor = "Gray") {
     $linha = (Get-Date -Format "HH:mm:ss") + "  " + $msg
     Write-Host $linha -ForegroundColor $cor
     Add-Content -Path $LogFile -Value $linha -Encoding UTF8
+    if ($script:ui) { $t = $msg.Trim(); if ($t -and -not $t.StartsWith("[dbg]") -and -not $t.StartsWith("(")) { $script:ui.Texto = $t } }   # etapa atual na janelinha
 }
 function Relatorio($arquivo, $tipo, $acao, $resultado, $msg) {
     if (-not (Test-Path $RelFile)) { Add-Content -Path $RelFile -Value "DATA;ARQUIVO;TIPO;ACAO;RESULTADO;MENSAGEM" -Encoding UTF8 }

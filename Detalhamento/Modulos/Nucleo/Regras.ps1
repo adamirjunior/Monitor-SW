@@ -14,7 +14,7 @@ $PropsUsinagemCnc   = Lista "PropriedadesUsinagemCnc" "TORNO CNC|FRESA CNC|ELETR
 $PropsProcesso      = Lista "PropriedadesProcesso" "SOLDA|TORNO|TORNO CNC|FRESA|FRESA CNC|ELETRO|FURADEIRA|ACAB.MANUAL|ACAB. MANUAL|LASER|OXICORTE|DOBRA|DOBRADEIRA|SERRA|PINTURA|CALANDRA"
 $PropAcabamento     = C "PropriedadeAcabamento" "ACABAMENTO"
 $ExigirPropriedades = Sim (C "ExigirPropriedades" "sim")
-$EspessuraLimiteCnc = [double](C "EspessuraLimiteFuracaoCnc" "4.76").Replace(",", ".") / 1000
+$EspessuraLimiteCnc = [double](C "EspessuraLimiteFuracaoCnc" "5").Replace(",", ".") / 1000
 $FatorDiametroRosca = [double](C "FatorDiametroRoscaEspessura" "0.7").Replace(",", ".")
 $CorAviso           = 255   # vermelho (COLORREF: R + G*256 + B*65536)
 
