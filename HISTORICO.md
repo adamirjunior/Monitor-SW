@@ -32,6 +32,7 @@ Formato: `- AAAA-MM-DD — o que mudou — motivo / pedido do usuário`. Itens *
 - Quebras: `InsertBreak` com coordenadas "modelo x escala a partir do centro" (InsertBreak2 não existe; InsertBreakVertical fazia linha errada).
 
 ## Tipo: chapa (plana / dobrada / laser)
+- 2026-10-26 — Cota do raio de dobra a 45° saiu ESPELHADA (para dentro da dobra, cruzando a aba): direção agora pela soma centro->pontas do arco (GetCurveParams2), bissetriz do lado de fora; o parâmetro médio da curva caía do lado errado. **PENDENTE testar.**
 - 2026-10-26 — Cota do raio de dobra ainda saía pela ponta do arco (quase horizontal): agora a direção vem do ponto do MEIO do arco (curva avaliada no parâmetro médio) → ~45° numa dobra de 90°. **PENDENTE testar.**
 - 2026-10-26 — Raio de dobra TESTADO (R10 ok). Cota do raio passa a sair no meio da dobra, entre as duas faces (chamada na bissetriz do arco, texto além do arco externo) — pedido do usuário com imagem. **PENDENTE testar.**
 - 2026-10-26 — 1.2: cota o RAIO DE DOBRA (arco interno que tem um arco concêntrico com raio + espessura) na vista de perfil da dobra; antes cotava o raio do rasgo (R4,17) na lateral — pedido do usuário. **PENDENTE testar.**

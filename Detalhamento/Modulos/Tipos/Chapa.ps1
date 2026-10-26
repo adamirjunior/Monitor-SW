@@ -331,17 +331,15 @@ function CotaRaioDobra($dm, $v) {
             # passando pelo meio do arco), texto além do arco externo
             $q0 = NaFolha $v ([double[]]@($cp[0], $cp[1], $cp[2]))
             $qs = NaFolha $v ([double[]](XD (X $ar[2] "GetPoint")))
-            # ponto do MEIO do arco: avalia a curva no parâmetro médio; senão, soma das duas pontas (início + fim)
+            # direção da chamada = bissetriz do lado DE FORA da dobra: soma dos vetores centro->ponta inicial e
+            # centro->ponta final do arco (pontas lidas da própria aresta). O parâmetro médio da curva podia cair
+            # do outro lado (cota saía espelhada para dentro da dobra).
             $qm = $null
             try {
                 $gp = [double[]](XD (X $ar[0] "GetCurveParams2"))
-                $pmid = (XD (X (X $ar[0] "GetCurve") "Evaluate2" (($gp[6] + $gp[7]) / 2) 0))
-                if ($pmid -and $pmid.Count -ge 3) { $qm = NaFolha $v ([double[]]@($pmid[0], $pmid[1], $pmid[2])) }
-                if (-not $qm) {
-                    $qa = NaFolha $v ([double[]]@($gp[0], $gp[1], $gp[2])); $qb = NaFolha $v ([double[]]@($gp[3], $gp[4], $gp[5]))
-                    $qm = @(($q0[0] + ($qa[0] - $q0[0]) + ($qb[0] - $q0[0])), ($q0[1] + ($qa[1] - $q0[1]) + ($qb[1] - $q0[1])))
-                }
-            } catch { Log "   (meio do arco: $($_.Exception.Message))" "DarkYellow" }
+                $qa = NaFolha $v ([double[]]@($gp[0], $gp[1], $gp[2])); $qb = NaFolha $v ([double[]]@($gp[3], $gp[4], $gp[5]))
+                $qm = @(($q0[0] + ($qa[0] - $q0[0]) + ($qb[0] - $q0[0])), ($q0[1] + ($qa[1] - $q0[1]) + ($qb[1] - $q0[1])))
+            } catch { Log "   (pontas do arco: $($_.Exception.Message))" "DarkYellow" }
             if (-not $qm) { $qm = $qs }
             $ux = $qm[0] - $q0[0]; $uy = $qm[1] - $q0[1]
             Log ("   (raio de dobra: direção da chamada {0:N0}°)" -f ([math]::Atan2($uy, $ux) * 180 / [math]::PI)) "DarkGray"
