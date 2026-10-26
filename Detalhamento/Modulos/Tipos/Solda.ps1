@@ -257,7 +257,7 @@ function DetalharMontagem($caminho, $asm) {
             $bl = X $dm "AutoBalloon5" $op
             $nb = 0; if ($bl) { $nb = @($bl).Count }
             if ($nb -eq 0) { Log "   Aviso: o SolidWorks não colocou nenhum balão (desenho não estava ativo?)" "Yellow" } else { Log "   Balões com o Nº DA PEÇA: $nb" }
-            if ($nb -gt 0) { Rebuild $dm; try { SetasNoCentro $dm $v @($bl) } catch { Log "   (setas no centro: $($_.Exception.Message))" "DarkYellow" } }
+            if ($nb -gt 0) { Rebuild $dm; try { $bl = SetasNoCentro $dm $v @($bl) } catch { Log "   (setas no centro: $($_.Exception.Message))" "DarkYellow" } }
             if ($nb -gt 0) { Rebuild $dm; try { OrganizarBaloes $dm $v @($bl) } catch { Log "   (organizar balões: $($_.Exception.Message))" "DarkYellow" } }
         } catch { Log "   Aviso: não coloquei balões ($($_.Exception.Message))" "Yellow" }
     }
@@ -295,6 +295,7 @@ function SetasNoCentro($dm, $v, $notas) {
     $xa = DadosXf $v
     $seta = K "swArrowStyle_e" @("swFILLED_ARROWHEAD") -99
     $ok = 0; $nTot = 0
+    $novas = @($notas)   # devolve a lista com os balões recriados no lugar dos originais
     foreach ($n in $notas) {
         if (-not $n) { continue }
         $nTot++
@@ -324,13 +325,34 @@ function SetasNoCentro($dm, $v, $notas) {
             $bx = [double[]](XD (X $face "GetBox"))
             $cp = [double[]](XD (X $face "GetClosestPointOn" (($bx[0] + $bx[3]) / 2) (($bx[1] + $bx[4]) / 2) (($bx[2] + $bx[5]) / 2)))
             $alvo = AplicarXf $xa (PtComp $t ([double[]]@($cp[0], $cp[1], $cp[2])) $melhor[0]) $melhor[1]
-            # prende na face e leva a ponta da seta para o meio dela
-            try { X $an "SetAttachedEntities" ([object[]]@($face)) | Out-Null } catch { }
-            $mv = $false
-            try { $mv = [bool](X $an "SetLeaderAttachmentPointAtIndex" 0 ([double]$alvo[0]) ([double]$alvo[1]) 0.0) } catch { }
-            if ($seta -ne -99) { try { X $an "SetArrowHeadStyleAtIndex" 0 $seta | Out-Null } catch { } }
-            if ($mv) { $ok++ } else { Log ("   (balão {0}: o SolidWorks não aceitou mover a ponta da seta)" -f $nTot) "DarkYellow" }
+            # SolidWorks 2016 não move a ponta de uma seta existente: seleciona a FACE da peça no ponto central (na folha)
+            # e cria o balão de novo preso ali (mesmo texto, formato e posição); apaga o original
+            $nomeComp = ""; try { $nomeComp = [string](XG $comp "Name2") } catch { }
+            X $dm "ClearSelection2" $true | Out-Null
+            $sel = $false; try { $sel = [bool](X (XG $dm "Extension") "SelectByID2" "" "FACE" ([double]$alvo[0]) ([double]$alvo[1]) 0.0 $false 0 $null 0) } catch { }
+            if (-not $sel) { Log ("   (balão {0}: não consegui selecionar a face no centro da peça)" -f $nTot) "DarkGray"; continue }
+            $sm = XG $dm "SelectionManager"; $fsel = $null; try { $fsel = X $sm "GetSelectedObject6" 1 -1 } catch { }
+            $cSel = ""; try { $cSel = [string](XG (X $fsel "GetComponent") "Name2") } catch { }
+            if ($nomeComp -and $cSel -and $cSel -ne $nomeComp) { X $dm "ClearSelection2" $true | Out-Null; Log ("   (balão {0}: no centro aparece outra peça ({1}); seta mantida na aresta)" -f $nTot, $cSel) "DarkGray"; continue }
+            $texto = [string](X $n "GetText")
+            $pos = $null; try { $pos = XD (X $an "GetPosition") } catch { }
+            $tf = $null; try { $tf = X $an "GetTextFormat" 0 } catch { }
+            $bst = $null; $bsz = $null; try { $bst = [int](X $n "GetBalloonStyle"); $bsz = [int](X $n "GetBalloonSize") } catch { }
+            $nn = X $dm "InsertNote" $texto
+            X $dm "ClearSelection2" $true | Out-Null
+            if (-not $nn) { Log ("   (balão {0}: não consegui recriar o balão)" -f $nTot) "DarkYellow"; continue }
+            $an2 = X $nn "GetAnnotation"
+            if ($tf) { try { X $an2 "SetTextFormat" 0 $false $tf | Out-Null } catch { } }
+            if ($null -ne $bst) { try { X $nn "SetBalloon" $bst $bsz | Out-Null } catch { } }
+            if ($pos) { try { X $an2 "SetPosition" $pos[0] $pos[1] 0.0 | Out-Null } catch { } }
+            if ($seta -ne -99) { try { X $an2 "SetArrowHeadStyleAtIndex" 0 $seta | Out-Null } catch { } }
+            # apaga o balão original (preso na aresta)
+            try { X $dm "ClearSelection2" $true | Out-Null; X $an "Select3" $false $null | Out-Null; X $dm "EditDelete" | Out-Null } catch { }
+            X $dm "ClearSelection2" $true | Out-Null
+            $novas[$nTot - 1] = $nn
+            $ok++
         } catch { Log "   (seta do balão $nTot : $($_.Exception.Message))" "DarkYellow" }
     }
     Log "   Setas no centro da peça: $ok de $nTot balão(ões)" "DarkGray"
+    return ,$novas
 }

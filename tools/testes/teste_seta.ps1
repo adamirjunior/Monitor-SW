@@ -9,6 +9,6 @@ $dm = XG $sw "ActiveDoc"
 $v = X (X $dm "GetFirstView") "GetNextView"
 $ns = @(X $v "GetNotes") | ? { $_ }
 foreach ($n in $ns) { $lp = XD (X (X $n "GetAnnotation") "GetLeaderPointsAtIndex" 0); "antes  " + (X $n "GetText") + ": " + ($lp[-3..-2] -join ";") }
-SetasNoCentro $dm $v $ns
+$ns = SetasNoCentro $dm $v $ns
 X $dm "GraphicsRedraw2" | Out-Null
 foreach ($n in $ns) { $lp = XD (X (X $n "GetAnnotation") "GetLeaderPointsAtIndex" 0); "depois " + (X $n "GetText") + ": " + ($lp[-3..-2] -join ";") }
