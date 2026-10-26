@@ -56,7 +56,8 @@ function DetalharPeca($caminho, $peca) {
     $dm = NovoDesenho
     $front = VistaModelo $dm $caminho $nomesFrente 0.08 0.15
     if (-not $front) { throw "não consegui criar a vista frontal" }
-    if ($plana -or $usinPrisma) { Deitar $dm $front }   # peça comprida em pé: gira a principal antes de projetar as outras
+    # peça comprida em pé: gira a principal antes de projetar as outras (chapa plana: sempre deitada, lado maior na horizontal)
+    if ($plana) { Deitar $dm $front 1.02 } elseif ($usinPrisma) { Deitar $dm $front }
     # usinada com muitos furos: padrão ProEstamp com TABELA DE FUROS (ex.: 02124106)
     $tabelaFuros = $false
     if ($usinPrisma) {
@@ -101,6 +102,7 @@ function DetalharPeca($caminho, $peca) {
     # folga em volta das vistas para as cotas: maior quando entram as cotas do modelo (usinagem)
     $script:MargemCotas = if ($laser -and -not $cls.Usinagem) { 0.010 } else { 0.018 }
     if ($usinPrisma) { $script:MargemCotas = 0.011; $Gap = 0.020 }   # usinada: cotas só em volta da principal, vistas mais próximas = escala maior
+    elseif ($plana) { $script:MargemCotas = 0.010; $Gap = 0.014 }    # chapa plana: vistas da espessura são finas, ficam perto da principal = escala maior
     # escala inicial pelo tamanho REAL das vistas (já com a orientação escolhida), sem contar a isométrica;
     # depois desce escala por escala até caber, tentando 3 arranjos: normal, isométrica menor e vistas empilhadas
     $esc0 = 1.0; try { $esc0 = [double](XG $front "ScaleDecimal") } catch { }

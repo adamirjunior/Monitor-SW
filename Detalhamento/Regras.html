@@ -170,6 +170,8 @@ const REGRAS = [
   ["geral", "Vista principal pela face com mais detalhes (furos, rasgos, rebaixos)", "part", "2026-10-26", "Hoje é a face maior."],
   ["geral", "Tabelas nunca maiores que as vistas", "part", "2026-10-21", "Tabela de furos achatada até ~100 x 90 mm; falta testar no 02124106."],
   ["laser", "Antes de detalhar: espessura da descrição tem que ser igual à do 3D (aviso e bloqueio se diferente ou faltando)", "teste", "2026-10-26", "Lê ESP. 2MM, ESPESSURA 2, 2mm e também colado: 3mm1020, ESP3MM. Vale também ao gerar só o DXF."],
+  ["laser", "1.1: chapa plana sempre deitada (lado maior na horizontal) e vistas da espessura mais perto da principal = escala maior", "teste", "2026-10-26", "02124100 (390 x 290 x 1,5) tinha saído em 1:7,5."],
+  ["laser", "1.1: espessura da chapa cotada na vista de baixo/lateral", "teste", "2026-10-26", "Não tinha vindo no 02124100."],
   ["laser", "Furos roscados ou com rebaixo: detalhe do furo (chamada)", "teste", "2026-10-26", "Furos do Assistente de Furação; rosca cosmética também conta."],
   ["laser", "Furos sem rosca e sem usinagem: não cotar (1.1 e 1.2)", "teste", "2026-10-26", ""],
   ["laser", "Laser com usinagem usa a tratativa de usinada (1.1.1)", "ok", "2026-10-26", "Peça2: cotas de posição e chamadas de furo."],
@@ -203,6 +205,7 @@ const REGRAS = [
   ["perfil", "Barras e cantoneiras com a lógica do metalon", "teste", "2026-10-26", "Cantoneira (perfil em L) precisa de teste."]
 ];
 const ALTERACOES = [
+  ["2026-10-26", "Chapa plana (1.1) com escala maior e espessura", "Gerador", ["Chapa plana sempre deitada, com as vistas finas mais perto da principal", "Espessura cotada na vista de baixo (duas linhas paralelas)"]],
   ["2026-10-26", "Seta do balão de solda no centro (correção)", "Gerador", ["Balão recriado preso na face no meio da peça", "Se no centro aparecer outra peça na frente, a seta fica na aresta"]],
   ["2026-10-26", "Balões de solda apontando para o centro da peça", "Gerador", ["Seta do balão vai para o meio da maior face da peça, em vez da aresta", "Ajuda a identificar peças pequenas na montagem"]],
   ["2026-10-26", "Monitor 2.12: tema por usuário", "Monitor", ["Tema claro/escuro gravado no usuário do Monitor (preferencias.tsv), não mais no PC", "Trocar de usuário reabre o Monitor com o tema de quem entrou"]],

@@ -35,6 +35,7 @@ Formato: `- AAAA-MM-DD — o que mudou — motivo / pedido do usuário`. Itens *
 - Quebras: `InsertBreak` com coordenadas "modelo x escala a partir do centro" (InsertBreak2 não existe; InsertBreakVertical fazia linha errada).
 
 ## Tipo: chapa (plana / dobrada / laser)
+- 2026-10-26 — 1.1 (02124100, 390x290x1,5): saiu em 1:7,5 e sem espessura. Agora a chapa plana é sempre deitada (gira se altura > 1,02 x largura), vão entre vistas 14 mm e margem 10 mm (vistas da espessura são finas) e a espessura é cotada com CotaEspessura (linhas paralelas) na vista de baixo/lateral. **PENDENTE testar.**
 - 2026-10-26 — 1.2/1.2.1: espessura cotada na MESMA vista do raio de dobra; distância da LINHA DE DOBRA até a aresta mais próxima (planificada) RELIGADA a pedido do usuário (o rejeitado era cotar cada aba / todas as medidas das dobras). **PENDENTE testar.**
 - 2026-10-26 — DXF: limite de espessura da furação passou de 4,76 para 5 mm (até 5 mm igual a antes); acima de 5 mm com furos, 2º aviso vermelho "Avaliar furações pequenas em relação a espessura - Requer CNC". **PENDENTE testar.**
 - 2026-10-26 — Espessura na descrição colada no texto ("CHAPA LASER 3mm1020", "ESP3MM") não era lida: regex sem exigir fim de palavra depois de MM/ESP. **PENDENTE testar.**

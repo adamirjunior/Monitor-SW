@@ -68,11 +68,11 @@ function VistaModelo($drw, $caminho, [string[]]$nomes, $x, $y) {
     return $null
 }
 # deixa a vista "deitada" (comprimento na horizontal)
-function Deitar($dm, $v) {
+function Deitar($dm, $v, [double]$fator = 1.6) {
     if (-not $v) { return }
     try {
         $o = Contorno $v
-        if ($o.h -gt 1.6 * $o.w) {
+        if ($o.h -gt $fator * $o.w) {
             XS $v "Angle" ([math]::PI / 2); Rebuild $dm
             Log "   Vista $(X $v 'GetName2') girada 90° (peça comprida)" "DarkGray"
         }

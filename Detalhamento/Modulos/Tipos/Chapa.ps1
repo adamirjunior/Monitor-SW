@@ -232,7 +232,8 @@ function CotasLaserInterno($dm, $front, $left, $top, $flat) {
     if ($front) { $n += CotaTotal $dm $front $true $true }
     if ($left) { $n += CotaTotal $dm $left $true $false }
     # vista de baixo: na chapa plana leva comprimento + espessura; nas outras, só a profundidade (se não houver lateral)
-    if ($top -and $script:planaAtual) { $n += CotaTotal $dm $top $true $true }
+    # chapa plana: a vista de baixo mostra a ESPESSURA (duas linhas paralelas na distância da espessura)
+    if ($script:planaAtual -and ($top -or $left)) { $ne = CotaEspessura $dm @($top, $left); if ($ne -eq 0 -and $top) { $ne = CotaTotal $dm $top $false $true }; $n += $ne }
     elseif ($top -and -not $left) { $n += CotaTotal $dm $top $false $true }
     if ($flat) { $n += CotaTotal $dm $flat $true $true }
     # chapa dobrada: espessura + linha de dobra até a extremidade mais próxima + notas de dobra harmonizadas
