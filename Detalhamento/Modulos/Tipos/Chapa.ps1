@@ -240,14 +240,14 @@ function CotasLaserInterno($dm, $front, $left, $top, $flat) {
         $script:vistaPerfil = $null
         $n += CotaEspessura $dm @($front, $left, $top)
         # (cotas de cada aba e da linha de dobra até a extremidade: desligadas a pedido - informação demais)
-        # raio de dobra nas vistas dobradas (um de cada tamanho)
+        # RAIO DE DOBRA (não raio de furo/rasgo): na vista que mostra a dobra de perfil
         $nr = 0
-        foreach ($vv in @($script:vistaPerfil, $front, $left, $top)) {
+        foreach ($vv in @($script:vistaPerfil, $top, $left, $front)) {
             if (-not $vv -or $nr -gt 0) { continue }
             try {
                 $pm = @(); foreach ($vx in (Entidades $vv "swViewEntityType_Vertex" 3)) { try { $pm += ,([double[]](XD (X $vx "GetPoint"))) } catch { } }
                 if ($pm.Count -gt 0) { EscolherModoXf $vv $pm | Out-Null }
-                $nr = CotasRaios $dm $vv $true
+                $nr = CotaRaioDobra $dm $vv
             } catch { }
         }
         if ($nr -gt 0) { Log "   $nr raio(s) de dobra cotado(s)" "DarkGray" }
@@ -294,4 +294,49 @@ function EspalharNotasDobra($dm, $v) {
         }
         if ($mov -gt 0) { Log "   $mov nota(s) de dobra afastada(s)" "DarkGray" }
     } catch { Log "   (não consegui afastar as notas de dobra: $($_.Exception.Message))" "DarkYellow" }
+}
+
+# raio de dobra: arco (não círculo inteiro) visto de perfil que tem outro arco CONCÊNTRICO com raio = raio + espessura
+# (raio interno e externo da dobra). Arcos de rasgos e furos não têm esse par e ficam de fora. Cota o raio interno.
+function CotaRaioDobra($dm, $v) {
+    $esp = [double]$script:espessura
+    if ($esp -le 0) { return 0 }
+    $a = DadosXf $v; $o = Contorno $v
+    $cx = ($o.x1 + $o.x2) / 2; $cy = ($o.y1 + $o.y2) / 2
+    $arcos = @()
+    foreach ($e in (Entidades $v "swViewEntityType_Edge" 1)) {
+        try {
+            $c = X $e "GetCurve"; if (-not (X $c "IsCircle")) { continue }
+            $sv = $null; try { $sv = X $e "GetStartVertex" } catch { }
+            if (-not $sv) { continue }   # círculo inteiro = furo
+            $cp = [double[]](XD (XG $c "CircleParams"))
+            $eixo = Rot $a @($cp[3], $cp[4], $cp[5])
+            if ([math]::Abs($eixo[0]) -gt 0.05 -or [math]::Abs($eixo[1]) -gt 0.05) { continue }   # só arco visto de perfil
+            $arcos += ,@($e, $cp, $sv)
+        } catch { }
+    }
+    $n = 0; $feitos = @{}
+    foreach ($ar in ($arcos | Sort-Object { $_[1][6] })) {
+        $cp = $ar[1]; $r = $cp[6]
+        $par = $arcos | Where-Object {
+            $q = $_[1]
+            ([math]::Abs($q[6] - ($r + $esp)) -lt 0.0002) -and
+            ([math]::Sqrt([math]::Pow($q[0] - $cp[0], 2) + [math]::Pow($q[1] - $cp[1], 2) + [math]::Pow($q[2] - $cp[2], 2)) -lt 0.002)
+        } | Select-Object -First 1
+        if (-not $par) { continue }
+        $rmm = [math]::Round($r * 1000, 2)
+        if ($feitos.ContainsKey($rmm)) { continue }
+        try {
+            $q = NaFolha $v ([double[]](XD (X $ar[2] "GetPoint")))
+            $dx = $q[0] - $cx; $dy = $q[1] - $cy; $len = [math]::Sqrt($dx * $dx + $dy * $dy); if ($len -lt 1e-6) { $len = 1 }
+            X $dm "ClearSelection2" $true | Out-Null
+            if (-not (SelecionarEntidade $dm $v $ar[0] $false)) { continue }
+            $tx = $q[0] + $dx / $len * 0.012; $ty = $q[1] + $dy / $len * 0.010
+            $tx = [math]::Max($o.x1 - 0.015, [math]::Min($o.x2 + 0.015, $tx)); $ty = [math]::Max($o.y1 - 0.012, [math]::Min($o.y2 + 0.012, $ty))
+            $d = $null; try { $d = X $dm "AddRadialDimension2" ([double]$tx) ([double]$ty) 0.0 } catch { }
+            if ($d) { $feitos[$rmm] = 1; $n++; Log ("   Raio de dobra R{0} cotado na vista {1}" -f $rmm, (X $v "GetName2")) "DarkGray" }
+        } catch { }
+    }
+    X $dm "ClearSelection2" $true | Out-Null
+    return $n
 }
