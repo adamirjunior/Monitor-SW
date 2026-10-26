@@ -40,3 +40,6 @@
   (só o gerador mudou: acrescentar `-SoGerador`). O Monitor aberto troca sozinho para a versão nova em ~20 s.
   Só pular a publicação se o usuário pedir para testar antes.
 - Sem push a outra sessão do Claude (claude.ai ou outro PC) não fica sabendo da mudança.
+- Mudança no gerador também atualiza `Detalhamento/Regras.html` (painel de acompanhamento): ajuste a situação da regra
+  em `REGRAS` (ok = testado, teste = aguardando teste, part, pend, rej) e acrescente a alteração no topo de `ALTERACOES`.
+  Quando o usuário confirmar um teste, troque `teste` por `ok`. O publicar.ps1 copia a página para o servidor.
