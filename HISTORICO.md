@@ -54,6 +54,7 @@ Formato: `- AAAA-MM-DD — o que mudou — motivo / pedido do usuário`. Itens *
 - Antes de 2026-10-20 — Duas medidas iguais → sem vista superior (repetiria a frontal); arruela/disco sem vértices → cota pelos círculos/silhueta.
 
 ## Montagem de solda (referência 13011773)
+- 2026-10-26 — Seta do balão no CENTRO da peça: depois do AutoBalloon, troca a aresta pela maior face vizinha e move a ponta da seta para o meio dessa face (conversão componente->montagem->folha calibrada pela própria aresta; seta cheia). Pedido do usuário para enxergar melhor peças pequenas. **PENDENTE testar.**
 - 2026-10-20 — Uma isométrica + lista de peças pelo template `ListaSolda_ProEstamp.sldbomtbt` (criado do 13011773); balões com o CÓDIGO da peça, um por peça diferente (IgnoreMultiple); desenho ativo antes dos balões.
 - **REJEITADO** — balões numéricos 1, 2, 3... ("não quero o balão numérico, só os textos").
 - **REJEITADO** — balão por cópia de peça repetida (gerava numeração). Se um dia quiser, só como texto manual por cópia, em mudança separada.

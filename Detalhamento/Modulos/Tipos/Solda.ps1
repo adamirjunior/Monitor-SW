@@ -257,6 +257,7 @@ function DetalharMontagem($caminho, $asm) {
             $bl = X $dm "AutoBalloon5" $op
             $nb = 0; if ($bl) { $nb = @($bl).Count }
             if ($nb -eq 0) { Log "   Aviso: o SolidWorks não colocou nenhum balão (desenho não estava ativo?)" "Yellow" } else { Log "   Balões com o Nº DA PEÇA: $nb" }
+            if ($nb -gt 0) { Rebuild $dm; try { SetasNoCentro $dm $v @($bl) } catch { Log "   (setas no centro: $($_.Exception.Message))" "DarkYellow" } }
             if ($nb -gt 0) { Rebuild $dm; try { OrganizarBaloes $dm $v @($bl) } catch { Log "   (organizar balões: $($_.Exception.Message))" "DarkYellow" } }
         } catch { Log "   Aviso: não coloquei balões ($($_.Exception.Message))" "Yellow" }
     }
@@ -272,4 +273,62 @@ function DetalharMontagem($caminho, $asm) {
     if ($script:FazPdf) { if (PdfProtegido $destDir $cod) { $pdfMsg = " (PDF mantido: existe APR)" } else { SalvarComo $dm $pdf ($SaveSilent + $SaveCopy); Log "   PDF: $pdf" "Green"; $pdfMsg = " + PDF" } }
     if ($FecharDesenho) { Fechar $dm }
     Relatorio $caminho "montagem" "detalhar" "ok" ("desenho" + $pdfMsg)
+}
+
+# ---------------------------------------------------------------- seta do balão no CENTRO da peça (não na aresta)
+# o balão automático prende numa aresta. Aqui: pega a maior face vizinha dessa aresta, acha um ponto no meio dela,
+# converte para a folha (componente -> montagem -> vista) e move a ponta da seta para lá, presa na face.
+# A conversão é conferida pela própria aresta: usa a fórmula que coloca a aresta onde a seta estava.
+function PtComp([double[]]$t, [double[]]$p, [int]$conv) {
+    if (-not $t -or $conv -eq 2) { return $p }
+    $s = 1.0; if ($t.Count -gt 12 -and $t[12] -ne 0) { $s = $t[12] }
+    if ($conv -eq 0) { return [double[]]@((($p[0] * $t[0] + $p[1] * $t[3] + $p[2] * $t[6]) * $s + $t[9]), (($p[0] * $t[1] + $p[1] * $t[4] + $p[2] * $t[7]) * $s + $t[10]), (($p[0] * $t[2] + $p[1] * $t[5] + $p[2] * $t[8]) * $s + $t[11])) }
+    return [double[]]@((($p[0] * $t[0] + $p[1] * $t[1] + $p[2] * $t[2]) * $s + $t[9]), (($p[0] * $t[3] + $p[1] * $t[4] + $p[2] * $t[5]) * $s + $t[10]), (($p[0] * $t[6] + $p[1] * $t[7] + $p[2] * $t[8]) * $s + $t[11]))
+}
+function DistSegPt($p, $a, $b) {
+    $dx = $b[0] - $a[0]; $dy = $b[1] - $a[1]; $l2 = $dx * $dx + $dy * $dy
+    $u = 0.0; if ($l2 -gt 1e-12) { $u = [math]::Max(0, [math]::Min(1, (($p[0] - $a[0]) * $dx + ($p[1] - $a[1]) * $dy) / $l2)) }
+    $qx = $a[0] + $u * $dx - $p[0]; $qy = $a[1] + $u * $dy - $p[1]
+    return [math]::Sqrt($qx * $qx + $qy * $qy)
+}
+function SetasNoCentro($dm, $v, $notas) {
+    $xa = DadosXf $v
+    $seta = K "swArrowStyle_e" @("swFILLED_ARROWHEAD") -99
+    $ok = 0; $nTot = 0
+    foreach ($n in $notas) {
+        if (-not $n) { continue }
+        $nTot++
+        try {
+            $an = AnnOf $n
+            $lp = XD (X $an "GetLeaderPointsAtIndex" 0); if (-not $lp -or $lp.Count -lt 2) { continue }
+            $ents = @(X $an "GetAttachedEntities3"); $ed = $ents | Where-Object { $_ } | Select-Object -First 1
+            if (-not $ed) { continue }
+            $comp = $null; try { $comp = X $ed "GetComponent" } catch { }
+            $t = $null; if ($comp) { try { $t = [double[]](XD (XG (XG $comp "Transform2") "ArrayData")) } catch { } }
+            $gp = [double[]](XD (X $ed "GetCurveParams2"))
+            $e1 = [double[]]@($gp[0], $gp[1], $gp[2]); $e2 = [double[]]@($gp[3], $gp[4], $gp[5])
+            # calibra: conversão componente->montagem e fórmula da vista que põem a aresta onde a seta está
+            $melhor = $null; $md = 1e9
+            foreach ($conv in 0, 1, 2) { foreach ($m in 0, 1, 2, 3) {
+                $a1 = AplicarXf $xa (PtComp $t $e1 $conv) $m; $a2 = AplicarXf $xa (PtComp $t $e2 $conv) $m
+                $d = DistSegPt @($lp[0], $lp[1]) $a1 $a2
+                if ($d -lt $md) { $md = $d; $melhor = @($conv, $m) }
+            } }
+            if ($md -gt 0.004) { Log ("   (balão {0}: não achei a posição da peça na folha, seta mantida na aresta)" -f $nTot) "DarkGray"; continue }
+            # maior face vizinha da aresta e um ponto no meio dela
+            $fs = @(X $ed "GetTwoAdjacentFaces2") | Where-Object { $_ }
+            $face = $fs | Sort-Object { try { -[double](X $_ "GetArea") } catch { 0 } } | Select-Object -First 1
+            if (-not $face) { continue }
+            $bx = [double[]](XD (X $face "GetBox"))
+            $cp = [double[]](XD (X $face "GetClosestPointOn" (($bx[0] + $bx[3]) / 2) (($bx[1] + $bx[4]) / 2) (($bx[2] + $bx[5]) / 2)))
+            $alvo = AplicarXf $xa (PtComp $t ([double[]]@($cp[0], $cp[1], $cp[2])) $melhor[0]) $melhor[1]
+            # prende na face e leva a ponta da seta para o meio dela
+            try { X $an "SetAttachedEntities" ([object[]]@($face)) | Out-Null } catch { }
+            $mv = $false
+            try { $mv = [bool](X $an "SetLeaderAttachmentPointAtIndex" 0 ([double]$alvo[0]) ([double]$alvo[1]) 0.0) } catch { }
+            if ($seta -ne -99) { try { X $an "SetArrowHeadStyleAtIndex" 0 $seta | Out-Null } catch { } }
+            if ($mv) { $ok++ } else { Log ("   (balão {0}: o SolidWorks não aceitou mover a ponta da seta)" -f $nTot) "DarkYellow" }
+        } catch { Log "   (seta do balão $nTot : $($_.Exception.Message))" "DarkYellow" }
+    }
+    Log "   Setas no centro da peça: $ok de $nTot balão(ões)" "DarkGray"
 }
