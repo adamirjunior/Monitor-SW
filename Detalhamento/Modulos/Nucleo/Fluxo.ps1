@@ -79,6 +79,7 @@ function Gerar($arq) {
         $peca = AbrirDoc $arq $DocPART
         if (-not $peca) { throw "não consegui abrir a peça" }
         $desc = Prop $peca $PropDesc
+        if (EhLaser $desc) { ConferirEspessuraLaser $peca $arq }   # só DXF: também confere a espessura
         $dxf = Join-Path $destDir "$cod.DXF"
         GerarDxf $arq $peca $dxf $desc; Log "   DXF: $dxf" "Green"; AbrirAutoCAD $dxf; $feito += "DXF"
     }

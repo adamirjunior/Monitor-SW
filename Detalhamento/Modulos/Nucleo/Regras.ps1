@@ -134,3 +134,55 @@ function AvisosDesenho($dm, [string[]]$textos) {
         $y = $prox
     }
 }
+
+# ---------------------------------------------------------------- conferência da ESPESSURA (laser)
+$ToleranciaEspessura = [double](C "ToleranciaEspessuraMm" "0.05").Replace(",", ".") / 1000
+$ConferirEspessura   = Sim (C "ConferirEspessuraLaser" "sim")
+# espessura escrita na descrição (m): 1º "ESP. 2" / "ESPESSURA 2MM" / "E=2"; senão a MENOR medida com mm ("2MM", "3,00 mm");
+# maiúsculas ou minúsculas. $null se não achar.
+function EspessuraDaDescricao([string]$desc) {
+    if (-not $desc) { return $null }
+    $num = '([0-9]+(?:[\.,][0-9]+)?)'
+    foreach ($pad in @("(?i)ESPESSURA\s*[:=]?\s*$num", "(?i)\bESP\b\.?\s*[:=]?\s*$num", "(?i)\bE\s*=\s*$num")) {
+        $m = [regex]::Match($desc, $pad)
+        if ($m.Success) { return [double]($m.Groups[1].Value.Replace(",", ".")) / 1000 }
+    }
+    $vals = @([regex]::Matches($desc, "(?i)$num\s*MM\b") | ForEach-Object { [double]($_.Groups[1].Value.Replace(",", ".")) })
+    if ($vals.Count -gt 0) { return ($vals | Measure-Object -Minimum).Minimum / 1000 }
+    return $null
+}
+# espessura do 3D (m): recurso de chapa metálica; senão a menor medida da caixa (chapa plana). $null se não der para saber
+function EspessuraDo3D($peca) {
+    try {
+        $ft = X $peca "FirstFeature"
+        while ($ft) { if ([string](X $ft "GetTypeName2") -eq "SheetMetal") { return [double](XG (X $ft "GetDefinition") "Thickness") }; $ft = X $ft "GetNextFeature" }
+    } catch { }
+    try {
+        $b = XD (X $peca "GetPartBox" $true)
+        $d = @([math]::Abs($b[3] - $b[0]), [math]::Abs($b[4] - $b[1]), [math]::Abs($b[5] - $b[2])) | Sort-Object
+        if ($d[0] -lt 0.1 * $d[2]) { return $d[0] }   # chapa plana sem recurso de chapa metálica
+    } catch { }
+    return $null
+}
+# laser: a espessura da descrição tem que ser a do 3D. Diferente (ou faltando) -> aviso e NÃO detalha
+function ConferirEspessuraLaser($peca, $caminho) {
+    if (-not $ConferirEspessura) { return }
+    $desc = [string](Prop $peca $PropDesc)
+    $e3d = EspessuraDo3D $peca
+    $eDesc = EspessuraDaDescricao $desc
+    if ($null -eq $e3d) { Log "   (espessura do 3D não identificada: conferência da descrição pulada)" "DarkYellow"; return }
+    $f = { param($x) ("{0:0.##} mm" -f ($x * 1000)) }
+    if ($null -eq $eDesc) {
+        $msg = "A descrição não informa a espessura da chapa. Espessura do 3D: $(& $f $e3d). Escreva na descrição, por exemplo: ESP. $(& $f $e3d)"
+    } elseif ([math]::Abs($eDesc - $e3d) -gt $ToleranciaEspessura) {
+        $msg = "Espessura diferente: descrição $(& $f $eDesc), 3D $(& $f $e3d). Corrija a descrição (ou o modelo) para a espessura do 3D antes de detalhar."
+    } else { Log ("   Espessura conferida: descrição = 3D = {0}" -f (& $f $e3d)) "DarkGray"; return }
+    Log "   $msg" "Red"
+    try {
+        Add-Type -AssemblyName System.Windows.Forms
+        $fm = New-Object System.Windows.Forms.Form; $fm.TopMost = $true
+        [void][System.Windows.Forms.MessageBox]::Show($fm, ((Codigo $caminho) + "`n`n" + $desc + "`n`n" + $msg), "Detalhamento - espessura da chapa", "OK", "Warning")
+        $fm.Dispose()
+    } catch { }
+    throw $msg
+}

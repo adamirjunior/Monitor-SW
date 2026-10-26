@@ -8,6 +8,7 @@ function DetalharPeca($caminho, $peca) {
     # 1) análise rápida: qual é o tipo da peça (regras em Nucleo\Classificar.ps1)
     ValidarPropriedades $peca $caminho   # DESCRIÇÃO, ACABAMENTO e um processo preenchidos (senão avisa e não detalha)
     $cls = ClassificarPeca $caminho $peca
+    if ($cls.Laser) { ConferirEspessuraLaser $peca $caminho }   # laser: espessura da descrição = espessura do 3D
     $script:classeAtual = $cls
     $script:tipoPeca = $cls.Classe + " " + $cls.Fluxo
     # saídas: pelo botão do Monitor vale o que o usuário marcou (desenho / PDF / DXF);
