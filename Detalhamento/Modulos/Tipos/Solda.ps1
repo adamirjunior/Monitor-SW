@@ -329,7 +329,7 @@ function SetasNoCentro($dm, $v, $notas) {
             # e cria o balão de novo preso ali (mesmo texto, formato e posição); apaga o original
             $nomeComp = ""; try { $nomeComp = [string](XG $comp "Name2") } catch { }
             X $dm "ClearSelection2" $true | Out-Null
-            $sel = $false; try { $sel = [bool](X (XG $dm "Extension") "SelectByID2" "" "FACE" ([double]$alvo[0]) ([double]$alvo[1]) 0.0 $false 0 $null 0) } catch { }
+            $sel = $false; try { $sel = [bool](X $dm "SelectByID" "" "FACE" ([double]$alvo[0]) ([double]$alvo[1]) 0.0) } catch { }   # SelectByID2 dá DISP_E_TYPEMISMATCH pela ponte
             if (-not $sel) { Log ("   (balão {0}: não consegui selecionar a face no centro da peça)" -f $nTot) "DarkGray"; continue }
             $sm = XG $dm "SelectionManager"; $fsel = $null; try { $fsel = X $sm "GetSelectedObject6" 1 -1 } catch { }
             $cSel = ""; try { $cSel = [string](XG (X $fsel "GetComponent") "Name2") } catch { }
