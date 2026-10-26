@@ -100,6 +100,11 @@ function DetalharPeca($caminho, $peca) {
     $of0 = Contorno $front
     $longa = ($of0.w -gt 2.5 * $of0.h)
     if ($longa) { Log "   Disposição para peça longa (vistas empilhadas)" "DarkGray" }
+    # chapa dobrada longa: principal + vista de baixo + planificada já mostram tudo; a lateral só repetiria a largura
+    # (e ficaria sem cota - nenhuma vista pode ficar sem cota)
+    if ($longa -and $left -and $top -and $laser -and $chapa -and -not $plana) {
+        try { Selecionar $dm $left | Out-Null; X $dm "EditDelete" | Out-Null; $left = $null; Rebuild $dm; Log "   Peça longa dobrada: sem vista lateral (largura cotada na vista de baixo)" "DarkGray" } catch { }
+    }
 
     # folga em volta das vistas para as cotas: maior quando entram as cotas do modelo (usinagem)
     $script:MargemCotas = if ($laser -and -not $cls.Usinagem) { 0.010 } else { 0.018 }
@@ -114,6 +119,12 @@ function DetalharPeca($caminho, $peca) {
     if ($left) { $lf += (Contorno $left).w }
     if ($top) { $hf += (Contorno $top).h }
     if ($flat) { $lf = [math]::Max($lf, $cF.w + (Contorno $flat).w) }
+    if ($longa) {
+        # vistas empilhadas: largura = a maior linha; altura = soma das vistas (a planificada vai embaixo, não ao lado)
+        $lf = $cF.w; if ($left) { $lf += (Contorno $left).w }
+        if ($top) { $lf = [math]::Max($lf, (Contorno $top).w) }
+        if ($flat) { $lf = [math]::Max($lf, (Contorno $flat).w); $hf += (Contorno $flat).h }
+    }
     $lf = $lf / $esc0; $hf = $hf / $esc0
     $i0 = EscalaInicial $lf $hf
     if ($i0 -gt 0) { $i0-- }   # otimista: a disposição confere se coube
