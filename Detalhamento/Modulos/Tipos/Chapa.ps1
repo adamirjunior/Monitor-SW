@@ -30,7 +30,7 @@ function ApagarCota($dm, $dd) {
     try { X $dm "ClearSelection2" $true | Out-Null; $an = X $dd "GetAnnotation"; $ok = $false; try { $ok = X $an "Select2" $false 0 } catch { }; if (-not $ok) { try { X $an "Select3" $false ([SwCom]::NullDisp()) | Out-Null } catch { } }; X $dm "EditDelete" | Out-Null } catch { }
 }
 # cota da ESPESSURA da chapa: procura duas arestas retas paralelas separadas pela espessura (aba vista de lado)
-function CotaEspessura($dm, $vistas, $xVert = $null) {
+function CotaEspessura($dm, $vistas, $xVert = $null, $yHoriz = $null) {
     $T = [double]$script:espessura
     if ($T -le 0) { return 0 }
     foreach ($v in @($vistas)) {
@@ -60,7 +60,11 @@ function CotaEspessura($dm, $vistas, $xVert = $null) {
             if ((QtdSelecionados $dm) -ne 2) { continue }
             $o = Contorno $v
             $dd = $null
-            if ($best[0][1] -eq "v") { $dd = X $dm "AddHorizontalDimension2" ([double](($o.x1 + $o.x2) / 2)) ([double]($o.y1 - $DistCota)) 0.0 }
+            if ($best[0][1] -eq "v") {
+                # horizontal: na mesma reta da cota horizontal da vista principal (ex.: DXF, junto do 390 em cima), quando informada
+                $yc = if ($null -ne $yHoriz) { [double]$yHoriz } else { [double]($o.y1 - $DistCota) }
+                $dd = X $dm "AddHorizontalDimension2" ([double](($o.x1 + $o.x2) / 2)) $yc 0.0
+            }
             else {
                 # vertical: na mesma reta da cota vertical da vista principal (ex.: 290 à esquerda), quando informada
                 $xc = if ($null -ne $xVert) { [double]$xVert } else { [double]($o.x2 + $DistCota) }

@@ -184,7 +184,7 @@ const REGRAS = [
   ["laser", "DXF planificado e cotado; linhas de dobra no 1.2 / 1.2.1", "part", "2026-10-20", "Conferir as linhas de dobra."],
   ["laser", "Todo DXF gerado abre enquadrado no AutoCAD (como o duplo clique no scroll)", "teste", "2026-10-26", "Cabeçalho do DXF já enquadrado; no AutoCAD recém-aberto espera o arquivo carregar e enquadra duas vezes."],
   ["laser", "DXF com usinagem: <span class=\"aviso\">Avaliar sobremetal - Recurso Offset</span>", "teste", "2026-10-26", ""],
-  ["laser", "DXF: vista de lado com a cota da espessura (também na chapa plana 1.1)", "teste", "2026-10-26", "Se a vista projetada falhar, usa uma vista de modelo de lado em 1:1."],
+  ["laser", "DXF: vista de lado com a cota da espessura (também na chapa plana 1.1), alinhada com a cota horizontal de cima", "teste", "2026-10-26", "Se a vista projetada falhar, usa uma vista de modelo de lado em 1:1."],
   ["laser", "DXF com rosca/rebaixo: só a circunferência do pré-furo", "teste", "2026-10-26", "Remove a circunferência concêntrica maior. Vale para qualquer espessura."],
   ["laser", "DXF com rosca/rebaixo e espessura > 5 mm: <span class=\"aviso\">Avaliar furação no CNC - Espessura &gt; 5mm</span>", "teste", "2026-10-26", "Limite mudou de 4,76 para 5 mm. Até 5 mm continua como estava."],
   ["laser", "DXF com espessura > 5 mm e furos: 2º aviso <span class=\"aviso\">Avaliar furações pequenas em relação a espessura - Requer CNC</span>", "teste", "2026-10-26", ""],
@@ -207,6 +207,7 @@ const REGRAS = [
   ["perfil", "Barras e cantoneiras com a lógica do metalon", "teste", "2026-10-26", "Cantoneira (perfil em L) precisa de teste."]
 ];
 const ALTERACOES = [
+  ["2026-10-26", "DXF: espessura alinhada em cima", "Gerador", ["Cota da espessura na mesma reta da cota horizontal de cima (ex.: 1,5 junto do 390)"]],
   ["2026-10-26", "DXF: cota da espessura e Ø mais curto", "Gerador", ["Espessura cotada entre as duas linhas da vista de lado", "Ø do furo cotado no furo mais perto do canto (linha de chamada não atravessa a peça)"]],
   ["2026-10-26", "DXF da chapa plana com espessura", "Gerador", ["Vista de lado com a cota da espessura no DXF da 1.1", "Se a vista projetada não sair, usa uma vista de modelo de lado em 1:1"]],
   ["2026-10-26", "Alinhamento da cota de espessura (1.1)", "Gerador", ["Escala e espessura da chapa plana testadas", "Espessura na mesma reta da cota vertical da principal (ex.: 290 e 1,50 alinhadas à esquerda)"]],

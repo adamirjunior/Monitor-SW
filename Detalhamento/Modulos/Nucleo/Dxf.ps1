@@ -362,7 +362,8 @@ function GerarDxf($caminhoPeca, $peca, $destinoDxf, $desc) {
                 try { $ft = X $peca "FirstFeature"; while ($ft) { if ([string](X $ft "GetTypeName2") -eq "SheetMetal") { $espL = [double](XG (X $ft "GetDefinition") "Thickness"); break }; $ft = X $ft "GetNextFeature" } } catch { }
                 if ($espL -le 0) { $bb = XD (X $peca "GetPartBox" $true); $espL = [math]::Min([math]::Abs($bb[3] - $bb[0]), [math]::Min([math]::Abs($bb[4] - $bb[1]), [math]::Abs($bb[5] - $bb[2]))) }
                 $espAntes = $script:espessura; $script:espessura = $espL
-                $ne = 0; try { $ne = CotaEspessura $d @($lat) } catch { }
+                $yH = $null; try { $yH = [double](CaixaReal $v).y2 + $DistCota } catch { }
+                $ne = 0; try { $ne = CotaEspessura $d @($lat) $null $yH } catch { }
                 $script:espessura = $espAntes
                 if ($ne -gt 0) { $nc += $ne; if (-not $mesmaAltura) { $nc += CotaTotal $d $lat $false $true } }
                 else { $nc += CotaTotal $d $lat $true (-not $mesmaAltura) }
