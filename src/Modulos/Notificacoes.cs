@@ -1,4 +1,4 @@
-// Monitor - Notificações: cada usuário escolhe de quais outros usuários quer receber avisos de alteração.
+﻿// Monitor - Notificações: cada usuário escolhe de quais outros usuários quer receber avisos de alteração.
 // notificacoes.tsv na pasta do Monitor (compartilhada, segue o usuário em qualquer PC): LOGIN, MODO (todos/marcados),
 // SEM NOME (sim/não = avisos de alterações sem usuário identificado), USUÁRIOS (logins separados por |).
 // Os avisos das próprias ações (gerar detalhamento, conferência, marcações) e a janelinha "Gerando detalhamento"
@@ -17,8 +17,8 @@ namespace MonitorSW
     {
         public class Pref
         {
-            public bool Todos = true;      // padrão: recebe de todos (como era antes)
-            public bool SemNome = true;
+            public bool Todos = false;     // padrão: só recebe de quem a pessoa ativar em Opções > Notificações
+            public bool SemNome = false;
             public HashSet<string> Logins = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         }
 
@@ -49,7 +49,7 @@ namespace MonitorSW
                             if (c.Length < 2) continue;
                             var p = new Pref();
                             p.Todos = !c[1].Trim().Equals("marcados", StringComparison.OrdinalIgnoreCase);
-                            p.SemNome = c.Length < 3 || !c[2].Trim().StartsWith("n", StringComparison.OrdinalIgnoreCase);
+                            p.SemNome = c.Length >= 3 && c[2].Trim().StartsWith("s", StringComparison.OrdinalIgnoreCase);
                             if (c.Length > 3) foreach (var l in c[3].Split('|')) if (l.Trim().Length > 0) p.Logins.Add(l.Trim());
                             m[c[0].Trim()] = p;
                         }

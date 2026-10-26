@@ -1184,6 +1184,21 @@ namespace MonitorSW
             return m.LastBy ?? "";
         }
 
+        // quem gravou o PDF/DXF: dono do arquivo no servidor (usuário do Windows, sem o domínio)
+        static string DonoArquivo(string path)
+        {
+            try
+            {
+                if (string.IsNullOrEmpty(path) || !File.Exists(path)) return "";
+                var acc = File.GetAccessControl(path).GetOwner(typeof(System.Security.Principal.NTAccount)).ToString();
+                int i = acc.LastIndexOf('\\');
+                acc = i >= 0 ? acc.Substring(i + 1) : acc;
+                if (acc.Equals("Administradores", StringComparison.OrdinalIgnoreCase) || acc.Equals("Administrators", StringComparison.OrdinalIgnoreCase) || acc.Equals("SYSTEM", StringComparison.OrdinalIgnoreCase)) return "";
+                return acc;
+            }
+            catch { return ""; }
+        }
+
         // ------------------------------------------------------------ verificacao de um projeto
         public List<Ev> ScanProject(Project p)
         {
@@ -1429,6 +1444,8 @@ namespace MonitorSW
                 }
                 if (pdfCh) kinds.Add("PDF gerado" + (it.PdfVer.Length > 0 ? " (" + it.PdfVer + ")" : ""));
                 if (dxfCh) kinds.Add("DXF gerado" + (it.DxfVer.Length > 0 ? " (" + it.DxfVer + ")" : ""));
+                if (who.Length == 0 && dxfCh) who = DonoArquivo(it.DxfPath);
+                if (who.Length == 0 && pdfCh) who = DonoArquivo(it.PdfPath);
 
                 var sb = new StringBuilder();
                 sb.Append(it.Process.Length > 0 ? "[" + it.Process + " - exige " + it.Need + "] " : "");
