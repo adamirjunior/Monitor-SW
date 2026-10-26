@@ -130,7 +130,8 @@ function CotaTotalSemVertices($dm, $v, [bool]$horiz, [bool]$vert) {
                 $cp = XD (XG $c "CircleParams")
                 $eixo = Rot $a @($cp[3], $cp[4], $cp[5])
                 if ([math]::Abs($eixo[0]) -gt 0.05 -or [math]::Abs($eixo[1]) -gt 0.05) { continue }
-                $circ += ,@($e, [math]::Round($cp[6] * 2000, 3))
+                $pc = Rot $a @($cp[0], $cp[1], $cp[2])
+                $circ += ,@($e, [math]::Round($cp[6] * 2000, 3), ($pc[0] + $pc[1]))
             } elseif (X $c "IsLine") {
                 $cpp = XD (X $e "GetCurveParams2")
                 $p1 = Rot $a @($cpp[0], $cpp[1], $cpp[2]); $p2 = Rot $a @($cpp[3], $cpp[4], $cpp[5])
@@ -141,7 +142,8 @@ function CotaTotalSemVertices($dm, $v, [bool]$horiz, [bool]$vert) {
     }
     # diâmetros: um de cada tamanho (externo e furo)
     $feitos = @{}; $k = 0
-    foreach ($ci in ($circ | Sort-Object { -$_[1] })) {
+    # de cada diâmetro, cota o círculo mais perto do canto superior direito (onde fica o texto): linha de chamada curta
+    foreach ($ci in ($circ | Sort-Object { -$_[1] }, { -$_[2] })) {
         if ($feitos.ContainsKey($ci[1])) { continue }
         X $dm "ClearSelection2" $true | Out-Null
         if (-not (SelecionarEntidade $dm $v $ci[0] $false)) { continue }

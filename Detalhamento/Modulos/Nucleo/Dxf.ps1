@@ -357,7 +357,15 @@ function GerarDxf($caminhoPeca, $peca, $destinoDxf, $desc) {
             if ($lat) {
                 $ol = Contorno $lat
                 $mesmaAltura = ([math]::Abs(($ol.y2 - $ol.y1) - ($o.y2 - $o.y1)) -lt 0.0008)
-                $nc += CotaTotal $d $lat $true (-not $mesmaAltura)
+                # espessura: cota entre as duas linhas paralelas da vista de lado (mesma função do desenho)
+                $espL = 0.0
+                try { $ft = X $peca "FirstFeature"; while ($ft) { if ([string](X $ft "GetTypeName2") -eq "SheetMetal") { $espL = [double](XG (X $ft "GetDefinition") "Thickness"); break }; $ft = X $ft "GetNextFeature" } } catch { }
+                if ($espL -le 0) { $bb = XD (X $peca "GetPartBox" $true); $espL = [math]::Min([math]::Abs($bb[3] - $bb[0]), [math]::Min([math]::Abs($bb[4] - $bb[1]), [math]::Abs($bb[5] - $bb[2]))) }
+                $espAntes = $script:espessura; $script:espessura = $espL
+                $ne = 0; try { $ne = CotaEspessura $d @($lat) } catch { }
+                $script:espessura = $espAntes
+                if ($ne -gt 0) { $nc += $ne; if (-not $mesmaAltura) { $nc += CotaTotal $d $lat $false $true } }
+                else { $nc += CotaTotal $d $lat $true (-not $mesmaAltura) }
             }
             Log "   (DXF: $nc cota(s) total(is))" "DarkGray"
             Rebuild $d
