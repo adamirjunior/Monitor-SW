@@ -287,7 +287,7 @@ function PtComp([double[]]$t, [double[]]$p, [int]$conv) {
 }
 function DistSegPt($p, $a, $b) {
     $dx = $b[0] - $a[0]; $dy = $b[1] - $a[1]; $l2 = $dx * $dx + $dy * $dy
-    $u = 0.0; if ($l2 -gt 1e-12) { $u = [math]::Max(0, [math]::Min(1, (($p[0] - $a[0]) * $dx + ($p[1] - $a[1]) * $dy) / $l2)) }
+    $u = 0.0; if ($l2 -gt 1e-12) { $u = [math]::Max([double]0.0, [math]::Min([double]1.0, [double]((($p[0] - $a[0]) * $dx + ($p[1] - $a[1]) * $dy) / $l2))) }
     $qx = $a[0] + $u * $dx - $p[0]; $qy = $a[1] + $u * $dy - $p[1]
     return [math]::Sqrt($qx * $qx + $qy * $qy)
 }
