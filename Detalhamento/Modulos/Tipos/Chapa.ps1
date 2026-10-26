@@ -73,6 +73,8 @@ function CotaEspessura($dm, $vistas, $xVert = $null, $yHoriz = $null) {
                     $cima = ([math]::Abs($A[4] - $maxY) -lt 0.0001 -and [math]::Abs($B[4] - $maxY) -lt 0.0001)
                     if ($baixo) { $ld = "baixo"; $bonus = 1000 } elseif ($cima) { $ld = "cima"; $bonus = 900 }
                 }
+                # quem chama já disse a direção da cota (DXF: em cima, junto da cota horizontal; 1.1: à esquerda): esse tipo de par vem primeiro
+                if (($null -ne $yHoriz -and $A[1] -eq "v") -or ($null -ne $xVert -and $A[1] -eq "h")) { $bonus += 2000 }
                 $nota = $ov + $bonus
                 if ($nota -gt $bestNota) { $bestNota = $nota; $best = @($A, $B); $lado = $ld }
             } }

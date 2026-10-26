@@ -15,8 +15,8 @@ using Microsoft.Win32;
 [assembly: AssemblyTitle("Monitor")]
 [assembly: AssemblyDescription("BOM dos projetos SolidWorks com status de PDF/DXF")]
 [assembly: AssemblyProduct("Monitor")]
-[assembly: AssemblyVersion("2.14.1.0")]
-[assembly: AssemblyFileVersion("2.14.1.0")]
+[assembly: AssemblyVersion("2.15.0.0")]
+[assembly: AssemblyFileVersion("2.15.0.0")]
 
 namespace MonitorSW
 {
@@ -1916,6 +1916,28 @@ namespace MonitorSW
         // (pasta Detalhamento ao lado do config.ini). Grava na pasta da peça no servidor.
         bool genRunning;
 
+        // um detalhamento por vez (em qualquer PC): o gerador deixa gerando.lock ABERTO enquanto trabalha.
+        // Devolve "Fulano (PC X) desde HH:mm: peça" se alguém está gerando, ou null.
+        static string GeradorOcupado(string pasta)
+        {
+            string f = Path.Combine(pasta, "gerando.lock");
+            try
+            {
+                if (!File.Exists(f)) return null;
+                try { using (new FileStream(f, FileMode.Open, FileAccess.ReadWrite, FileShare.None)) { } return null; }   // ninguém segurando: sobra antiga
+                catch (IOException) { }
+                string txt = "";
+                try { using (var fs = new FileStream(f, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete)) using (var sr = new StreamReader(fs, Encoding.UTF8)) txt = sr.ReadToEnd(); } catch { }
+                var c = txt.Split('|');
+                string s = c.Length > 0 && c[0].Trim().Length > 0 ? c[0].Trim() : "outra pessoa";
+                if (c.Length > 1 && c[1].Trim().Length > 0) s += " (PC " + c[1].Trim() + ")";
+                if (c.Length > 2 && c[2].Trim().Length > 0) s += " desde " + c[2].Trim();
+                if (c.Length > 3 && c[3].Trim().Length > 0) s += ": " + c[3].Trim();
+                return s;
+            }
+            catch { return null; }
+        }
+
         void GenerateDetail()
         {
             string model = null, name = null, sdesc = ""; Item it = null;
@@ -1941,6 +1963,8 @@ namespace MonitorSW
 
             string script = Path.Combine(Path.GetDirectoryName(engine.Cfg.FilePath) ?? Util.AppDir, "Detalhamento", "DetalharSW.ps1");
             if (!File.Exists(script)) { MessageBox.Show("Não encontrei o gerador de detalhamento:\n" + script, "Gerar detalhamento", MessageBoxButtons.OK, MessageBoxIcon.Warning); return; }
+            string ocupado = GeradorOcupado(Path.GetDirectoryName(script));
+            if (ocupado != null) { MessageBox.Show("Já tem um detalhamento sendo gerado por " + ocupado + ".\n\nAguarde terminar e gere de novo.", "Gerar detalhamento", MessageBoxButtons.OK, MessageBoxIcon.Information); return; }
 
             bool isAsm = model.EndsWith(".SLDASM", StringComparison.OrdinalIgnoreCase);
             bool isDrw = model.EndsWith(".SLDDRW", StringComparison.OrdinalIgnoreCase);
@@ -2040,8 +2064,9 @@ namespace MonitorSW
             Aviso(4000, "Gerando detalhamento", name + ": " + what, ToolTipIcon.Info);
             System.Threading.ThreadPool.QueueUserWorkItem(_ =>
             {
-                try { p.WaitForExit(); } catch { }
-                string res = GenResult(Path.GetDirectoryName(script), model, started);
+                int codigo = 0;
+                try { p.WaitForExit(); codigo = p.ExitCode; } catch { }
+                string res = codigo == 3 ? "não gerado - outra pessoa estava gerando um detalhamento; aguarde e gere de novo" : GenResult(Path.GetDirectoryName(script), model, started);
                 bool marcou = false;
                 if (res.StartsWith("pronto"))
                 {
