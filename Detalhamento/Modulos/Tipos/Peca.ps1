@@ -97,6 +97,7 @@ function DetalharPeca($caminho, $peca) {
         Rebuild $dm
     }
     Deitar $dm $flat
+    AlinharPlanificada $dm $front $flat
     $of0 = Contorno $front
     $longa = ($of0.w -gt 2.5 * $of0.h)
     if ($longa) { Log "   Disposição para peça longa (vistas empilhadas)" "DarkGray" }

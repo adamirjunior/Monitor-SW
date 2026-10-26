@@ -77,6 +77,40 @@ function CotaEspessura($dm, $vistas, $xVert = $null, $yHoriz = $null) {
     Log "   (não achei onde cotar a espessura da chapa)" "DarkYellow"
     return 0
 }
+# planificada no mesmo sentido da vista principal: as dobras do lado em que aparecem na principal
+# (a planificada sai do SolidWorks virada; ex.: 02204262 com as dobras à direita na principal e à esquerda na planificada)
+function AlinharPlanificada($dm, $front, $flat) {
+    if (-not $front -or -not $flat) { return }
+    try {
+        $pm = @(); foreach ($vx in (Entidades $front "swViewEntityType_Vertex" 3)) { try { $pm += ,([double[]](XD (X $vx "GetPoint"))) } catch { } }
+        if ($pm.Count -gt 0) { EscolherModoXf $front $pm | Out-Null }
+        $xs = @()
+        foreach ($e in (Entidades $front "swViewEntityType_Edge" 1)) {
+            try {
+                $c = X $e "GetCurve"; if (-not (X $c "IsCircle")) { continue }
+                if (-not (X $e "GetStartVertex")) { continue }   # círculo inteiro = furo, não dobra
+                $cp = [double[]](XD (XG $c "CircleParams")); $q = NaFolha $front @($cp[0], $cp[1], $cp[2]); $xs += $q[0]
+            } catch { }
+        }
+        $xn = @()
+        foreach ($nt in @(X $flat "GetNotes")) {
+            if (-not $nt) { continue }
+            if ([string](X $nt "GetText") -notmatch "(?i)PARA (CIMA|BAIXO)") { continue }
+            try { $xn += [double](XD (X (X $nt "GetAnnotation") "GetPosition"))[0] } catch { }
+        }
+        if ($xs.Count -eq 0 -or $xn.Count -eq 0) { return }
+        $of = Contorno $front; $ol = Contorno $flat
+        $ladoF = (($xs | Measure-Object -Average).Average - ($of.x1 + $of.x2) / 2) / [math]::Max(0.001, $of.w)
+        $ladoP = (($xn | Measure-Object -Average).Average - ($ol.x1 + $ol.x2) / 2) / [math]::Max(0.001, $ol.w)
+        # só quando as dobras estão claramente de lados opostos (dobra no meio da peça não importa)
+        if ([math]::Abs($ladoF) -gt 0.1 -and [math]::Abs($ladoP) -gt 0.1 -and ($ladoF * $ladoP) -lt 0) {
+            $ang = 0.0; try { $ang = [double](XG $flat "Angle") } catch { }
+            XS $flat "Angle" ($ang + [math]::PI); Rebuild $dm
+            Log "   Planificada girada 180° (dobras do mesmo lado da vista principal)" "DarkGray"
+        }
+    } catch { Log "   (alinhar planificada: $($_.Exception.Message))" "DarkYellow" }
+    $script:xfCache = @{}; $script:xfModo = @{}
+}
 # chapa dobrada: cota de cada linha de dobra até a extremidade MAIS PRÓXIMA (o operador mede depois de dobrar).
 # A direção de cada linha vem da nota "PARA CIMA/BAIXO" presa a ela (a nota fica no sentido da linha, na folha);
 # a linha é a entidade em que a nota está presa. Cria a cota até os dois lados e deixa só a menor.
