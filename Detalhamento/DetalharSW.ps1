@@ -86,6 +86,7 @@ foreach ($arq in $lista) {
 }
 Log "Concluído: $nOk ok, $nErro com erro. Log: $LogFile" "Cyan"
 if ($Modo -eq "gerar") {
-    if ($nErro -gt 0) { Write-Host ""; Write-Host "Deu erro (veja acima). Pressione Enter para fechar." -ForegroundColor Yellow; [void](Read-Host) }
-    else { Start-Sleep -Seconds 2 }
+    # janela fecha sozinha sempre (o Monitor mostra o resultado/erro no aviso e o detalhe fica no log.txt)
+    if ($nErro -gt 0) { Write-Host ""; Write-Host "Deu erro (veja o aviso do Monitor ou o log.txt). Fechando..." -ForegroundColor Yellow; Start-Sleep -Seconds 3 }
+    else { Start-Sleep -Seconds 1 }
 }

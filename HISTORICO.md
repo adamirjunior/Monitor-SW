@@ -7,6 +7,7 @@ Formato: `- AAAA-MM-DD — o que mudou — motivo / pedido do usuário`. Itens *
 ---
 
 ## Gerador — regras gerais
+- 2026-10-26 — Janela do PowerShell do gerador (pelo Monitor) fecha sozinha SEMPRE, mesmo com erro (antes esperava Enter) — pedido do usuário. **PENDENTE testar.**
 - 2026-10-26 — Avisos vermelhos do desenho sempre em uma coluna (mesma borda esquerda, um embaixo do outro) no topo esquerdo da folha; novo aviso no 1.1.1 e 1.2.1: "Remover cotas desnecessárias para processo laser" — pedido do usuário. **PENDENTE testar.**
 - 2026-10-26 — Pelo botão do Monitor valem as saídas que o usuário marcou (desenho/PDF/DXF); a regra "laser = desenho + PDF + DXF" só vale arrastando no DETALHAR.bat — teste da Peça2 gerou DXF sem marcar. Balões vermelhos no cantinho superior esquerdo da FOLHA (acima da área das vistas; AvisoPosicaoX/Y no ini). Texto de todas as cotas centralizado na linha de cota (CenterText) — cota 60 da Peça2 saiu deslocada. **PENDENTE testar.**
 - 2026-10-26 — Regras do setor (REGRAS_DETALHAMENTO.txt) no gerador: classes 1.1/1.1.1/1.2/1.2.1 (laser), 2.1 (usinagem), 3.1/3.2 (solda), 4.1/4.2 (metalon, barras, cantoneiras); só detalha com DESCRIÇÃO + ACABAMENTO + um processo preenchidos (aviso e bloqueio); laser sai com desenho+PDF+DXF, demais desenho+PDF; tabela de furos com MAIS DE 8 furos; avisos em vermelho (acabamento/precisões no desenho de usinagem; sobremetal, espessura > 4,76 e diâmetro pequeno no DXF); DXF de rosca/rebaixo só com o pré-furo. Página Detalhamento/Regras.html mostra o que está pronto, parcial e pendente. **PENDENTE testar no SolidWorks.**
@@ -32,6 +33,7 @@ Formato: `- AAAA-MM-DD — o que mudou — motivo / pedido do usuário`. Itens *
 - Quebras: `InsertBreak` com coordenadas "modelo x escala a partir do centro" (InsertBreak2 não existe; InsertBreakVertical fazia linha errada).
 
 ## Tipo: chapa (plana / dobrada / laser)
+- 2026-10-26 — Espessura na descrição colada no texto ("CHAPA LASER 3mm1020", "ESP3MM") não era lida: regex sem exigir fim de palavra depois de MM/ESP. **PENDENTE testar.**
 - 2026-10-26 — LASER: antes de detalhar (e ao gerar só o DXF) confere a espessura da DESCRIÇÃO (ESP./ESPESSURA/E=, senão a menor medida com MM, maiúscula ou minúscula) com a do 3D (chapa metálica ou menor medida da chapa plana), tolerância 0,05 mm; diferente ou faltando = aviso e bloqueio, para obrigar a descrição a seguir o 3D — pedido do usuário. **PENDENTE testar.**
 - 2026-10-26 — TESTADO pelo usuário: oblongo no 1.2.1, avisos vermelhos em coluna, aviso "Remover cotas desnecessárias para processo laser".
 - 2026-10-26 — 1.2.1 (dobrada + FRESA CNC): além do raio de dobra, cota os OBLONGOS (par de arcos de meia-volta de mesmo raio): raio, centro a centro e posição do centro a partir das bordas da vista — pedido do usuário. **PENDENTE testar.**

@@ -110,5 +110,5 @@ function AcharTemplate {
     return ""
 }
 $Template = AcharTemplate
-if ($Template -eq "") { Log "ERRO: não achei o template DETALHAMENTO.drwdot. Informe o caminho em detalhamento.ini (TemplateDesenho=)." "Red"; Read-Host "Enter para sair"; exit 1 }
+if ($Template -eq "") { Log "ERRO: não achei o template DETALHAMENTO.drwdot. Informe o caminho em detalhamento.ini (TemplateDesenho=)." "Red"; if ($Modo -ne "gerar") { Read-Host "Enter para sair" }; exit 1 }
 Log "Template: $Template"

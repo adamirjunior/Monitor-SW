@@ -143,11 +143,11 @@ $ConferirEspessura   = Sim (C "ConferirEspessuraLaser" "sim")
 function EspessuraDaDescricao([string]$desc) {
     if (-not $desc) { return $null }
     $num = '([0-9]+(?:[\.,][0-9]+)?)'
-    foreach ($pad in @("(?i)ESPESSURA\s*[:=]?\s*$num", "(?i)\bESP\b\.?\s*[:=]?\s*$num", "(?i)\bE\s*=\s*$num")) {
+    foreach ($pad in @("(?i)ESPESSURA\s*[:=]?\s*$num", "(?i)\bESP(?![A-Z])\.?\s*[:=]?\s*$num", "(?i)\bE\s*=\s*$num")) {
         $m = [regex]::Match($desc, $pad)
         if ($m.Success) { return [double]($m.Groups[1].Value.Replace(",", ".")) / 1000 }
     }
-    $vals = @([regex]::Matches($desc, "(?i)$num\s*MM\b") | ForEach-Object { [double]($_.Groups[1].Value.Replace(",", ".")) })
+    $vals = @([regex]::Matches($desc, "(?i)$num\s*MM(?![A-Z])") | ForEach-Object { [double]($_.Groups[1].Value.Replace(",", ".")) })
     if ($vals.Count -gt 0) { return ($vals | Measure-Object -Minimum).Minimum / 1000 }
     return $null
 }
