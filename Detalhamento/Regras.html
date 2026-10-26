@@ -198,11 +198,12 @@ const REGRAS = [
   ["solda", "Balões com o código da peça, um por peça diferente", "ok", "2026-10-20", ""],
   ["solda", "Balões numéricos 1, 2, 3", "rej", "2026-10-20", "Só o texto com o código."],
   ["solda", "3.2: furos alinhados com cota em um só furo do padrão", "pend", "", ""],
-  ["solda", "Seta do balão no CENTRO da peça, presa na face (não na aresta)", "teste", "2026-10-26", "2º ajuste: no 1º teste a seta ficou na aresta (lia a ponta errada da linha de chamada)."],
+  ["solda", "Seta do balão no CENTRO da peça, presa na face (não na aresta)", "teste", "2026-10-26", "3º ajuste: o balão é recriado preso na face no centro da peça (o SolidWorks 2016 não move a seta). Teste no desenho aberto: 2 de 2."],
   ["perfil", "Metalon: quebras de seção, perfil, isométrica, cotas encadeadas", "ok", "2026-10-20", "Padrão 02123721."],
   ["perfil", "Barras e cantoneiras com a lógica do metalon", "teste", "2026-10-26", "Cantoneira (perfil em L) precisa de teste."]
 ];
 const ALTERACOES = [
+  ["2026-10-26", "Seta do balão de solda no centro (correção)", "Gerador", ["Balão recriado preso na face no meio da peça", "Se no centro aparecer outra peça na frente, a seta fica na aresta"]],
   ["2026-10-26", "Balões de solda apontando para o centro da peça", "Gerador", ["Seta do balão vai para o meio da maior face da peça, em vez da aresta", "Ajuda a identificar peças pequenas na montagem"]],
   ["2026-10-26", "Monitor 2.12: tema por usuário", "Monitor", ["Tema claro/escuro gravado no usuário do Monitor (preferencias.tsv), não mais no PC", "Trocar de usuário reabre o Monitor com o tema de quem entrou"]],
   ["2026-10-26", "Monitor 2.11: notificações por usuário", "Monitor", ["Opções > Notificações: receber avisos de todos ou só dos usuários marcados", "Escolha gravada por usuário (vale em qualquer PC)", "Testados: espessura na vista do raio, linha de dobra até a aresta, janelinha de status"]],
