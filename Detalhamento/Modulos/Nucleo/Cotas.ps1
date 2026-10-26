@@ -71,6 +71,7 @@ function CotaEntre($dm, $v, $a, $b, $x, $y, [string]$nome) {
     $q = QtdSelecionados $dm
     if ($q -ne 2) { Log "   (cota $nome de $(X $v 'GetName2') não feita: $q selecionado(s))" "DarkYellow"; return 0 }
     try { $d = X $dm $metodo ([double]$x) ([double]$y) 0.0; if ($d) { return 1 } } catch { Log "   ($metodo falhou: $($_.Exception.Message))" "DarkYellow" }
+    Log "   (cota $nome de $(X $v 'GetName2'): o SolidWorks não criou)" "DarkYellow"
     return 0
 }
 function CotaTotal($dm, $v, [bool]$horiz, [bool]$vert) {
@@ -114,6 +115,7 @@ function CotaTotal($dm, $v, [bool]$horiz, [bool]$vert) {
         if ([math]::Abs($maxY - $minY) -gt 0.001) { $n += CotaEntre $dm $v $a $b ($cx1 - $DistCota) (($cy1 + $cy2) / 2) "vertical" }
     }
     X $dm "ClearSelection2" $true | Out-Null
+    if ($n -eq 0 -and ($horiz -or $vert)) { Log ("   (vista {0}: cota total não saiu - {1} vértice(s))" -f (X $v 'GetName2'), $verts.Count) "DarkYellow" }
     return $n
 }
 # peça redonda (arruela, disco, bucha vista de lado...): não tem cantos. Cota o diâmetro dos círculos

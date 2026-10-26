@@ -57,7 +57,8 @@ function DetalharPeca($caminho, $peca) {
     $front = VistaModelo $dm $caminho $nomesFrente 0.08 0.15
     if (-not $front) { throw "não consegui criar a vista frontal" }
     # peça comprida em pé: gira a principal antes de projetar as outras (chapa plana: sempre deitada, lado maior na horizontal)
-    if ($plana) { Deitar $dm $front 1.02 } elseif ($usinPrisma) { Deitar $dm $front }
+    # chapa dobrada (1.2): comprimento também na horizontal (ex.: 02204262, comprida no eixo Y do modelo)
+    if ($plana) { Deitar $dm $front 1.02 } elseif ($usinPrisma -or ($chapa -and $laser)) { Deitar $dm $front }
     # usinada com muitos furos: padrão ProEstamp com TABELA DE FUROS (ex.: 02124106)
     $tabelaFuros = $false
     if ($usinPrisma) {
@@ -88,6 +89,7 @@ function DetalharPeca($caminho, $peca) {
         foreach ($v in @($front, $left, $top)) { if ($v) { try { Selecionar $dm $v | Out-Null; X $dm "EditDelete" | Out-Null } catch { } } }
         $front = VistaModelo $dm $caminho @($melhor[1]) 0.08 0.15
         if (-not $front) { throw "não consegui recriar a vista principal" }
+        Deitar $dm $front
         $left = $null; $top = $null
         try { Selecionar $dm $front | Out-Null; $left = X $dm "CreateUnfoldedViewAt3" 0.20 0.15 0.0 $false } catch { }
         if (-not $redonda) { try { Selecionar $dm $front | Out-Null; $top = X $dm "CreateUnfoldedViewAt3" 0.08 0.07 0.0 $false } catch { } }
