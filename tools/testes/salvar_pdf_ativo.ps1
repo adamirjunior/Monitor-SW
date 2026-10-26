@@ -1,5 +1,5 @@
 ﻿# Salva o documento ATIVO do SolidWorks como PDF (cópia) para conferir o resultado de um teste.
-param([string]$Saida = "$env:USERPROFILE\Documents\teste_ativo.pdf", [string]$Pasta = "C:\Users\adami\Documents\Monitor-SW\Detalhamento")
+param([string]$Saida = "$env:USERPROFILE\Documents\teste_ativo.pdf", [string]$Titulo = "", [string]$Pasta = "C:\Users\adami\Documents\Monitor-SW\Detalhamento")
 $ErrorActionPreference = "Stop"
 $Modo = "diag"; $Saidas = ""; $Destino = ""; $Desenhista = ""; $Recriar = $false
 $LogFile = Join-Path $env:TEMP "diag_pdf.log"; $RelFile = Join-Path $env:TEMP "diag_rel.csv"
