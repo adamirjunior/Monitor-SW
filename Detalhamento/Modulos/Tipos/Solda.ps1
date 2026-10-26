@@ -316,7 +316,7 @@ function SetasNoCentro($dm, $v, $notas) {
                 $d = DistSegPt @($lp[0], $lp[1]) $a1 $a2
                 if ($d -lt $md) { $md = $d; $melhor = @($conv, $m) }
             } }
-            if ($md -gt 0.004) { Log ("   (balão {0}: não achei a posição da peça na folha, seta mantida na aresta)" -f $nTot) "DarkGray"; continue }
+            if ($md -gt 0.004) { Log ("   (balão {0}: não achei a posição da peça na folha, seta mantida na aresta - erro {1:N1} mm; seta ({2:N4};{3:N4}); T={4})" -f $nTot, ($md * 1000), $lp[0], $lp[1], $(if ($t) { $t.Count } else { "sem" })) "DarkGray"; continue }
             # maior face vizinha da aresta e um ponto no meio dela
             $fs = @(X $ed "GetTwoAdjacentFaces2") | Where-Object { $_ }
             $face = $fs | Sort-Object { try { -[double](X $_ "GetArea") } catch { 0 } } | Select-Object -First 1
