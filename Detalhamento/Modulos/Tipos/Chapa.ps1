@@ -81,16 +81,22 @@ function CotaEspessura($dm, $vistas, $xVert = $null, $yHoriz = $null) {
             SelecionarEntidade $dm $v $best[0][0] $false | Out-Null; SelecionarEntidade $dm $v $best[1][0] $true | Out-Null
             if ((QtdSelecionados $dm) -ne 2) { continue }
             $o = Contorno $v
+            # texto da cota junto da ponta da chapa (e não no meio da vista)
+            $cr = CaixaReal $v; $escV = 1.0; try { $escV = [double](XG $v "ScaleDecimal") } catch { }
+            $meio = ([double]$best[0][2] + [double]$best[1][2]) / 2
+            $yPonta = [double]($cr.y1 + ($meio - $minY) * $escV); $xPonta = [double]($cr.x1 + ($meio - $minX) * $escV)
+            if ($yPonta -lt $o.y1 -or $yPonta -gt $o.y2) { $yPonta = ($o.y1 + $o.y2) / 2 }
+            if ($xPonta -lt $o.x1 -or $xPonta -gt $o.x2) { $xPonta = ($o.x1 + $o.x2) / 2 }
             $dd = $null
             if ($best[0][1] -eq "v") {
                 # horizontal: na mesma reta da cota horizontal da vista principal (ex.: DXF, junto do 390 em cima), quando informada
                 $yc = if ($null -ne $yHoriz) { [double]$yHoriz } elseif ($lado -eq "cima") { [double]($o.y2 + $DistCota) } else { [double]($o.y1 - $DistCota) }
-                $dd = X $dm "AddHorizontalDimension2" ([double](($o.x1 + $o.x2) / 2)) $yc 0.0
+                $dd = X $dm "AddHorizontalDimension2" $xPonta $yc 0.0
             }
             else {
                 # vertical: na mesma reta da cota vertical da vista principal (ex.: 290 à esquerda), quando informada
                 $xc = if ($null -ne $xVert) { [double]$xVert } elseif ($lado -eq "esq") { [double]($o.x1 - $DistCota) } else { [double]($o.x2 + $DistCota) }
-                $dd = X $dm "AddVerticalDimension2" $xc ([double](($o.y1 + $o.y2) / 2)) 0.0
+                $dd = X $dm "AddVerticalDimension2" $xc $yPonta 0.0
             }
             X $dm "ClearSelection2" $true | Out-Null
             if ($dd) { $script:vistaPerfil = $v; Log ("   Cota da espessura ({0:N2} mm) na vista {1}" -f ($T * 1000), (X $v "GetName2")) "DarkGray"; return 1 }

@@ -4,12 +4,19 @@
 function Log([string]$msg, [string]$cor = "Gray") {
     $linha = (Get-Date -Format "HH:mm:ss") + "  " + $msg
     Write-Host $linha -ForegroundColor $cor
-    Add-Content -Path $LogFile -Value $linha -Encoding UTF8
+    # log.txt é um só no servidor: com duas pessoas gerando ao mesmo tempo o arquivo fica ocupado por instantes.
+    # Tenta de novo e, se não der, segue sem gravar (antes o erro de gravação interrompia as cotas)
+    for ($t = 0; $t -lt 5; $t++) { try { Add-Content -Path $LogFile -Value $linha -Encoding UTF8 -ErrorAction Stop; break } catch { Start-Sleep -Milliseconds 120 } }
     if ($script:ui) { $t = $msg.Trim(); if ($t -and -not $t.StartsWith("[dbg]") -and -not $t.StartsWith("(")) { $script:ui.Texto = $t } }   # etapa atual na janelinha
 }
 function Relatorio($arquivo, $tipo, $acao, $resultado, $msg) {
-    if (-not (Test-Path $RelFile)) { Add-Content -Path $RelFile -Value "DATA;ARQUIVO;TIPO;ACAO;RESULTADO;MENSAGEM" -Encoding UTF8 }
-    Add-Content -Path $RelFile -Value ((Get-Date -Format "dd/MM/yyyy HH:mm") + ";$arquivo;$tipo;$acao;$resultado;$msg") -Encoding UTF8
+    for ($t = 0; $t -lt 5; $t++) {
+        try {
+            if (-not (Test-Path $RelFile)) { Add-Content -Path $RelFile -Value "DATA;ARQUIVO;TIPO;ACAO;RESULTADO;MENSAGEM" -Encoding UTF8 -ErrorAction Stop }
+            Add-Content -Path $RelFile -Value ((Get-Date -Format "dd/MM/yyyy HH:mm") + ";$arquivo;$tipo;$acao;$resultado;$msg") -Encoding UTF8 -ErrorAction Stop
+            break
+        } catch { Start-Sleep -Milliseconds 120 }
+    }
 }
 
 # ---------------------------------------------------------------- configuracao
