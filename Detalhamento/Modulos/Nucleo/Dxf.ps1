@@ -422,6 +422,13 @@ function GerarDxf($caminhoPeca, $peca, $destinoDxf, $desc) {
             foreach ($t in $avD) { AvisoVermelho $d $t $o.x1 $yAv $altAv | Out-Null; $yAv += 3 * $altAv }
         } catch { Log "   (DXF: avisos não inseridos: $($_.Exception.Message))" "DarkYellow" }
         Rebuild $d
+        # DXF anterior aberto no AutoCAD trava o arquivo: fecha (sem salvar) antes de gravar o novo
+        if (Test-Path $destinoDxf) {
+            try {
+                $acad0 = AcadAberto
+                if ($acad0) { $doc0 = AcadDocDoArquivo $acad0 $destinoDxf; if ($doc0) { [SwCom]::Call($doc0, "Close", [object[]]@($false)) | Out-Null; Start-Sleep -Milliseconds 800; Log "   (DXF anterior fechado no AutoCAD para gravar o novo)" "DarkGray" } }
+            } catch { }
+        }
         SalvarComo $d $destinoDxf ($SaveSilent + $SaveCopy)
         CorDxf $destinoDxf
         if (($fuD.Roscados + $fuD.Rebaixos) -gt 0) { PreFuroDxf $destinoDxf }

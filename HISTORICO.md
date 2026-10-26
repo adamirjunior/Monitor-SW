@@ -65,6 +65,7 @@ Formato: `- AAAA-MM-DD — o que mudou — motivo / pedido do usuário`. Itens *
 - Layout de balões em escadinha/fileiras: várias tentativas; ficou a versão aprovada (commit b4c2400) — "ficou bom aparentemente".
 
 ## DXF / AutoCAD
+- 2026-10-26 — DXF: se o DXF anterior estiver aberto no AutoCAD (arquivo travado: "sendo usado por outro processo"), fecha sem salvar antes de gravar o novo.
 - 2026-10-26 — DXF: cota da espessura (vista de lado) na mesma reta da cota horizontal de cima da peça (ex.: 1,5 alinhado com o 390), em vez de embaixo. Pedido do usuário. **PENDENTE testar.**
 - 2026-10-26 — DXF: a vista de lado saiu, mas sem cota (usuário: "não ficou legal"). Espessura no DXF agora cotada entre as duas linhas paralelas da vista de lado (mesma CotaEspessura do desenho); Ø do furo cotado no furo mais perto do canto superior direito (linha de chamada curta, não atravessa a peça). **PENDENTE testar.**
 - 2026-10-26 — DXF da chapa plana (1.1) sem vista/cota de espessura: a vista projetada não era criada (seleção da vista pela ponte COM falhava em silêncio). Selecionar agora tenta SelectByID2 e, se falhar, SelectByID; se ainda assim não sair a vista projetada, cria uma vista de modelo de lado em 1:1 à direita da peça (espessura na horizontal) e cota. Pedido do usuário. **PENDENTE testar.**
