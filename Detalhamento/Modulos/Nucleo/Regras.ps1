@@ -119,10 +119,18 @@ function AvisoVermelho($dm, [string]$texto, [double]$x, [double]$y, [double]$alt
     } catch { Log "   (aviso não inserido: $($_.Exception.Message))" "DarkYellow"; return $null }
 }
 # avisos do desenho (folha A4): no cantinho superior esquerdo da FOLHA, acima da área das vistas
-# (faixa entre o topo da área útil e a margem), empilhados de cima para baixo
+# (faixa entre o topo da área útil e a margem). Vários avisos: uma COLUNA, todos com a mesma borda esquerda,
+# um embaixo do outro, sem encostar
 $AvisoX = [double](C "AvisoPosicaoX" "0.012").Replace(",", ".")
 $AvisoY = [double](C "AvisoPosicaoY" "0.197").Replace(",", ".")
 function AvisosDesenho($dm, [string[]]$textos) {
     $y = $AvisoY
-    foreach ($t in $textos) { if ($t) { AvisoVermelho $dm $t $AvisoX $y 0.0022 | Out-Null; $y -= 0.005 } }
+    foreach ($t in $textos) {
+        if (-not $t) { continue }
+        $n = AvisoVermelho $dm $t $AvisoX $y 0.0022
+        $prox = $y - 0.005
+        # o próximo começa logo abaixo do anterior (pela altura real do balão), mesma borda esquerda
+        if ($n) { try { Rebuild $dm; $ext = XD (X $n "GetExtent"); $baixo = [math]::Min($ext[1], $ext[4]); if ($baixo -gt 0.05 -and $baixo -lt $y) { $prox = $baixo - 0.0012 } } catch { } }
+        $y = $prox
+    }
 }

@@ -86,6 +86,7 @@ function ClassificarPeca($caminho, $peca) {
 
     # avisos em vermelho do DESENHO
     if ($u) { $k.Avisos += "Adicionar acabamento nas faces e precisões necessárias" }
+    if ($k.Classe -eq "1.1.1" -or $k.Classe -eq "1.2.1") { $k.Avisos += "Remover cotas desnecessárias para processo laser" }
 
     $f = $k.Furos
     Log ("   Classificação: {0} {1} ({2}) | fluxo {3} | caixa {4:N1} x {5:N1} x {6:N1} mm | esp. {7:N2} mm | furos: {8} roscado(s), {9} rebaixo(s), {10} simples" -f `

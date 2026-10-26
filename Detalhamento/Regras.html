@@ -161,12 +161,14 @@ const REGRAS = [
   ["geral", "Arrastando no DETALHAR.bat: laser com desenho + PDF + DXF, demais desenho + PDF", "teste", "2026-10-26", ""],
   ["geral", "Valor de todas as cotas no centro da linha de cota", "teste", "2026-10-26", "Cota 60 da Peça2 tinha saído deslocada."],
   ["geral", "Avisos vermelhos no cantinho superior esquerdo da folha", "teste", "2026-10-26", "Na Peça2 o aviso ficou sobre a cota 100. Posição em AvisoPosicaoX/Y."],
+  ["geral", "Mais de um aviso: alinhados numa mesma coluna, um embaixo do outro, no topo da folha", "teste", "2026-10-26", "Mesma borda esquerda para todos."],
   ["geral", "Escala ajustada ao tamanho da peça", "ok", "2026-10-20", "5:1 a 1:50, a maior que cabe."],
   ["geral", "Vista principal pela face com mais detalhes (furos, rasgos, rebaixos)", "part", "2026-10-26", "Hoje é a face maior."],
   ["geral", "Tabelas nunca maiores que as vistas", "part", "2026-10-21", "Tabela de furos achatada até ~100 x 90 mm; falta testar no 02124106."],
   ["laser", "Furos roscados ou com rebaixo: detalhe do furo (chamada)", "teste", "2026-10-26", "Furos do Assistente de Furação; rosca cosmética também conta."],
   ["laser", "Furos sem rosca e sem usinagem: não cotar (1.1 e 1.2)", "teste", "2026-10-26", ""],
   ["laser", "Laser com usinagem usa a tratativa de usinada (1.1.1)", "ok", "2026-10-26", "Peça2: cotas de posição e chamadas de furo."],
+  ["laser", "1.1.1 e 1.2.1: <span class=\"aviso\">Remover cotas desnecessárias para processo laser</span>", "teste", "2026-10-26", "Junto com o aviso de acabamento, na mesma coluna."],
   ["laser", "Com usinagem e mais de 8 furos: tabela de furos", "part", "2026-10-26", "Pronto no 1.1.1; no 1.2.1 ainda não."],
   ["laser", "Com usinagem e furos alinhados: cota em um só furo do padrão", "pend", "", ""],
   ["laser", "Ponto 0 (marcação CNC) no canto superior esquerdo da frontal", "pend", "", "Exemplo 0214215."],
@@ -189,6 +191,7 @@ const REGRAS = [
   ["perfil", "Barras e cantoneiras com a lógica do metalon", "teste", "2026-10-26", "Cantoneira (perfil em L) precisa de teste."]
 ];
 const ALTERACOES = [
+  ["2026-10-26", "Avisos em coluna e aviso de laser com usinagem", "Gerador", ["Vários avisos vermelhos alinhados numa coluna no topo esquerdo da folha", "Novo aviso no 1.1.1 e 1.2.1: Remover cotas desnecessárias para processo laser"]],
   ["2026-10-26", "Ajustes do teste da Peça2", "Gerador", ["Saídas pelo botão do Monitor: só o que for marcado (DXF não sai sozinho)", "Avisos vermelhos no cantinho superior esquerdo da folha", "Texto de todas as cotas no centro da linha de cota"]],
   ["2026-10-26", "Correção do config.ini do servidor", "Servidor", ["Acentos quebrados faziam o gerador procurar \"DESCRI??O\"; arquivo restaurado em UTF-8"]],
   ["2026-10-26", "Regras do setor no gerador", "Gerador", ["Validação de DESCRIÇÃO, ACABAMENTO e processo", "Classes 1.1 / 1.1.1 / 1.2 / 1.2.1, 2.1, 3.1 / 3.2, 4.1 / 4.2", "Tabela de furos com mais de 8 furos", "Avisos vermelhos no desenho e no DXF; DXF só com o pré-furo", "Decisões confirmadas: barra chata, CHAPA = laser, processo decide usinagem"]],
