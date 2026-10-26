@@ -7,6 +7,7 @@ Formato: `- AAAA-MM-DD — o que mudou — motivo / pedido do usuário`. Itens *
 ---
 
 ## Gerador — regras gerais
+- 2026-10-26 — TESTADO pelo usuário: espessura na vista do raio de dobra, linha de dobra até a aresta, janelinha "Gerando detalhamento".
 - 2026-10-26 — Janelinha "Gerando detalhamento" (sempre por cima, canto inferior direito) com barra animada, nome da peça e etapa atual (última linha do log), em todos os detalhamentos; fica vermelha se der erro — pedido do usuário. **PENDENTE testar.**
 - 2026-10-26 — Janela do PowerShell do gerador (pelo Monitor) fecha sozinha SEMPRE, mesmo com erro (antes esperava Enter) — pedido do usuário. **PENDENTE testar.**
 - 2026-10-26 — Avisos vermelhos do desenho sempre em uma coluna (mesma borda esquerda, um embaixo do outro) no topo esquerdo da folha; novo aviso no 1.1.1 e 1.2.1: "Remover cotas desnecessárias para processo laser" — pedido do usuário. **PENDENTE testar.**
@@ -63,6 +64,7 @@ Formato: `- AAAA-MM-DD — o que mudou — motivo / pedido do usuário`. Itens *
 - 2026-10-21 — DXF grava a extensão real ($EXTMIN/$EXTMAX e vista *Active) para abrir enquadrado; abre no AutoCAD JÁ ABERTO (não abre outro), substitui se o arquivo já estiver aberto, REGEN + ZOOM E. Usuário confirmou: "deu certo".
 
 ## Monitor SW (programa)
+- 2026-10-26 — 2.11: Opções > Notificações — cada usuário escolhe de quais usuários recebe avisos de alteração (todos / só marcados / alterações sem usuário), gravado em notificacoes.tsv por login. Avisos das próprias ações e a janelinha "Gerando detalhamento" aparecem sempre para quem faz — pedido do usuário (Adamir não quer os avisos do Guilherme). **PENDENTE testar.**
 - 2026-10-25 — 2.10: Opções › Tema (Escuro / Claro), escolha por usuário em `%LOCALAPPDATA%\MonitorSW\tema.txt`; ao trocar, o Monitor reinicia para aplicar — pedido do usuário (tema claro e escuro).
 - 2026-10-25 — 2.9.0: projeto do Visual Studio (`Monitor.sln`, .NET 4.8), código em `src/Nucleo`, `src/Interface`, `src/Modulos`; `publicar.ps1`. Servidor `X:\MonitorSW` só com o que roda (sem código-fonte); fonte no GitHub privado e em `Documentos\Monitor-SW`.
 - 2026-10-21 — 2.8.6: gerador minimizado. 2.8.5: erro inesperado não derruba o Monitor, grava `erros.log`.

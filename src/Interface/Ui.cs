@@ -15,8 +15,8 @@ using Microsoft.Win32;
 [assembly: AssemblyTitle("Monitor")]
 [assembly: AssemblyDescription("BOM dos projetos SolidWorks com status de PDF/DXF")]
 [assembly: AssemblyProduct("Monitor")]
-[assembly: AssemblyVersion("2.10.0.0")]
-[assembly: AssemblyFileVersion("2.10.0.0")]
+[assembly: AssemblyVersion("2.11.0.0")]
+[assembly: AssemblyFileVersion("2.11.0.0")]
 
 namespace MonitorSW
 {
@@ -864,6 +864,7 @@ namespace MonitorSW
                 if (LoginUi.Escolher(this)) { atualizaUser(); lblStatus.Text = "Usando como " + Users.Me + "."; }
             }));
             toolsMenu.Items.Add(mUser);
+            toolsMenu.Items.Add(Mi("Notificações...", (s, a) => { Notificacoes.Editar(this); var np = Notificacoes.Minha(); lblStatus.Text = np.Todos ? "Notificações: de todos os usuários." : "Notificações: de " + np.Logins.Count + " usuário(s) escolhido(s)."; }));
             toolsMenu.Items.Add(Mi("Testar aviso", (s, a) => Aviso(8000, "Teste de aviso", "Se você está vendo isto, os avisos do Monitor funcionam neste PC (" + Users.Me + ").", ToolTipIcon.Info)));
             var mCfg = new ToolStripMenuItem("Configurações");
             mCfg.DropDownItems.Add(Mi("Configurações do Monitor...", (s, a) => OpenConfig()));
@@ -2528,6 +2529,7 @@ namespace MonitorSW
             var list = evs;
             if (engine.Cfg.NotifyOthersOnly)
                 list = evs.Where(e => string.IsNullOrEmpty(e.Who) || !e.Who.Equals(Environment.UserName, StringComparison.OrdinalIgnoreCase) && !e.Who.Equals(Users.Me, StringComparison.OrdinalIgnoreCase)).ToList();
+            list = list.Where(Notificacoes.Aceita).ToList();   // Opções > Notificações: só dos usuários escolhidos
             if (list.Count == 0) return;
             list = list.OrderByDescending(e => e.Sev).ToList();
             lastBalloon = list[0];
