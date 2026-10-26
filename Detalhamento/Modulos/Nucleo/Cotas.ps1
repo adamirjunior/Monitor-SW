@@ -416,3 +416,18 @@ function CotasRaios($dm, $v, [bool]$soMenor = $false) {
     X $dm "ClearSelection2" $true | Out-Null
     return $n
 }
+
+# texto de TODAS as cotas do desenho no centro da linha de cota (entre as linhas de chamada)
+function CentralizarTextosCotas($dm) {
+    $n = 0
+    try {
+        $v = X (X $dm "GetFirstView") "GetNextView"
+        while ($v) {
+            $dd = $null; try { $dd = X $v "GetFirstDisplayDimension5" } catch { }
+            $g = 0
+            while ($dd -and $g -lt 200) { $g++; try { XS $dd "CenterText" $true; $n++ } catch { }; $dd = X $dd "GetNext5" }
+            $v = X $v "GetNextView"
+        }
+    } catch { Log "   (não consegui centralizar o texto das cotas: $($_.Exception.Message))" "DarkYellow" }
+    if ($n -gt 0) { Rebuild $dm; Log "   Texto de $n cota(s) centralizado na linha de cota" "DarkGray" }
+}

@@ -183,7 +183,7 @@ function DetalharMontagem($caminho, $asm) {
     if ((Test-Path $drwPath) -and -not $Sobrescrever) { Log "   Já existe $drwPath (Sobrescrever=não). Pulando criação." "Yellow"; Relatorio $caminho "montagem" "detalhar" "pulado" "desenho já existe"; return }
     ValidarPropriedades $asm $caminho   # DESCRIÇÃO, ACABAMENTO e um processo preenchidos (senão avisa e não detalha)
     $clsM = ClassificarMontagem $caminho $asm   # 3.1 sem usinagem | 3.2 com usinagem
-    $script:FazPdf = $true                       # regra do setor: solda sempre com detalhamento + PDF
+    if ($Modo -ne "gerar") { $script:FazPdf = $true }   # pelo Monitor vale o que o usuário marcou
     if (-not $clsM.EhSolda) { Log "   Aviso: não é solda pelas regras (código 1301.../descrição SOLDA/pasta); vou detalhar igual (isométrica + lista)." "Yellow" }
     if ($clsM.Usinagem) { Log "   3.2: montagem de solda com usinagem - cotas do padrão de furos ainda não automáticas (PENDENTE)." "Yellow" }
 

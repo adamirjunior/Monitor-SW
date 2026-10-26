@@ -10,8 +10,9 @@ function DetalharPeca($caminho, $peca) {
     $cls = ClassificarPeca $caminho $peca
     $script:classeAtual = $cls
     $script:tipoPeca = $cls.Classe + " " + $cls.Fluxo
-    $script:FazPdf = $true                          # regra do setor: todo detalhamento sai com PDF
-    if ($cls.FazDxf) { $script:FazDxf = $true }      # laser: detalhamento + PDF + DXF
+    # saídas: pelo botão do Monitor vale o que o usuário marcou (desenho / PDF / DXF);
+    # arrastando sobre o DETALHAR.bat segue a regra do setor (laser: desenho + PDF + DXF; demais: desenho + PDF)
+    if ($Modo -ne "gerar") { $script:FazPdf = $true; $script:FazDxf = [bool]$cls.FazDxf }
     $desc = $cls.Descricao; $laser = $cls.Laser; $chapa = $cls.Chapa
     $destDir = PastaDestino $caminho
     $drwPath = Join-Path $destDir "$cod.SLDDRW"
@@ -154,6 +155,7 @@ function DetalharPeca($caminho, $peca) {
     }
     }   # fim: sem tabela de furos
     }   # fim: peça que não é metalon
+    CentralizarTextosCotas $dm         # valor de cada cota no meio da linha de cota
     AvisosDesenho $dm @($cls.Avisos)   # balões vermelhos (ex.: usinagem -> acabamento e precisões)
     TrocarDesenhista $dm
     Rebuild $dm

@@ -101,7 +101,7 @@ td small { display: block; color: var(--muted); font-size: 13px; margin-top: 3px
     <li><strong>Conferir propriedades.</strong> Precisa de <code>DESCRIÇÃO</code>, <code>ACABAMENTO</code> e pelo menos um processo com valor (ex.: <code>02</code> em SOLDA, TORNO CNC, FRESA CNC, ACAB. MANUAL). Se faltar, aparece um aviso e o desenho não é gerado.</li>
     <li><strong>Classificar.</strong> Pela descrição, pelos processos e pela geometria (caixa, espessura, chapa metálica, furos roscados e com rebaixo). O log mostra a classe, ex.: <code>Classificação: 1.1.1 LASER</code>.</li>
     <li><strong>Detalhar pela classe.</strong> Cada classe chama o seu fluxo: chapa, usinada, tabela de furos, perfil ou solda.</li>
-    <li><strong>Saídas.</strong> Laser: desenho + PDF + DXF. Demais: desenho + PDF.</li>
+    <li><strong>Saídas.</strong> Pelo botão do Monitor: o que você marcar (desenho, PDF, DXF). Arrastando no DETALHAR.bat: laser sai com desenho + PDF + DXF; demais, desenho + PDF.</li>
   </ol>
   <div class="tab"><table>
     <thead><tr><th>Regra geral</th><th>Situação</th></tr></thead>
@@ -154,7 +154,7 @@ td small { display: block; color: var(--muted); font-size: 13px; margin-top: 3px
       <thead><tr><th>Regra</th><th>Situação</th></tr></thead>
       <tbody>
         <tr><td>Desenho e PDF obrigatórios</td><td><span class="chip ok">Implementado</span></td></tr>
-        <tr><td>No desenho: <span class="aviso">Adicionar acabamento nas faces e precisões necessárias</span><small>Balão vermelho no canto superior esquerdo da área útil.</small></td><td><span class="chip ok">Implementado</span></td></tr>
+        <tr><td>No desenho: <span class="aviso">Adicionar acabamento nas faces e precisões necessárias</span><small>Balão vermelho no cantinho superior esquerdo da folha, acima das vistas.</small></td><td><span class="chip ok">Implementado</span></td></tr>
         <tr><td>Mais de 8 furos dispersos: tabela de furos com X e Y de cada furo, origem no canto superior esquerdo da vista</td><td><span class="chip ok">Implementado</span></td></tr>
         <tr><td>Peça laser com FRESA CNC ou TORNO CNC usa a tratativa de usinada</td><td><span class="chip ok">Implementado</span></td></tr>
         <tr><td>Furos e circunferências maiores que 12 mm com precisão +0,1 / −0,1</td><td><span class="chip pend">Pendente</span></td></tr>
@@ -208,7 +208,7 @@ td small { display: block; color: var(--muted); font-size: 13px; margin-top: 3px
     <li><span class="chip ok">Confirmado</span> <strong>BARRA CHATA</strong> está nas regras de usinagem e de perfis. Com usinagem, é <strong>2.1 usinada</strong> (como o 02124106). Sem usinagem, é <strong>4.1</strong>. Outras barras com usinagem são <strong>4.2</strong>.</li>
     <li><span class="chip ok">Confirmado</span> <strong>CHAPA</strong> como palavra de laser vale para qualquer descrição com "CHAPA". Chapa que não vai ao laser precisa de outra palavra na descrição.</li>
     <li><span class="chip ok">Confirmado</span> Na usinagem, quem decide é o processo (TORNO CNC, FRESA CNC, ELETRO). O material na descrição só aparece no log. Peça sem nenhuma regra segue o fluxo antigo, com aviso no log.</li>
-    <li><span class="chip ok">Confirmado</span> Balões vermelhos no desenho ficam no canto superior esquerdo da área útil.</li>
+    <li><span class="chip ok">Confirmado</span> Balões vermelhos no desenho ficam no cantinho superior esquerdo da folha, acima das vistas.</li>
   </ul>
 </aside>
 
