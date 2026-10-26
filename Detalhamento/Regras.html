@@ -95,7 +95,7 @@ td.rg { min-width: 300px }
     <p>Acompanhamento das regras do gerador automático: o que já funciona, o que espera teste no SolidWorks, o que falta, e a linha do tempo das alterações.</p>
   </div>
   <dl>
-    <dt>Monitor SW</dt><dd>2.11.0.0</dd>
+    <dt>Monitor SW</dt><dd>2.12.0.0</dd>
     <dt>Gerador</dt><dd id="ultima">—</dd>
     <dt>Regras</dt><dd>REGRAS_DETALHAMENTO.txt</dd>
     <dt>Último teste</dt><dd>1.2.1 · 26/10</dd>
@@ -165,6 +165,7 @@ const REGRAS = [
   ["geral", "Janela do PowerShell fecha sozinha, mesmo com erro ou aviso", "teste", "2026-10-26", "O resultado aparece no aviso do Monitor e o detalhe no log.txt."],
   ["geral", "Janelinha \"Gerando detalhamento\" com animação e a etapa atual, em todos os detalhamentos", "ok", "2026-10-26", "Canto inferior direito, sempre por cima; desliga em JanelaGerando no ini."],
   ["geral", "Monitor: Opções > Notificações — cada usuário escolhe de quem recebe avisos de alteração", "teste", "2026-10-26", "Padrão: todos. A janelinha de detalhamento sempre aparece para quem está gerando."],
+  ["geral", "Monitor: tema claro/escuro de cada usuário (vale em qualquer PC)", "teste", "2026-10-26", "Ao entrar ou trocar de usuário, o Monitor reabre com o tema dele."],
   ["geral", "Escala ajustada ao tamanho da peça", "ok", "2026-10-20", "5:1 a 1:50, a maior que cabe."],
   ["geral", "Vista principal pela face com mais detalhes (furos, rasgos, rebaixos)", "part", "2026-10-26", "Hoje é a face maior."],
   ["geral", "Tabelas nunca maiores que as vistas", "part", "2026-10-21", "Tabela de furos achatada até ~100 x 90 mm; falta testar no 02124106."],
@@ -202,6 +203,7 @@ const REGRAS = [
   ["perfil", "Barras e cantoneiras com a lógica do metalon", "teste", "2026-10-26", "Cantoneira (perfil em L) precisa de teste."]
 ];
 const ALTERACOES = [
+  ["2026-10-26", "Monitor 2.12: tema por usuário", "Monitor", ["Tema claro/escuro gravado no usuário do Monitor (preferencias.tsv), não mais no PC", "Trocar de usuário reabre o Monitor com o tema de quem entrou"]],
   ["2026-10-26", "Monitor 2.11: notificações por usuário", "Monitor", ["Opções > Notificações: receber avisos de todos ou só dos usuários marcados", "Escolha gravada por usuário (vale em qualquer PC)", "Testados: espessura na vista do raio, linha de dobra até a aresta, janelinha de status"]],
   ["2026-10-26", "Dobra, furação do DXF e janela de status", "Gerador", ["Espessura cotada na mesma vista do raio de dobra (1.2 / 1.2.1)", "Linha de dobra até a aresta mais próxima (1.2 / 1.2.1)", "DXF: limite de 5 mm e 2º aviso para furos pequenos em chapa grossa", "Janelinha \"Gerando detalhamento\" com animação"]],
   ["2026-10-26", "Espessura colada na descrição e janela que fecha sozinha", "Gerador", ["Espessura reconhecida mesmo colada no texto (ex.: 3mm1020, ESP3MM)", "PowerShell do gerador fecha sozinho mesmo com erro"]],

@@ -15,8 +15,8 @@ using Microsoft.Win32;
 [assembly: AssemblyTitle("Monitor")]
 [assembly: AssemblyDescription("BOM dos projetos SolidWorks com status de PDF/DXF")]
 [assembly: AssemblyProduct("Monitor")]
-[assembly: AssemblyVersion("2.11.0.0")]
-[assembly: AssemblyFileVersion("2.11.0.0")]
+[assembly: AssemblyVersion("2.12.0.0")]
+[assembly: AssemblyFileVersion("2.12.0.0")]
 
 namespace MonitorSW
 {
@@ -47,14 +47,24 @@ namespace MonitorSW
 
         static string Arquivo { get { return Path.Combine(Util.UserDir, "tema.txt"); } }
 
-        static bool LerEscolha()
+        // tema é do USUÁRIO do Monitor (preferencias.tsv na pasta compartilhada); antes do login usa o último usuário deste PC
+        static bool LerEscolha() { return EscuroDe(Users.Remembered()); }
+
+        public static bool EscuroDe(string login)
         {
-            try { return !File.Exists(Arquivo) || !File.ReadAllText(Arquivo).Trim().Equals("claro", StringComparison.OrdinalIgnoreCase); }
+            try
+            {
+                string v = Preferencias.Get(login, "tema");
+                if (v == null && File.Exists(Arquivo)) v = File.ReadAllText(Arquivo).Trim();   // escolha antiga (por PC)
+                return v == null || !v.Equals("claro", StringComparison.OrdinalIgnoreCase);
+            }
             catch { return true; }   // padrão: escuro
         }
 
         public static void GravarEscolha(bool escuro)
         {
+            string login = Users.Current != null ? Users.Current.Login : Users.Remembered();
+            if (!string.IsNullOrEmpty(login)) Preferencias.Set(login, "tema", escuro ? "escuro" : "claro");
             Directory.CreateDirectory(Util.UserDir);
             File.WriteAllText(Arquivo, escuro ? "escuro" : "claro");
         }
@@ -517,6 +527,19 @@ namespace MonitorSW
                 }
                 // login: quem está usando (carimbo do desenho, "conferido por", e-mail para avisos)
                 if (!LoginUi.Startup()) return;
+                // tema é de cada usuário: se quem entrou usa outro tema (a tela de login abriu com o do último usuário), reabre com o dele
+                if (Users.Current != null && Theme.EscuroDe(Users.Current.Login) != Theme.Escuro)
+                {
+                    try
+                    {
+                        Users.Remember(Users.Current.Login);
+                        var psi = new ProcessStartInfo(Application.ExecutablePath, string.Join(" ", args.Select(x => "\"" + x + "\"")));
+                        psi.UseShellExecute = false; psi.WorkingDirectory = Path.GetDirectoryName(Application.ExecutablePath);
+                        Process.Start(psi);
+                        return;
+                    }
+                    catch { }
+                }
                 if (firstRun || MainForm.IsAutoStart()) MainForm.SetAutoStart(true);
                 bool startHidden = args.Any(a => a.Equals("/bandeja", StringComparison.OrdinalIgnoreCase));
                 if (!cfg.RootFound && !startHidden)
@@ -861,7 +884,12 @@ namespace MonitorSW
             }));
             mUser.DropDownItems.Add(Mi("Trocar usuário...", (s, a) =>
             {
-                if (LoginUi.Escolher(this)) { atualizaUser(); lblStatus.Text = "Usando como " + Users.Me + "."; }
+                if (LoginUi.Escolher(this))
+                {
+                    atualizaUser(); lblStatus.Text = "Usando como " + Users.Me + ".";
+                    // cada usuário tem o seu tema: se o novo usuário usa outro, reabre já com o tema dele
+                    if (Theme.EscuroDe(Users.Current.Login) != Theme.Escuro) { Users.Remember(Users.Current.Login); Reiniciar(); }
+                }
             }));
             toolsMenu.Items.Add(mUser);
             toolsMenu.Items.Add(Mi("Notificações...", (s, a) => { Notificacoes.Editar(this); var np = Notificacoes.Minha(); lblStatus.Text = np.Todos ? "Notificações: de todos os usuários." : "Notificações: de " + np.Logins.Count + " usuário(s) escolhido(s)."; }));
@@ -2438,6 +2466,12 @@ namespace MonitorSW
                 MessageBoxButtons.OKCancel, MessageBoxIcon.Question) != DialogResult.OK) return;
             try { Theme.GravarEscolha(escuro); }
             catch (Exception ex) { MessageBox.Show(this, "Não foi possível gravar o tema:\n" + ex.Message, "Tema", MessageBoxButtons.OK, MessageBoxIcon.Warning); return; }
+            Reiniciar();
+        }
+
+        // reabre o Monitor (mesmos argumentos) e fecha este - usado para aplicar o tema
+        void Reiniciar()
+        {
             try
             {
                 var args = Environment.GetCommandLineArgs().Skip(1).Where(x => !x.Equals("/bandeja", StringComparison.OrdinalIgnoreCase)).Select(x => "\"" + x + "\"").ToArray();

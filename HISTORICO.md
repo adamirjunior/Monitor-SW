@@ -64,6 +64,7 @@ Formato: `- AAAA-MM-DD — o que mudou — motivo / pedido do usuário`. Itens *
 - 2026-10-21 — DXF grava a extensão real ($EXTMIN/$EXTMAX e vista *Active) para abrir enquadrado; abre no AutoCAD JÁ ABERTO (não abre outro), substitui se o arquivo já estiver aberto, REGEN + ZOOM E. Usuário confirmou: "deu certo".
 
 ## Monitor SW (programa)
+- 2026-10-26 — 2.12: tema claro/escuro é do USUÁRIO do Monitor (preferencias.tsv na pasta compartilhada, vale em qualquer PC); antes do login usa o último usuário do PC; ao entrar/trocar de usuário com outro tema, o Monitor reabre com o tema dele — pedido do usuário. **PENDENTE testar.**
 - 2026-10-26 — 2.11: Opções > Notificações — cada usuário escolhe de quais usuários recebe avisos de alteração (todos / só marcados / alterações sem usuário), gravado em notificacoes.tsv por login. Avisos das próprias ações e a janelinha "Gerando detalhamento" aparecem sempre para quem faz — pedido do usuário (Adamir não quer os avisos do Guilherme). **PENDENTE testar.**
 - 2026-10-25 — 2.10: Opções › Tema (Escuro / Claro), escolha por usuário em `%LOCALAPPDATA%\MonitorSW\tema.txt`; ao trocar, o Monitor reinicia para aplicar — pedido do usuário (tema claro e escuro).
 - 2026-10-25 — 2.9.0: projeto do Visual Studio (`Monitor.sln`, .NET 4.8), código em `src/Nucleo`, `src/Interface`, `src/Modulos`; `publicar.ps1`. Servidor `X:\MonitorSW` só com o que roda (sem código-fonte); fonte no GitHub privado e em `Documentos\Monitor-SW`.
