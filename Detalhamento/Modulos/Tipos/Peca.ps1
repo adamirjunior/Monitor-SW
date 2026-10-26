@@ -110,6 +110,7 @@ function DetalharPeca($caminho, $peca) {
     $script:MargemCotas = if ($laser -and -not $cls.Usinagem) { 0.010 } else { 0.018 }
     if ($usinPrisma) { $script:MargemCotas = 0.011; $Gap = 0.020 }   # usinada: cotas só em volta da principal, vistas mais próximas = escala maior
     elseif ($plana) { $script:MargemCotas = 0.010; $Gap = 0.014 }    # chapa plana: vistas da espessura são finas, ficam perto da principal = escala maior
+    elseif ($longa -and $laser -and $chapa) { $Gap = 0.020 }          # dobrada longa: vistas empilhadas mais próximas = escala maior (02204262)
     # escala inicial pelo tamanho REAL das vistas (já com a orientação escolhida), sem contar a isométrica;
     # depois desce escala por escala até caber, tentando 3 arranjos: normal, isométrica menor e vistas empilhadas
     $esc0 = 1.0; try { $esc0 = [double](XG $front "ScaleDecimal") } catch { }
