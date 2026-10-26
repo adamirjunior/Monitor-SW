@@ -15,8 +15,8 @@ using Microsoft.Win32;
 [assembly: AssemblyTitle("Monitor")]
 [assembly: AssemblyDescription("BOM dos projetos SolidWorks com status de PDF/DXF")]
 [assembly: AssemblyProduct("Monitor")]
-[assembly: AssemblyVersion("2.14.0.0")]
-[assembly: AssemblyFileVersion("2.14.0.0")]
+[assembly: AssemblyVersion("2.14.1.0")]
+[assembly: AssemblyFileVersion("2.14.1.0")]
 
 namespace MonitorSW
 {
@@ -963,7 +963,7 @@ namespace MonitorSW
             projList.Resize += (s, a) => { int w = projList.ClientSize.Width - 4; if (w > 80) projList.Columns[0].Width = w; };
             projList.SelectedIndexChanged += (s, a) =>
             {
-                if (projList.SelectedItems.Count == 0) return;
+                if (enchendoProj || projList.SelectedItems.Count == 0) return;
                 var novo = projList.SelectedItems[0].Tag as Project;
                 bool trocou = novo != null && novo != current;
                 current = novo;
@@ -2604,7 +2604,16 @@ namespace MonitorSW
             tray.Text = t.Length > 63 ? t.Substring(0, 63) : t;
         }
 
+        // enquanto a lista de projetos é refeita, a troca de seleção NÃO dispara o evento (causava erro e travava o Monitor)
+        bool enchendoProj;
         void FillProjects()
+        {
+            if (enchendoProj) return;
+            enchendoProj = true;
+            try { FillProjectsInterno(); }
+            finally { enchendoProj = false; }
+        }
+        void FillProjectsInterno()
         {
             List<Project> list;
             lock (engine.Sync) list = new List<Project>(engine.Projects);
