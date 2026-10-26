@@ -15,8 +15,8 @@ using Microsoft.Win32;
 [assembly: AssemblyTitle("Monitor")]
 [assembly: AssemblyDescription("BOM dos projetos SolidWorks com status de PDF/DXF")]
 [assembly: AssemblyProduct("Monitor")]
-[assembly: AssemblyVersion("2.13.0.0")]
-[assembly: AssemblyFileVersion("2.13.0.0")]
+[assembly: AssemblyVersion("2.14.0.0")]
+[assembly: AssemblyFileVersion("2.14.0.0")]
 
 namespace MonitorSW
 {
@@ -527,6 +527,7 @@ namespace MonitorSW
                 }
                 // login: quem está usando (carimbo do desenho, "conferido por", e-mail para avisos)
                 if (!LoginUi.Startup()) return;
+                cfg.ApplyUserProjects();   // montagens abertas são de cada usuário
                 // tema é de cada usuário: se quem entrou usa outro tema (a tela de login abriu com o do último usuário), reabre com o dele
                 if (Users.Current != null && Theme.EscuroDe(Users.Current.Login) != Theme.Escuro)
                 {
@@ -887,6 +888,9 @@ namespace MonitorSW
                 if (LoginUi.Escolher(this))
                 {
                     atualizaUser(); lblStatus.Text = "Usando como " + Users.Me + ".";
+                    // cada usuário tem as suas montagens abertas
+                    lock (engine.Sync) engine.Cfg.ApplyUserProjects();
+                    engine.SyncProjects(); current = null; RefreshAll(); engine.ForceRefresh(current);
                     // cada usuário tem o seu tema: se o novo usuário usa outro, reabre já com o tema dele
                     if (Theme.EscuroDe(Users.Current.Login) != Theme.Escuro) { Users.Remember(Users.Current.Login); Reiniciar(); }
                 }
@@ -963,6 +967,7 @@ namespace MonitorSW
                 var novo = projList.SelectedItems[0].Tag as Project;
                 bool trocou = novo != null && novo != current;
                 current = novo;
+                if (trocou) LembrarAtual();
                 // trocou de montagem: a busca anterior (ou "Todo o servidor") escondia os itens da montagem nova
                 if (trocou && search.Text.Trim().Length > 0) { srvTimer.Stop(); search.Text = ""; ApplySearchMode(); }
                 else FillGrid();
@@ -2619,8 +2624,17 @@ namespace MonitorSW
             }
             if (sel == null || !list.Contains(sel))
             {
-                current = list.FirstOrDefault();
-                if (projList.Items.Count > 0) projList.Items[0].Selected = true;
+                // volta para a última montagem que ESTE usuário estava vendo
+                Project ult = null;
+                try
+                {
+                    var u = Users.Current != null ? Preferencias.Get(Users.Current.Login, "projeto atual") : null;
+                    if (!string.IsNullOrEmpty(u)) { var m = engine.Cfg.Map(u); ult = list.FirstOrDefault(x => x.MainPath.Equals(m, StringComparison.OrdinalIgnoreCase)); }
+                }
+                catch { }
+                current = ult ?? list.FirstOrDefault();
+                int ix = current == null ? -1 : list.IndexOf(current);
+                if (ix >= 0 && ix < projList.Items.Count) projList.Items[ix].Selected = true;
             }
             projList.EndUpdate();
         }
@@ -3507,13 +3521,14 @@ namespace MonitorSW
             ReloadSharedConfig();
             foreach (var f in picked)
                 if (!engine.Cfg.Projects.Any(x => engine.Cfg.Map(x).Equals(f, StringComparison.OrdinalIgnoreCase))) engine.Cfg.Projects.Add(engine.Cfg.Unmap(f));
-            engine.Cfg.Save();
+            engine.Cfg.SaveUserProjects();
             engine.SyncProjects();
             lock (engine.Sync) current = engine.Projects.FirstOrDefault(x => x.MainPath.Equals(picked[0], StringComparison.OrdinalIgnoreCase))
                 ?? engine.Projects.FirstOrDefault(x => Path.GetFileName(x.MainPath).Equals(Path.GetFileName(picked[0]), StringComparison.OrdinalIgnoreCase));
             if (search.Text.Trim().Length > 0) { srvTimer.Stop(); search.Text = ""; ApplySearchMode(); }   // busca antiga escondia os itens
             RefreshAll();
             engine.ForceRefresh(current);   // a montagem aberta é conferida primeiro (não espera as outras)
+            LembrarAtual();
             if (current != null) ShowPreview(current.MainPath, current.Name);
             lblStatus.Text = "Lendo o projeto... a BOM aparece em alguns segundos.";
         }
@@ -3605,13 +3620,19 @@ namespace MonitorSW
         void RemoveProject()
         {
             if (current == null) return;
-            if (MessageBox.Show("Fechar o projeto " + current.Name + "?\n\nEle sai da lista à esquerda (para todos que usam o Monitor).\nNenhum arquivo é apagado; dá para abrir de novo quando quiser.", "Monitor", MessageBoxButtons.YesNo, MessageBoxIcon.Question) != DialogResult.Yes) return;
+            if (MessageBox.Show("Fechar o projeto " + current.Name + "?\n\nEle sai só da SUA lista à esquerda (os outros usuários não são afetados).\nNenhum arquivo é apagado; dá para abrir de novo quando quiser.", "Monitor", MessageBoxButtons.YesNo, MessageBoxIcon.Question) != DialogResult.Yes) return;
             ReloadSharedConfig();
             engine.Cfg.Projects.RemoveAll(x => engine.Cfg.Map(x).Equals(current.MainPath, StringComparison.OrdinalIgnoreCase));
-            engine.Cfg.Save();
+            engine.Cfg.SaveUserProjects();
             engine.SyncProjects();
             current = null;
             RefreshAll();
+        }
+
+        // guarda a montagem que o usuário está vendo (reabre nela, em qualquer PC)
+        void LembrarAtual()
+        {
+            try { if (Users.Current != null && current != null) Preferencias.Set(Users.Current.Login, "projeto atual", engine.Cfg.Unmap(current.MainPath)); } catch { }
         }
 
         void OpenConfig()

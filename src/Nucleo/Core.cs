@@ -355,8 +355,9 @@ namespace MonitorSW
             if (!File.Exists(path))
             {
                 c.Defaults();
-                c.Projects.Add(DefaultProject);
+                c.SharedProjects.Add(DefaultProject);
                 c.Save();
+                c.ApplyUserProjects();
                 return c;
             }
             bool sawEmail = false;
@@ -397,7 +398,7 @@ namespace MonitorSW
                     case "emailassinatura": c.EmailAssinatura = v; break;
                     case "arquivohistorico": if (v.Length > 0) c.HistoryFile = v; break;
                     case "comandogerardetalhamento": c.GenCmd = v; sawGen = true; break;
-                    case "projeto": if (v.Length > 0) c.Projects.Add(v); break;
+                    case "projeto": if (v.Length > 0) c.SharedProjects.Add(v); break;
                 }
             }
             // config da v1.4 (indexava so a 01): passa para a pasta SOLIDWORKS inteira
@@ -406,40 +407,36 @@ namespace MonitorSW
             c.Root = ResolveRoot(c.RootStored, out c.RootFound);
             c.LoadedStamp = Util.MTime(path);
             if (!sawEmail || !sawWeld || !sawCols || !sawIdx || !sawIdxMain || !sawGen || !sawAcab) c.Save(); // atualiza arquivo antigo com as opcoes novas
+            c.ApplyUserProjects();
             return c;
         }
 
-        public string UserProjectsFile { get { return Path.Combine(Util.UserDir, "projetos.txt"); } }
+        // Montagens abertas são de cada USUÁRIO do Monitor (login), em preferencias.tsv (chave "projetos"): cada um vê só as suas,
+        // em qualquer PC. As linhas Projeto= do config.ini ficam só como lista inicial de quem ainda não tem a sua.
+        public List<string> SharedProjects = new List<string>();
+        public DateTime PrefsStamp;
+        static string LoginAtual { get { return Users.Current != null && Users.Current.Login.Length > 0 ? Users.Current.Login : null; } }
 
-        // lista de projetos e de cada usuario (cada pessoa ve os seus); na 1a vez herda os do config.ini
-        void LoadUserProjects()
+        public void ApplyUserProjects()
         {
-            try
+            PrefsStamp = Util.MTime(Preferencias.FilePath);
+            string login = LoginAtual;
+            string v = login == null ? null : Preferencias.Get(login, "projetos");
+            Projects.Clear();
+            var src = v == null ? (IEnumerable<string>)SharedProjects : v.Split('|');
+            foreach (var x in src)
             {
-                var f = UserProjectsFile;
-                if (File.Exists(f))
-                {
-                    Projects.Clear();
-                    foreach (var l in File.ReadAllLines(f, Encoding.UTF8))
-                        if (l.Trim().Length > 0 && !l.StartsWith("#") && !Projects.Contains(l.Trim(), StringComparer.OrdinalIgnoreCase)) Projects.Add(l.Trim());
-                }
-                else
-                {
-                    if (Projects.Count == 0) Projects.Add(DefaultProject);
-                    SaveUserProjects();
-                }
+                var t = x.Trim();
+                if (t.Length > 0 && !Projects.Contains(t, StringComparer.OrdinalIgnoreCase)) Projects.Add(t);
             }
-            catch { }
         }
 
         public void SaveUserProjects()
         {
-            try
-            {
-                Directory.CreateDirectory(Util.UserDir);
-                File.WriteAllLines(UserProjectsFile, new[] { "# Projetos monitorados por " + Environment.UserName + " neste PC (um por linha)" }.Concat(Projects).ToArray(), new UTF8Encoding(true));
-            }
-            catch { }
+            string login = LoginAtual;
+            if (login == null) { SharedProjects = new List<string>(Projects); Save(); return; }
+            Preferencias.Set(login, "projetos", string.Join("|", Projects.ToArray()));
+            PrefsStamp = Util.MTime(Preferencias.FilePath);
         }
 
         public void Save()
@@ -501,8 +498,8 @@ namespace MonitorSW
             sb.AppendLine("# {arquivo} = caminho da peça/montagem, {desenho} = caminho do .SLDDRW, {pasta} = pasta da peça. Vazio = ainda não configurado");
             sb.AppendLine("ComandoGerarDetalhamento=" + GenCmd);
             sb.AppendLine("#");
-            sb.AppendLine("# Montagens principais monitoradas (uma por linha) - lista compartilhada por todos que usam o Monitor");
-            foreach (var p in Projects) sb.AppendLine("Projeto=" + p);
+            sb.AppendLine("# Lista inicial de montagens (só para quem ainda não abriu as suas). Cada usuário tem a sua lista em preferencias.tsv");
+            foreach (var p in SharedProjects) sb.AppendLine("Projeto=" + p);
             string text = sb.ToString();
             try { if (File.Exists(FilePath) && File.ReadAllText(FilePath, Encoding.UTF8) == text) return; } catch { }
             File.WriteAllText(FilePath, text, new UTF8Encoding(true));
@@ -1078,6 +1075,12 @@ namespace MonitorSW
                     {
                         var n = Config.Load(Cfg.FilePath);
                         lock (Sync) { Cfg = n; }
+                        SyncProjects();
+                    }
+                    else if (Util.MTime(Preferencias.FilePath) > Cfg.PrefsStamp.AddSeconds(1))
+                    {
+                        // o mesmo usuário abriu/fechou montagem em outro PC
+                        lock (Sync) Cfg.ApplyUserProjects();
                         SyncProjects();
                     }
                     RunOnce();
