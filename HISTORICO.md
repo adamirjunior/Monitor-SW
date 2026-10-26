@@ -7,6 +7,7 @@ Formato: `- AAAA-MM-DD — o que mudou — motivo / pedido do usuário`. Itens *
 ---
 
 ## Gerador — regras gerais
+- 2026-10-26 — CAUSA de vistas sem cota quando gerado pelo Monitor: o Monitor roda o gerador SEM administrador e aí a biblioteca swconst não carregava; as constantes caíam no padrão interno e o de VÉRTICE estava errado (3 = face; certo = 2). Resultado: cotas totais/linhas de dobra não achavam os cantos ("peça sem cantos"). Nos testes do Claude (com administrador) a swconst carregava e tudo saía certo. Correção: carrega a swconst também pelos bytes do arquivo, tabela interna com os valores reais (vértice, face, aresta, tipos do assistente de furação, InputDimValOnCreate) e padrões corrigidos. Tipos de furo: Type do assistente é swWzdGeneralHoleTypes_e (antes lia swWzdHoleTypes_e, valores diferentes). tools/testes/conferir_constantes.ps1 compara os padrões com a swconst. **PENDENTE testar pelo Monitor.**
 - 2026-10-26 — TESTADO pelo usuário: espessura na vista do raio de dobra, linha de dobra até a aresta, janelinha "Gerando detalhamento".
 - 2026-10-26 — Janelinha "Gerando detalhamento" (sempre por cima, canto inferior direito) com barra animada, nome da peça e etapa atual (última linha do log), em todos os detalhamentos; fica vermelha se der erro — pedido do usuário. **PENDENTE testar.**
 - 2026-10-26 — Janela do PowerShell do gerador (pelo Monitor) fecha sozinha SEMPRE, mesmo com erro (antes esperava Enter) — pedido do usuário. **PENDENTE testar.**

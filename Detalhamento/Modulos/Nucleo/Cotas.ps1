@@ -75,7 +75,7 @@ function CotaEntre($dm, $v, $a, $b, $x, $y, [string]$nome) {
     return 0
 }
 function CotaTotal($dm, $v, [bool]$horiz, [bool]$vert) {
-    $verts = Entidades $v "swViewEntityType_Vertex" 3
+    $verts = Entidades $v "swViewEntityType_Vertex" 2
     if ($verts.Count -lt 2) { return (CotaTotalSemVertices $dm $v $horiz $vert) }
     $modelo = @(); $okVerts = @()
     foreach ($vx in $verts) { try { $modelo += ,([double[]](XD (X $vx "GetPoint"))); $okVerts += $vx } catch { } }
@@ -279,7 +279,7 @@ function CotasUsinagem($dm, $front, $top) {
         $script:xfCache = @{}; $script:xfModo = @{}
         $n = 0
         if ($front) {
-            $pm = @(); foreach ($vx in (Entidades $front "swViewEntityType_Vertex" 3)) { try { $pm += ,([double[]](XD (X $vx "GetPoint"))) } catch { } }
+            $pm = @(); foreach ($vx in (Entidades $front "swViewEntityType_Vertex" 2)) { try { $pm += ,([double[]](XD (X $vx "GetPoint"))) } catch { } }
             if ($pm.Count -gt 0) { EscolherModoXf $front $pm | Out-Null }
         }
         if ($front) { $n += CotaTotal $dm $front $true $true }
@@ -331,7 +331,7 @@ function CotasPosicaoFuros($dm, $v) {
     if ($furos.Count -eq 0) { return 0 }
     $a = DadosXf $v
     $pts = @()
-    foreach ($vx in (Entidades $v "swViewEntityType_Vertex" 3)) { try { $pm = [double[]](XD (X $vx "GetPoint")); $pts += ,@($vx, (Rot $a $pm), $pm) } catch { } }
+    foreach ($vx in (Entidades $v "swViewEntityType_Vertex" 2)) { try { $pm = [double[]](XD (X $vx "GetPoint")); $pts += ,@($vx, (Rot $a $pm), $pm) } catch { } }
     if ($pts.Count -lt 2) { return 0 }
     EscolherModoXf $v @($pts | ForEach-Object { ,$_[2] }) | Out-Null
     # limites reais da peça (caixa do modelo girada como a vista); os vértices visíveis podem não chegar nos cantos arredondados
@@ -472,7 +472,7 @@ function OblongosDaVista($v) {
 function CotasOblongo($dm, $v) {
     if (-not $v) { return 0 }
     $pm = @(); $vts = @()
-    foreach ($vx in (Entidades $v "swViewEntityType_Vertex" 3)) { try { $pt = [double[]](XD (X $vx "GetPoint")); $pm += ,$pt; $vts += ,@($vx, $pt) } catch { } }
+    foreach ($vx in (Entidades $v "swViewEntityType_Vertex" 2)) { try { $pt = [double[]](XD (X $vx "GetPoint")); $pm += ,$pt; $vts += ,@($vx, $pt) } catch { } }
     if ($pm.Count -gt 0) { EscolherModoXf $v $pm | Out-Null }
     $obl = OblongosDaVista $v
     if ($obl.Count -eq 0) { return 0 }

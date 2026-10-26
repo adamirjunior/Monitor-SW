@@ -60,10 +60,11 @@ function ValidarPropriedades($model, $caminho) {
 # Assistente de furação: roscado / rebaixo (escareado conta como rebaixo) / simples; rosca cosmética conta como roscado
 function InfoFuros($peca) {
     $r = [pscustomobject]@{ Roscados = 0; Rebaixos = 0; Simples = 0; DiamRoscas = @() }
-    $tCb = K "swWzdHoleTypes_e" @("swCounterBored") 0
-    $tCs = K "swWzdHoleTypes_e" @("swCounterSunk") 1
-    $tTap = K "swWzdHoleTypes_e" @("swTapped") 3
-    $tPipe = K "swWzdHoleTypes_e" @("swPipeTapped") 4
+    # Type do assistente de furação = swWzdGeneralHoleTypes_e (o enum swWzdHoleTypes_e é outro: lá rebaixo = 2)
+    $tCb = K "swWzdGeneralHoleTypes_e" @("swWzdCounterBore") 0
+    $tCs = K "swWzdGeneralHoleTypes_e" @("swWzdCounterSink") 1
+    $tTap = K "swWzdGeneralHoleTypes_e" @("swWzdTap") 4
+    $tPipe = K "swWzdGeneralHoleTypes_e" @("swWzdPipeTap") 3
     try {
         $ft = X $peca "FirstFeature"
         while ($ft) {

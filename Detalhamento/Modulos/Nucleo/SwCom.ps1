@@ -74,14 +74,32 @@ if (-not $script:swconst) {
     $cands += "$env:ProgramFiles\SOLIDWORKS Corp\SOLIDWORKS\api\redist\SolidWorks.Interop.swconst.dll"
     $cands += "D:\SOLIDWORKS\api\redist\SolidWorks.Interop.swconst.dll"
     $cands += "D:\SOLIDWORKS\SolidWorks.Interop.swconst.dll"
-    foreach ($c in $cands) { if (Test-Path $c) { try { $script:swconst = [Reflection.Assembly]::LoadFrom($c); break } catch { } } }
+    $errK = ""
+    foreach ($c in $cands) {
+        if (-not (Test-Path $c)) { continue }
+        try { $script:swconst = [Reflection.Assembly]::LoadFrom($c); break } catch { $errK = $_.Exception.Message }
+        # sem administrador o LoadFrom pode ser recusado: carrega pelos bytes do arquivo
+        try { $script:swconst = [Reflection.Assembly]::Load([IO.File]::ReadAllBytes($c)); break } catch { $errK = $_.Exception.Message }
+    }
 }
-if (-not $script:swconst) { Log "Aviso: biblioteca swconst não encontrada; usando constantes internas." "Yellow" }
+if (-not $script:swconst) { Log "Aviso: biblioteca swconst não encontrada; usando a tabela interna de constantes. $errK" "Yellow" }
+# valores reais do SolidWorks 2016 (conferidos na swconst em 26/10/2026 - tools\testes\conferir_constantes.ps1).
+# Usados quando a biblioteca não carrega: antes caía no "padrão" de cada chamada, e alguns estavam errados
+# Só entram aqui as que estavam ERRADAS e quebravam algo; as outras ficam como foram testadas
+# (ex.: vértice = 2, não 3 -> sem a biblioteca as cotas totais não achavam os cantos e vistas ficavam sem cota).
+$script:swTabela = @{
+    "swViewEntityType_e.swViewEntityType_Edge" = 1; "swViewEntityType_e.swViewEntityType_Vertex" = 2
+    "swViewEntityType_e.swViewEntityType_Face" = 3; "swViewEntityType_e.swViewEntityType_SilhouetteEdge" = 4
+    "swWzdGeneralHoleTypes_e.swWzdCounterBore" = 0; "swWzdGeneralHoleTypes_e.swWzdCounterSink" = 1; "swWzdGeneralHoleTypes_e.swWzdHole" = 2
+    "swWzdGeneralHoleTypes_e.swWzdPipeTap" = 3; "swWzdGeneralHoleTypes_e.swWzdTap" = 4
+    "swUserPreferenceToggle_e.swInputDimValOnCreate" = 10
+}
 function K([string]$enum, [string[]]$nomes, [int]$padrao) {
     if ($script:swconst) {
         $t = $script:swconst.GetType("SolidWorks.Interop.swconst.$enum")
         if ($t) { foreach ($n in $nomes) { try { return [int][Enum]::Parse($t, $n) } catch { } } }
     }
+    foreach ($n in $nomes) { $ch = "$enum.$n"; if ($script:swTabela.ContainsKey($ch)) { return [int]$script:swTabela[$ch] } }
     return $padrao
 }
 $DocPART = 1; $DocASM = 2; $DocDRW = 3

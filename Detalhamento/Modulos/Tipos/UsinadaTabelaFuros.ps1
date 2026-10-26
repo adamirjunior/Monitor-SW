@@ -46,13 +46,13 @@ function InserirTabelaFuros($dm, $front) {
     AtivarDesenho $dm | Out-Null
     $a = DadosXf $front
     # origem: canto superior esquerdo da peça na vista principal
-    $pts = @(); foreach ($vx in (Entidades $front "swViewEntityType_Vertex" 3)) { try { $pts += ,@($vx, (Rot $a ([double[]](XD (X $vx "GetPoint"))))) } catch { } }
+    $pts = @(); foreach ($vx in (Entidades $front "swViewEntityType_Vertex" 2)) { try { $pts += ,@($vx, (Rot $a ([double[]](XD (X $vx "GetPoint"))))) } catch { } }
     if ($pts.Count -eq 0) { Log "   (tabela de furos: sem vértices na vista principal)" "DarkYellow"; return $null }
     $minX = ($pts | ForEach-Object { $_[1][0] } | Measure-Object -Minimum).Minimum
     $orig = @($pts | Where-Object { $_[1][0] -le $minX + 0.0002 } | Sort-Object { $_[1][1] })[-1]
     # face: a maior face plana virada para quem olha
     $face = $null; $areaMax = 0
-    foreach ($f in (Entidades $front "swViewEntityType_Face" 2)) {
+    foreach ($f in (Entidades $front "swViewEntityType_Face" 3)) {
         try {
             $nrm = XD (XG $f "Normal"); if (-not $nrm) { continue }
             $z = $nrm[0] * $a[2] + $nrm[1] * $a[5] + $nrm[2] * $a[8]

@@ -14,7 +14,7 @@ function CaixaReal($v) {
     try {
         $a = DadosXf $v; $esc = [double](XG $v "ScaleDecimal")
         $rx = @(); $ry = @()
-        foreach ($vx in (Entidades $v "swViewEntityType_Vertex" 3)) { try { $q = Rot $a ([double[]](XD (X $vx "GetPoint"))); $rx += $q[0]; $ry += $q[1] } catch { } }
+        foreach ($vx in (Entidades $v "swViewEntityType_Vertex" 2)) { try { $q = Rot $a ([double[]](XD (X $vx "GetPoint"))); $rx += $q[0]; $ry += $q[1] } catch { } }
         if ($rx.Count -ge 2) {
             $w = (($rx | Measure-Object -Maximum).Maximum - ($rx | Measure-Object -Minimum).Minimum) * $esc
             $h = (($ry | Measure-Object -Maximum).Maximum - ($ry | Measure-Object -Minimum).Minimum) * $esc
@@ -82,7 +82,7 @@ function CotaEspessura($dm, $vistas, $xVert = $null, $yHoriz = $null) {
 function AlinharPlanificada($dm, $front, $flat) {
     if (-not $front -or -not $flat) { return }
     try {
-        $pm = @(); foreach ($vx in (Entidades $front "swViewEntityType_Vertex" 3)) { try { $pm += ,([double[]](XD (X $vx "GetPoint"))) } catch { } }
+        $pm = @(); foreach ($vx in (Entidades $front "swViewEntityType_Vertex" 2)) { try { $pm += ,([double[]](XD (X $vx "GetPoint"))) } catch { } }
         if ($pm.Count -gt 0) { EscolherModoXf $front $pm | Out-Null }
         $xs = @()
         foreach ($e in (Entidades $front "swViewEntityType_Edge" 1)) {
@@ -124,7 +124,7 @@ function CotasLinhasDobra($dm, $v) {
     if (-not $v) { return 0 }
     $a = DadosXf $v; $esc = 1.0; try { $esc = [double](XG $v "ScaleDecimal") } catch { }
     $pts = @()
-    foreach ($vx in (Entidades $v "swViewEntityType_Vertex" 3)) { try { $pts += ,@($vx, (Rot $a ([double[]](XD (X $vx "GetPoint"))))) } catch { } }
+    foreach ($vx in (Entidades $v "swViewEntityType_Vertex" 2)) { try { $pts += ,@($vx, (Rot $a ([double[]](XD (X $vx "GetPoint"))))) } catch { } }
     if ($pts.Count -lt 2) { return 0 }
     # linhas de dobra da vista (para quando a nota não disser a qual linha está presa)
     $bls = @(); try { $bls = @(X $v "GetBendLines") | Where-Object { $_ } } catch { }
@@ -286,7 +286,7 @@ function CotasLaserInterno($dm, $front, $left, $top, $flat) {
         foreach ($vv in @($top, $left, $front)) {
             if (-not $vv -or $nr -gt 0) { continue }
             try {
-                $pm = @(); foreach ($vx in (Entidades $vv "swViewEntityType_Vertex" 3)) { try { $pm += ,([double[]](XD (X $vx "GetPoint"))) } catch { } }
+                $pm = @(); foreach ($vx in (Entidades $vv "swViewEntityType_Vertex" 2)) { try { $pm += ,([double[]](XD (X $vx "GetPoint"))) } catch { } }
                 if ($pm.Count -gt 0) { EscolherModoXf $vv $pm | Out-Null }
                 $nr = CotaRaioDobra $dm $vv
                 if ($nr -gt 0) { $vistaRaio = $vv }
