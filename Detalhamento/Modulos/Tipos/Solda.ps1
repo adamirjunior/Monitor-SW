@@ -300,7 +300,9 @@ function SetasNoCentro($dm, $v, $notas) {
         $nTot++
         try {
             $an = AnnOf $n
-            $lp = XD (X $an "GetLeaderPointsAtIndex" 0); if (-not $lp -or $lp.Count -lt 2) { continue }
+            $lp0 = XD (X $an "GetLeaderPointsAtIndex" 0); if (-not $lp0 -or $lp0.Count -lt 3) { continue }
+            # pontos da linha de chamada: o 1º é o lado do balão, o ÚLTIMO é a ponta da seta (na peça)
+            $k3 = $lp0.Count - 3; $lp = @($lp0[$k3], $lp0[$k3 + 1])
             $ents = @(X $an "GetAttachedEntities3"); $ed = $ents | Where-Object { $_ } | Select-Object -First 1
             if (-not $ed) { continue }
             $comp = $null; try { $comp = X $ed "GetComponent" } catch { }
