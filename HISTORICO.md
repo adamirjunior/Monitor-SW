@@ -32,6 +32,7 @@ Formato: `- AAAA-MM-DD — o que mudou — motivo / pedido do usuário`. Itens *
 - Quebras: `InsertBreak` com coordenadas "modelo x escala a partir do centro" (InsertBreak2 não existe; InsertBreakVertical fazia linha errada).
 
 ## Tipo: chapa (plana / dobrada / laser)
+- 2026-10-26 — TESTADO pelo usuário: oblongo no 1.2.1, avisos vermelhos em coluna, aviso "Remover cotas desnecessárias para processo laser".
 - 2026-10-26 — 1.2.1 (dobrada + FRESA CNC): além do raio de dobra, cota os OBLONGOS (par de arcos de meia-volta de mesmo raio): raio, centro a centro e posição do centro a partir das bordas da vista — pedido do usuário. **PENDENTE testar.**
 - 2026-10-26 — Cota do raio de dobra a 45° saiu ESPELHADA (para dentro da dobra, cruzando a aba): direção agora pela soma centro->pontas do arco (GetCurveParams2), bissetriz do lado de fora; o parâmetro médio da curva caía do lado errado. **PENDENTE testar.**
 - 2026-10-26 — Cota do raio de dobra ainda saía pela ponta do arco (quase horizontal): agora a direção vem do ponto do MEIO do arco (curva avaliada no parâmetro médio) → ~45° numa dobra de 90°. **PENDENTE testar.**
