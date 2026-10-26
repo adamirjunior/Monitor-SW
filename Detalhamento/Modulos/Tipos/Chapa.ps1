@@ -49,22 +49,32 @@ function CotaEspessura($dm, $vistas, $xVert = $null, $yHoriz = $null) {
             # par de linhas paralelas na distância da espessura, de preferência numa EXTREMIDADE da peça
             # (no lado onde a cota fica: direita para cota vertical, embaixo para horizontal; à esquerda quando alinha com a principal),
             # assim a cota nunca puxa linha de chamada pelo meio da peça (ex.: 02204262)
-            $hx = @($lin | Where-Object { $_[1] -eq "h" }); $vx = @($lin | Where-Object { $_[1] -eq "v" })
-            $maxX = if ($hx.Count) { ($hx | ForEach-Object { $_[4] } | Measure-Object -Maximum).Maximum } else { 0 }
-            $minX = if ($hx.Count) { ($hx | ForEach-Object { $_[3] } | Measure-Object -Minimum).Minimum } else { 0 }
-            $minY = if ($vx.Count) { ($vx | ForEach-Object { $_[3] } | Measure-Object -Minimum).Minimum } else { 0 }
-            $best = $null; $bestNota = -1.0
+            # extremos da vista (todas as linhas retas): uma ponta LIVRE da chapa encosta num deles
+            $xsA = @(); $ysA = @()
+            foreach ($L in $lin) { if ($L[1] -eq "h") { $xsA += $L[3], $L[4]; $ysA += $L[2] } else { $xsA += $L[2]; $ysA += $L[3], $L[4] } }
+            $minX = ($xsA | Measure-Object -Minimum).Minimum; $maxX = ($xsA | Measure-Object -Maximum).Maximum
+            $minY = ($ysA | Measure-Object -Minimum).Minimum; $maxY = ($ysA | Measure-Object -Maximum).Maximum
+            $best = $null; $bestNota = -1.0; $lado = ""
             for ($i = 0; $i -lt $lin.Count; $i++) { for ($j = $i + 1; $j -lt $lin.Count; $j++) {
                 $A = $lin[$i]; $B = $lin[$j]
                 if ($A[1] -ne $B[1]) { continue }
                 if ([math]::Abs([math]::Abs($A[2] - $B[2]) - $T) -gt 0.00003) { continue }
                 $ini = [math]::Max($A[3], $B[3]); $fim = [math]::Min($A[4], $B[4]); $ov = $fim - $ini
                 if ($ov -le 0) { continue }
-                $ponta = $false
-                if ($A[1] -eq "h") { if ($null -ne $xVert) { $ponta = ([math]::Abs($ini - $minX) -lt 0.0001) } else { $ponta = ([math]::Abs($fim - $maxX) -lt 0.0001) } }
-                else { $ponta = ([math]::Abs($ini - $minY) -lt 0.0001) }
-                $nota = $ov + $(if ($ponta) { 1000.0 } else { 0.0 })
-                if ($nota -gt $bestNota) { $bestNota = $nota; $best = @($A, $B) }
+                # ponta livre: as duas linhas terminam juntas no extremo da peça (lado preferido primeiro)
+                $ld = ""; $bonus = 0.0
+                if ($A[1] -eq "h") {
+                    $dir = ([math]::Abs($A[4] - $maxX) -lt 0.0001 -and [math]::Abs($B[4] - $maxX) -lt 0.0001)
+                    $esq = ([math]::Abs($A[3] - $minX) -lt 0.0001 -and [math]::Abs($B[3] - $minX) -lt 0.0001)
+                    if ($null -ne $xVert) { if ($esq) { $ld = "esq"; $bonus = 1000 } elseif ($dir) { $ld = "dir"; $bonus = 900 } }
+                    else { if ($dir) { $ld = "dir"; $bonus = 1000 } elseif ($esq) { $ld = "esq"; $bonus = 900 } }
+                } else {
+                    $baixo = ([math]::Abs($A[3] - $minY) -lt 0.0001 -and [math]::Abs($B[3] - $minY) -lt 0.0001)
+                    $cima = ([math]::Abs($A[4] - $maxY) -lt 0.0001 -and [math]::Abs($B[4] - $maxY) -lt 0.0001)
+                    if ($baixo) { $ld = "baixo"; $bonus = 1000 } elseif ($cima) { $ld = "cima"; $bonus = 900 }
+                }
+                $nota = $ov + $bonus
+                if ($nota -gt $bestNota) { $bestNota = $nota; $best = @($A, $B); $lado = $ld }
             } }
             if (-not $best) { continue }
             X $dm "ClearSelection2" $true | Out-Null
@@ -74,12 +84,12 @@ function CotaEspessura($dm, $vistas, $xVert = $null, $yHoriz = $null) {
             $dd = $null
             if ($best[0][1] -eq "v") {
                 # horizontal: na mesma reta da cota horizontal da vista principal (ex.: DXF, junto do 390 em cima), quando informada
-                $yc = if ($null -ne $yHoriz) { [double]$yHoriz } else { [double]($o.y1 - $DistCota) }
+                $yc = if ($null -ne $yHoriz) { [double]$yHoriz } elseif ($lado -eq "cima") { [double]($o.y2 + $DistCota) } else { [double]($o.y1 - $DistCota) }
                 $dd = X $dm "AddHorizontalDimension2" ([double](($o.x1 + $o.x2) / 2)) $yc 0.0
             }
             else {
                 # vertical: na mesma reta da cota vertical da vista principal (ex.: 290 à esquerda), quando informada
-                $xc = if ($null -ne $xVert) { [double]$xVert } else { [double]($o.x2 + $DistCota) }
+                $xc = if ($null -ne $xVert) { [double]$xVert } elseif ($lado -eq "esq") { [double]($o.x1 - $DistCota) } else { [double]($o.x2 + $DistCota) }
                 $dd = X $dm "AddVerticalDimension2" $xc ([double](($o.y1 + $o.y2) / 2)) 0.0
             }
             X $dm "ClearSelection2" $true | Out-Null
