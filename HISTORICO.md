@@ -51,6 +51,7 @@ Formato: `- AAAA-MM-DD — o que mudou — motivo / pedido do usuário`. Itens *
 - Layout de balões em escadinha/fileiras: várias tentativas; ficou a versão aprovada (commit b4c2400) — "ficou bom aparentemente".
 
 ## DXF / AutoCAD
+- 2026-10-26 — Enquadramento (duplo clique no scroll) em TODO DXF gerado: AutoCAD recém-aberto agora espera o próprio arquivo carregar e dá REGEN + ZOOM E duas vezes; AutoCAD já aberto também repete o zoom. Raio de dobra a 45° pelo lado de fora: TESTADO. **PENDENTE testar o DXF.**
 - 2026-10-21 — DXF grava a extensão real ($EXTMIN/$EXTMAX e vista *Active) para abrir enquadrado; abre no AutoCAD JÁ ABERTO (não abre outro), substitui se o arquivo já estiver aberto, REGEN + ZOOM E. Usuário confirmou: "deu certo".
 
 ## Monitor SW (programa)

@@ -173,12 +173,13 @@ const REGRAS = [
   ["laser", "Com usinagem e furos alinhados: cota em um só furo do padrão", "pend", "", ""],
   ["laser", "Ponto 0 (marcação CNC) no canto superior esquerdo da frontal", "pend", "", "Exemplo 0214215."],
   ["laser", "DXF planificado e cotado; linhas de dobra no 1.2 / 1.2.1", "part", "2026-10-20", "Conferir as linhas de dobra."],
+  ["laser", "Todo DXF gerado abre enquadrado no AutoCAD (como o duplo clique no scroll)", "teste", "2026-10-26", "Cabeçalho do DXF já enquadrado; no AutoCAD recém-aberto espera o arquivo carregar e enquadra duas vezes."],
   ["laser", "DXF com usinagem: <span class=\"aviso\">Avaliar sobremetal - Recurso Offset</span>", "teste", "2026-10-26", ""],
   ["laser", "DXF com rosca/rebaixo: só a circunferência do pré-furo", "teste", "2026-10-26", "Remove a circunferência concêntrica maior."],
   ["laser", "DXF com rosca/rebaixo e espessura > 4,76 mm: <span class=\"aviso\">Avaliar furação no CNC - Espessura &gt; 4,76mm</span>", "teste", "2026-10-26", ""],
   ["laser", "DXF com rosca menor que 70% da espessura: <span class=\"aviso\">Avaliar furação no CNC - Diâmetro pequeno</span>", "teste", "2026-10-26", ""],
   ["laser", "1.2 / 1.2.1: cotar o RAIO DE DOBRA na vista de perfil da dobra (não raio de furo ou rasgo)", "ok", "2026-10-26", "Testado: R10 na vista de perfil."],
-  ["laser", "Cota do raio de dobra no meio da dobra, entre as duas faces (chamada na bissetriz do arco)", "teste", "2026-10-26", "3º ajuste: no 2º a cota saiu a 45° mas espelhada, para dentro da dobra; agora a bissetriz é do lado de fora (pelas duas pontas do arco)."],
+  ["laser", "Cota do raio de dobra no meio da dobra, entre as duas faces (chamada na bissetriz do arco)", "ok", "2026-10-26", "Testado: 45° pelo lado de fora da dobra (3º ajuste)."],
   ["laser", "Cotas das linhas de dobra", "rej", "2026-10-20", "Gerou muita informação."],
   ["usin", "No desenho: <span class=\"aviso\">Adicionar acabamento nas faces e precisões necessárias</span>", "ok", "2026-10-26", "Apareceu na Peça2; posição ajustada depois."],
   ["usin", "Mais de 8 furos: tabela com X e Y, origem no canto superior esquerdo", "teste", "2026-10-26", "Limite mudou de 6 para 9 furos."],
@@ -193,6 +194,7 @@ const REGRAS = [
   ["perfil", "Barras e cantoneiras com a lógica do metalon", "teste", "2026-10-26", "Cantoneira (perfil em L) precisa de teste."]
 ];
 const ALTERACOES = [
+  ["2026-10-26", "DXF sempre enquadrado", "Gerador", ["Raio de dobra a 45° pelo lado de fora: testado", "Todo DXF abre enquadrado no AutoCAD, também quando o AutoCAD ainda estava fechado"]],
   ["2026-10-26", "Raio de dobra pelo lado de fora", "Gerador", ["Cota a 45° saía espelhada (para dentro da dobra); agora a chamada vai pelo lado de fora da dobra"]],
   ["2026-10-26", "Raio de dobra a 45°", "Gerador", ["Chamada do raio passa pelo ponto do meio do arco (a 45° numa dobra de 90°); o 1º ajuste ainda saía pela ponta"]],
   ["2026-10-26", "Posição da cota do raio de dobra", "Gerador", ["Raio de dobra testado e aprovado (R10)", "Linha de chamada no meio da dobra, entre as duas faces"]],

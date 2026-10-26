@@ -201,6 +201,17 @@ function AcadAbrirArquivo($acad, $arq) {
     try { [SwCom]::Call($doc, "Activate", [object[]]@()) | Out-Null } catch { }
     try { [SwCom]::Set($acad, "Visible", $true) } catch { }
     AcadEnquadrar $acad $doc
+    # o AutoCAD executa o comando quando termina de carregar: repete o enquadramento para garantir
+    Start-Sleep -Milliseconds 1500
+    AcadEnquadrar $acad $doc
+}
+# documento do AutoCAD com este arquivo (ou $null)
+function AcadDocDoArquivo($acad, $arq) {
+    try {
+        $docs = [SwCom]::Get($acad, "Documents"); $n = [int][SwCom]::Get($docs, "Count")
+        for ($i = 0; $i -lt $n; $i++) { $d = [SwCom]::Call($docs, "Item", [object[]]@($i)); if ([string]([SwCom]::Get($d, "FullName")) -ieq $arq) { return $d } }
+    } catch { }
+    return $null
 }
 # enquadra pelo desenho de verdade: recalcula a extensão (o cabeçalho do DXF pode trazer a extensão da folha inteira)
 # e dá zoom de extensão como o duplo clique no scroll
@@ -231,12 +242,22 @@ function AbrirAutoCAD($arq) {
         if ($exe) { Start-Process -FilePath $exe -ArgumentList ('"' + $arq + '"') } else { Start-Process -FilePath $arq }
         Log "   DXF aberto no $(if ($exe) { 'AutoCAD' } else { 'programa padrão do Windows' })" "DarkGray"
     } catch { Log "   (não consegui abrir o DXF: $($_.Exception.Message))" "DarkYellow"; return }
-    # espera o AutoCAD subir (até ~90 s) para enquadrar
-    for ($t = 0; $t -lt 45; $t++) {
+    # espera o AutoCAD subir E abrir este DXF (até ~2 min) para enquadrar, como o duplo clique no scroll
+    $feito = $false
+    for ($t = 0; $t -lt 60 -and -not $feito; $t++) {
         Start-Sleep -Seconds 2
         $acad = AcadAberto
-        if ($acad) { try { Start-Sleep -Seconds 4; AcadEnquadrar $acad $null; Log "   (DXF enquadrado)" "DarkGray" } catch { }; break }
+        if (-not $acad) { continue }
+        $doc = AcadDocDoArquivo $acad $arq
+        if (-not $doc) { continue }
+        try {
+            Start-Sleep -Seconds 2
+            try { [SwCom]::Call($doc, "Activate", [object[]]@()) | Out-Null } catch { }
+            AcadEnquadrar $acad $doc; Start-Sleep -Seconds 2; AcadEnquadrar $acad $doc
+            $feito = $true; Log "   (DXF enquadrado)" "DarkGray"
+        } catch { }
     }
+    if (-not $feito) { Log "   (não consegui enquadrar o DXF no AutoCAD: o arquivo já abre enquadrado pelo cabeçalho)" "DarkYellow" }
 }
 function GerarDxf($caminhoPeca, $peca, $destinoDxf, $desc) {
     $d = NovoDesenho
