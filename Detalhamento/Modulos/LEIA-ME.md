@@ -3,12 +3,18 @@
 O `DetalharSW.ps1` só lê os parâmetros, carrega os módulos e percorre a lista de arquivos.
 Toda peça passa por **duas etapas**:
 
+0. **Validar** (`Nucleo\Regras.ps1` → `ValidarPropriedades`): DESCRIÇÃO, ACABAMENTO e um processo preenchidos; senão avisa e não detalha.
 1. **Classificar** (`Nucleo\Classificar.ps1` → `ClassificarPeca`): análise rápida com as propriedades
    (descrição, usinagem, processo) e a geometria (caixa, espessura, chapa metálica). Decide o **tipo**
    e grava no log: `Classificação: USINADA (usinagem preenchida, prismática) | caixa ...`.
 2. **Detalhar pelo tipo**: cada tipo tem o seu arquivo em `Tipos\`.
 
-## Tipos atuais
+## Classes do setor (ver `Detalhamento\Regras.html` e `REGRAS_DETALHAMENTO.txt`)
+
+1.1 / 1.1.1 / 1.2 / 1.2.1 laser · 2.1 usinagem · 3.1 / 3.2 solda · 4.1 / 4.2 metalon, barras e cantoneiras.
+A classe escolhe o fluxo abaixo (`$cls.Fluxo`).
+
+## Fluxos (tipos de detalhamento)
 
 | Tipo | Regra (a primeira que bate decide) | Onde está | Referência |
 |---|---|---|---|

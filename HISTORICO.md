@@ -7,6 +7,9 @@ Formato: `- AAAA-MM-DD — o que mudou — motivo / pedido do usuário`. Itens *
 ---
 
 ## Gerador — regras gerais
+- 2026-10-26 — Regras do setor (REGRAS_DETALHAMENTO.txt) no gerador: classes 1.1/1.1.1/1.2/1.2.1 (laser), 2.1 (usinagem), 3.1/3.2 (solda), 4.1/4.2 (metalon, barras, cantoneiras); só detalha com DESCRIÇÃO + ACABAMENTO + um processo preenchidos (aviso e bloqueio); laser sai com desenho+PDF+DXF, demais desenho+PDF; tabela de furos com MAIS DE 8 furos; avisos em vermelho (acabamento/precisões no desenho de usinagem; sobremetal, espessura > 4,76 e diâmetro pequeno no DXF); DXF de rosca/rebaixo só com o pré-furo. Página Detalhamento/Regras.html mostra o que está pronto, parcial e pendente. **PENDENTE testar no SolidWorks.**
+- 2026-10-26 — **A CONFIRMAR**: BARRA CHATA com usinagem = 2.1, sem usinagem = 4.1; CHAPA na descrição = laser; processo (não o material) decide usinagem; posição dos balões vermelhos.
+- PENDENTE (regras do setor) — ponto 0 CNC no laser com usinagem; cota em um furo do padrão repetido (laser/solda 3.2); ±0,1 em furos > 12 mm; balão de solda preso na face; vista principal pela face com mais detalhes; tabela de furos no 1.2.1.
 - 2026-10-25 — Gerador dividido em módulos (`Modulos/Nucleo`, `Modulos/Tipos`) + `Classificar.ps1` decide o tipo ANTES de detalhar — pedidos de um tipo estavam afetando outros tipos; a especialidade da aplicação é analisar a peça (propriedades + geometria) e rodar o script certo para ela.
 - 2026-10-21 — Gerado pelo Monitor: o desenho fica ABERTO no SolidWorks com zoom na folha inteira; PDF não abre nada; DXF abre no AutoCAD — para conferir na hora.
 - 2026-10-21 — Janela do PowerShell do gerador abre minimizada.

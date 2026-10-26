@@ -20,7 +20,7 @@ $RelFile = Join-Path $Pasta ("relatorio_" + (Get-Date -Format "yyyy-MM-dd") + ".
 
 # ---------------------------------------------------------------- módulos
 # Nucleo\ = funções comuns; Tipos\ = um arquivo por tipo de peça. A ordem importa (configuração e COM primeiro).
-foreach ($mod in @('Nucleo\Config', 'Nucleo\SwCom', 'Nucleo\Utilidades', 'Nucleo\Dxf', 'Nucleo\Carimbo', 'Nucleo\Cotas', 'Nucleo\Layout', 'Nucleo\Classificar', 'Tipos\Chapa', 'Tipos\Metalon', 'Tipos\UsinadaTabelaFuros', 'Tipos\Solda', 'Tipos\Peca', 'Nucleo\Fluxo')) {
+foreach ($mod in @('Nucleo\Config', 'Nucleo\SwCom', 'Nucleo\Utilidades', 'Nucleo\Dxf', 'Nucleo\Carimbo', 'Nucleo\Cotas', 'Nucleo\Layout', 'Nucleo\Regras', 'Nucleo\Classificar', 'Tipos\Chapa', 'Tipos\Metalon', 'Tipos\UsinadaTabelaFuros', 'Tipos\Solda', 'Tipos\Peca', 'Nucleo\Fluxo')) {
     $arqMod = Join-Path $Pasta ("Modulos\" + $mod + ".ps1")
     if (-not (Test-Path $arqMod)) { throw "Módulo não encontrado: $arqMod" }
     . $arqMod

@@ -1,0 +1,67 @@
+﻿# REGRAS DE DETALHAMENTO DO SETOR (texto original do usuário, 26/10/2026)
+# Implementação: Modulos\Nucleo\Classificar.ps1 e Regras.ps1. Situação de cada regra: Regras.html
+# Ajustes nas regras: altere este arquivo E peça a mudança no código (ou no detalhamento.ini, para palavras-chave).
+
+Os detalhamentos que utilizamos no setor funciona na seguinte organização abaixo que precisamos classificar anteriormente,
+para definir através dos dados de tabelas e geometria da peça, qual é o tipo de detalhamento será feito conforme as regras e exceções. 
+Deverá mostrar um aviso antes de gerar o detalhamento, caso não tenha sido preenchido, para preencher a tabela de propriedades da peça. Só deverá
+gerar detalhamento se pelo menos o campo de DESCRIÇÃO, ACABAMENTO estiver preenchido e algum processo for diferente de vazio, ex.: 02 (SOLDA, TORNO CNC, FRESA CNC, ACAB. MANUAL, etc...)
+Para cada caso descrito abaixo, considerar antes o plano e como a peça foi construída, para considerar a vistas dos detalhamentos, aquela que representa onde tem mais detalhes de furos, 
+rasgos, rebaixos ou qualquer outro detalhe que seja importante representar. Além disso é importante saber a geometria e tamanho da peça para ajustar as proporções de escala para melhor
+aproveitamento na representação das vista na folha de desenho. Outro ponto é evitar que tabelas no detalhamento ocupem mais espaço que as vistas detalhadas. Avaliar antes sempre o espaço
+disponível diante das informações e da peça e tabelas (se tiver) para fazer o melhor ajuste para visualização.
+
+1) Laser
+2) Usinagem
+3) Montagem de solda
+4) Metalons, Barras, Cantoneiras
+
+1) Laser: São classificadas as peças laser todas aquelas que tenham na descrição palavras do tipo: Laser, LASER, Oxicorte, OXICORTE, Chapa, CHAPA
+
+  1.1) Chapas planas ou geometrias planas sem dobras
+   1.1.1) Chapas planas ou geometrias planas sem dobras, com processo de usinagem (Fresa CNC ou semelhante) - Considerar detalhamento completo de usinagem
+  1.2) Chapas dobradas (detalhamentos mais eloboradas que mostram os raios de dobra, as cotas externas das dobras, etc..)
+   1.2.1) Chapas dobradas (detalhamentos mais eloboradas que mostram os raios de dobra, as cotas externas das dobras, etc..), com processo de usinagem (Fresa CNC ou semelhante)  - Considerar detalhamento completo de usinagem
+
+- Os detalhamentos Laser serão classificados em 1.1, 1.1.1, 1.2, 1.2.1;
+- Todo detalhamento laser com usinagem adicionar ponto 0 (coordenado de marcação para CNC) no canto superior esquerdo da vista considerada frontal (Exemplo peça 0214215);
+- Todas as peças classificadas como laser é necessário detalhamento, DXF e PDF;
+- Toda peça que possui furações com rosca ou rebaixo, mostrar detalhamento de furos (tanto no caso 1.1, 1.1.1, 1.2, 1.2.1);
+- Toda peça que possui furações sem rosca (furo passante ou semelhante), e não tiver processo de usinagem, não adicionar cotas nas furações (tanto no caso 1.1 quanto 1.2);
+- Toda peça que tenha processo de usinagem e tiver mais de 8 furos dispersos na geometria da peça, utilizar tabela de furos no detalhamento (tanto no caso 1.1.1 quanto 1.2.1) (Exemplo peça 0214215); 
+- Toda peça que tenha processo de usinagem e tiver furos alinhados com a gometria da peça, utilizar cota em apenas um furo no padrão que se repete(tanto no caso 1.1.1 quanto 1.2.1);   
+- Todo DXF é planificado e cotado (como já é feito hoje). Se tiver dobra (1.2 e 1.2.1) mostrar linhas de marcações de dobra;
+- Todo DXF, onde a peça tenha processo de usinagem (Fresa CNC ou semelhante), inserir balão em vermelho: "Avaliar sobremetal - Recurso Offset";
+- Todo DXF que tenha furo(s) roscado(s) ou rebaixo(s), com espessura da chapa menor ou igual a 4,76mm, considerar no DXF apenas a circunferência do pré-furo ou diâmetro menor;
+- Todo DXF que tenha furo(s) roscado(s) ou rebaixo(s), com espessura da chapa maior que 4,76 considerar no DXF apenas a circunferência do pré-furo ou diâmetro menor e inserir balão em vermelho: "Avaliar furação no CNC - Espessura > 4,76mm".
+- Todo DXF que tenha furo(s) roscado(s) com diâmetro menor que o valor 70% do valor da espessura da peça inserir balão em vermelho: "Avaliar furação no CNC - Diâmetro pequeno"
+
+2) Usinagem: São classificadas as peças usinadas todas aquelas que tenha algum valor (ex.:02) na tabela de propriedades no campo TORNO CNC ou FRESA CNC ou ELETRO,  que tenham na descrição palavras do tipo: Barra chata, BARRA CHATA, TRIF, Trif, Trifilado, Laminado, LAMINADO, Sextavado, SEXTAVADO,Tarugo, TARUGO, Poliacetal, Tecnnyl, Bronze, Alumínio
+
+  2.1 Peças usinadas (FRESA CNC, TORNO CNC ou semelhante)
+
+- Todas as peças classificadas como usinagem é necessário detalhamento e PDF;
+- Furos ou circunferências maiores que 12mm considerar precisão +0,1 -0,1;
+- No detalhamento, inserir balão em vermelho: "Adicionar acabamento nas faces e precisões necessárias";
+- A tratativa de detalhamento de peça usinada pode ser usada em peças laser, caso ela tenha processo de FRESA CNC, TORNO CNC na tabela de propriedades;
+- Toda peça usinada e tiver mais de 8 furos dispersos na geometria da peça, utilizar tabela de furos no detalhamento (Exemplo peça 0214215). Importante ter a coordenada X e Y de cada furo na tabela, conforme o ponto de origem definido - Ponto na aresta na parte superior à esquerda da vista escolhida para detalhar.
+
+3) Solda ou Montagem de solda: São montagens de solda que tem o nome iniciado em 1301xxxx ou que tenham na descrição palavras do tipo: SOLDA, solda, MONTAGEM DE SOLDA. Montagem de solda 
+
+  3.1 Montagem de solda sem usinagem
+  3.2 Montagem de solda com usinagem (Fresa CNC ou semelhante)
+
+- Todas as montagens classificadas como solda ou montagem de solda é necessário detalhamento e PDF;
+- Toda peça que tenha processo de usinagem e tiver furos alinhados com a gometria da peça, utilizar cota em apenas um furo no padrão que se repete(caso 4.2) (Exemplo peça 13011828);
+- Se a montagem de solda ou solda não tiver processo de usinagem (3.1), apenas detalhar os balões e tabelas de peça da montagem;
+- Cada balão com nome da peça, deve ser pego da face da peça e não da aresta como está agora.
+
+4) Metalons:
+
+ 4.1 Metalons, barras e cantoneiras sem usinagem
+ 4.2 Metalons, barras e cantoneiras com usinagem (Fresa CNC ou semelhante)
+
+- Todas as peças classificadas como metalon, barras e cantoneiras é necessário detalhamento e PDF;
+- Para metalons compridos ou curtos, usar a mesma regra já definida para quebra de seção e detalhamento. Essa lógica deve ser utilizada para barras e cantoneiras também.
+
+

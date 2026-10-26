@@ -60,7 +60,9 @@ $copias = @(
     @{ de = $gerador; para = $det },
     @{ de = (Join-Path $raiz 'Detalhamento\DETALHAR.bat'); para = $det },
     @{ de = (Join-Path $raiz 'Detalhamento\EXPORTAR_PDF_DXF.bat'); para = $det },
-    @{ de = (Join-Path $raiz 'Detalhamento\LEIA-ME.txt'); para = $det }
+    @{ de = (Join-Path $raiz 'Detalhamento\LEIA-ME.txt'); para = $det },
+    @{ de = (Join-Path $raiz 'Detalhamento\REGRAS_DETALHAMENTO.txt'); para = $det },
+    @{ de = (Join-Path $raiz 'Detalhamento\Regras.html'); para = $det }
 )
 # detalhamento.ini e templates: so copia se ainda nao existir no servidor (as configuracoes do servidor mandam)
 foreach ($f in Get-ChildItem (Join-Path $raiz 'Detalhamento') -Include *.ini,*.sldbomtbt,*.sldholtbt) {

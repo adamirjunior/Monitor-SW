@@ -181,7 +181,11 @@ function DetalharMontagem($caminho, $asm) {
     $destDir = PastaDestino $caminho
     $drwPath = Join-Path $destDir "$cod.SLDDRW"
     if ((Test-Path $drwPath) -and -not $Sobrescrever) { Log "   Já existe $drwPath (Sobrescrever=não). Pulando criação." "Yellow"; Relatorio $caminho "montagem" "detalhar" "pulado" "desenho já existe"; return }
-    if (-not (EhPastaSolda $caminho)) { Log "   Aviso: não está numa pasta de SOLDA; vou detalhar igual (isométrica + lista)." "Yellow" }
+    ValidarPropriedades $asm $caminho   # DESCRIÇÃO, ACABAMENTO e um processo preenchidos (senão avisa e não detalha)
+    $clsM = ClassificarMontagem $caminho $asm   # 3.1 sem usinagem | 3.2 com usinagem
+    $script:FazPdf = $true                       # regra do setor: solda sempre com detalhamento + PDF
+    if (-not $clsM.EhSolda) { Log "   Aviso: não é solda pelas regras (código 1301.../descrição SOLDA/pasta); vou detalhar igual (isométrica + lista)." "Yellow" }
+    if ($clsM.Usinagem) { Log "   3.2: montagem de solda com usinagem - cotas do padrão de furos ainda não automáticas (PENDENTE)." "Yellow" }
 
     try { $real = [string](X $asm "GetPathName"); if ($real) { $caminho = $real } } catch { }
     try { X $asm "ResolveAllLightWeightComponents" $false | Out-Null } catch { }

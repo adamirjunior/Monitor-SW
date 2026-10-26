@@ -6,8 +6,12 @@ function DetalharPeca($caminho, $peca) {
     $script:chamadas = @()
     $cod = Codigo $caminho
     # 1) análise rápida: qual é o tipo da peça (regras em Nucleo\Classificar.ps1)
+    ValidarPropriedades $peca $caminho   # DESCRIÇÃO, ACABAMENTO e um processo preenchidos (senão avisa e não detalha)
     $cls = ClassificarPeca $caminho $peca
-    $script:tipoPeca = $cls.Tipo
+    $script:classeAtual = $cls
+    $script:tipoPeca = $cls.Classe + " " + $cls.Fluxo
+    $script:FazPdf = $true                          # regra do setor: todo detalhamento sai com PDF
+    if ($cls.FazDxf) { $script:FazDxf = $true }      # laser: detalhamento + PDF + DXF
     $desc = $cls.Descricao; $laser = $cls.Laser; $chapa = $cls.Chapa
     $destDir = PastaDestino $caminho
     $drwPath = Join-Path $destDir "$cod.SLDDRW"
@@ -20,7 +24,7 @@ function DetalharPeca($caminho, $peca) {
     $mx = $cls.Maior
     $mn = $cls.Menor
     # 2) detalhamento do tipo
-    if ($cls.Tipo -eq "metalon") {
+    if ($cls.Fluxo -eq "metalon") {
         # METALON / METALOM: detalhamento próprio (padrão 02123721) - Tipos\Metalon.ps1
         Log "   Metalon: vista lateral com quebras + perfil + isométrica" "DarkGray"
         $laser = $false
@@ -93,7 +97,7 @@ function DetalharPeca($caminho, $peca) {
     if ($longa) { Log "   Disposição para peça longa (vistas empilhadas)" "DarkGray" }
 
     # folga em volta das vistas para as cotas: maior quando entram as cotas do modelo (usinagem)
-    $script:MargemCotas = if ($laser -and -not (TemUsinagem $peca)) { 0.010 } else { 0.018 }
+    $script:MargemCotas = if ($laser -and -not $cls.Usinagem) { 0.010 } else { 0.018 }
     if ($usinPrisma) { $script:MargemCotas = 0.011; $Gap = 0.020 }   # usinada: cotas só em volta da principal, vistas mais próximas = escala maior
     # escala inicial pelo tamanho REAL das vistas (já com a orientação escolhida), sem contar a isométrica;
     # depois desce escala por escala até caber, tentando 3 arranjos: normal, isométrica menor e vistas empilhadas
@@ -127,10 +131,17 @@ function DetalharPeca($caminho, $peca) {
     EspalharNotasDobra $dm $flat
     $script:isoAtual = $iso
 
-    $usinagem = TemUsinagem $peca
-    Log "   Processo: $(if ($laser) { 'laser' } else { 'fabricada' })$(if ($usinagem) { ' + usinagem' } else { '' })"
-    if ($InserirCotas -and $laser -and -not $usinagem) {
+    $usinagem = $cls.Usinagem
+    Log "   Processo: $(if ($laser) { 'laser' } else { 'fabricada' })$(if ($usinagem) { ' + usinagem' } else { '' }) (classe $($cls.Classe))"
+    if ($InserirCotas -and $laser -and -not $usinPrisma) {
+        # 1.1 / 1.2 (e 1.2.1): cotas totais; furos sem rosca/rebaixo e sem usinagem NÃO são cotados
         try { CotasLaser $dm $front $left $top $flat } catch { Log "   Aviso: cotas de laser falharam ($($_.Exception.Message))" "Yellow" }
+        # furos roscados ou com rebaixo: chamada de furo (detalhe do furo)
+        if ($cls.Furos.Roscados + $cls.Furos.Rebaixos -gt 0) {
+            try { ChamadasFuro $dm $front | Out-Null } catch { Log "   Aviso: chamadas de furo falharam ($($_.Exception.Message))" "Yellow" }
+        }
+        # 1.2.1: dobrada com usinagem -> posição dos furos também
+        if ($usinagem) { try { CotasPosicaoFuros $dm $front | Out-Null } catch { Log "   Aviso: cotas dos furos falharam ($($_.Exception.Message))" "Yellow" } }
     } elseif ($InserirCotas -and $usinPrisma) {
         try { CotasUsinagem $dm $front $top } catch { Log "   Aviso: cotas de usinagem falharam ($($_.Exception.Message))" "Yellow" }
     } elseif ($InserirCotas) {
@@ -143,6 +154,7 @@ function DetalharPeca($caminho, $peca) {
     }
     }   # fim: sem tabela de furos
     }   # fim: peça que não é metalon
+    AvisosDesenho $dm @($cls.Avisos)   # balões vermelhos (ex.: usinagem -> acabamento e precisões)
     TrocarDesenhista $dm
     Rebuild $dm
 

@@ -114,7 +114,7 @@ function CorDxf($arq) {
         $enc = [Text.Encoding]::Default
         $L = [IO.File]::ReadAllLines($arq, $enc)
         $out = New-Object System.Collections.Generic.List[string]
-        $sec = ""; $n = 0; $lfac = $false
+        $sec = ""; $n = 0; $lfac = $false; $aviso = $false
         for ($i = 0; $i -lt $L.Count - 1; $i += 2) {
             $c = $L[$i].Trim(); $v = $L[$i + 1]
             if ($c -eq "0" -and $v.Trim() -eq "SECTION") { $sec = "?" }
@@ -126,7 +126,12 @@ function CorDxf($arq) {
             if ($c -eq "1040" -and $lfac) { $v = "1.0" }
             $lfac = ($c -eq "1070" -and $v.Trim() -eq "144")
             if ($sec -eq "ENTITIES" -or $sec -eq "BLOCKS") {
-                if ($c -eq "8" -and $v.Trim() -ne "0" -and $v.Trim() -notmatch "DEFPOINTS") { $v = "0"; $n++ }
+                # camada AVISOS (balões vermelhos do setor): mantém a camada e força vermelho (cor 1)
+                if ($c -eq "0") { $aviso = $false }
+                if ($c -eq "8" -and $v.Trim() -eq "AVISOS") { $aviso = $true }
+                elseif ($aviso -and $c -eq "62") { $v = "     1" }
+                elseif ($aviso -and $c -eq "420") { continue }
+                elseif ($c -eq "8" -and $v.Trim() -ne "0" -and $v.Trim() -notmatch "DEFPOINTS") { $v = "0"; $n++ }
                 elseif ($c -eq "62" -and $v.Trim() -ne "0") { $v = "     7" }
                 elseif ($c -eq "420") { continue }
             }
@@ -344,11 +349,73 @@ function GerarDxf($caminhoPeca, $peca, $destinoDxf, $desc) {
                 }
             } catch { Log "   (sem nota no DXF: $($_.Exception.Message))" "DarkYellow" }
         }
+        # avisos do setor em VERMELHO (camada AVISOS, preservada pelo CorDxf)
+        $fuD = InfoFuros $peca
+        try {
+            $espD = 0.0
+            try { $ft = X $peca "FirstFeature"; while ($ft) { if ([string](X $ft "GetTypeName2") -eq "SheetMetal") { $espD = [double](XG (X $ft "GetDefinition") "Thickness"); break }; $ft = X $ft "GetNextFeature" } } catch { }
+            if ($espD -le 0) { $bb = XD (X $peca "GetPartBox" $true); $espD = [math]::Min([math]::Abs($bb[3] - $bb[0]), [math]::Min([math]::Abs($bb[4] - $bb[1]), [math]::Abs($bb[5] - $bb[2]))) }
+            $avD = @()
+            if (TemUsinagemCnc $peca) { $avD += "Avaliar sobremetal - Recurso Offset" }
+            if (($fuD.Roscados + $fuD.Rebaixos) -gt 0 -and $espD -gt $EspessuraLimiteCnc + 0.000001) { $avD += "Avaliar furação no CNC - Espessura > 4,76mm" }
+            if (@($fuD.DiamRoscas | Where-Object { $_ -lt $FatorDiametroRosca * $espD }).Count -gt 0) { $avD += "Avaliar furação no CNC - Diâmetro pequeno" }
+            if ($fuD.Roscados -gt 0 -and @($fuD.DiamRoscas).Count -eq 0) { Log "   (DXF: rosca sem diâmetro legível - regra do diâmetro pequeno não conferida)" "DarkYellow" }
+            $o = Contorno $v
+            $altAv = [math]::Max(0.0035, $altCota * 1.2)
+            $yAv = $o.y2 + $DistCota + 0.012 + 2 * $altDesc + 2.5 * $altDesc
+            foreach ($t in $avD) { AvisoVermelho $d $t $o.x1 $yAv $altAv | Out-Null; $yAv += 3 * $altAv }
+        } catch { Log "   (DXF: avisos não inseridos: $($_.Exception.Message))" "DarkYellow" }
         Rebuild $d
         SalvarComo $d $destinoDxf ($SaveSilent + $SaveCopy)
         CorDxf $destinoDxf
+        if (($fuD.Roscados + $fuD.Rebaixos) -gt 0) { PreFuroDxf $destinoDxf }
         VistaDxf $destinoDxf
     } finally {
         Fechar $d
     }
+}
+
+# furo roscado / rebaixo no DXF: fica só a circunferência do PRÉ-FURO (diâmetro menor).
+# Círculos/arcos concêntricos com um círculo menor (até 2,2x o raio dele) são removidos; o contorno externo
+# de uma peça redonda (bem maior que o furo) não é tocado.
+function PreFuroDxf($arq) {
+    try {
+        $enc = [Text.Encoding]::Default
+        $L = [IO.File]::ReadAllLines($arq, $enc)
+        # localiza a seção ENTITIES e quebra em entidades (cada uma começa no código 0)
+        $ini = -1; $fim = -1
+        for ($i = 0; $i -lt $L.Count - 3; $i += 2) {
+            if ($L[$i].Trim() -eq "0" -and $L[$i + 1].Trim() -eq "SECTION" -and $L[$i + 2].Trim() -eq "2" -and $L[$i + 3].Trim() -eq "ENTITIES") { $ini = $i + 4 }
+            elseif ($ini -ge 0 -and $L[$i].Trim() -eq "0" -and $L[$i + 1].Trim() -eq "ENDSEC" -and $i -ge $ini) { $fim = $i; break }
+        }
+        if ($ini -lt 0 -or $fim -lt 0) { return }
+        $ents = New-Object System.Collections.Generic.List[object]
+        $cur = $null
+        for ($i = $ini; $i -lt $fim; $i += 2) {
+            if ($L[$i].Trim() -eq "0") { $cur = [pscustomobject]@{ tipo = $L[$i + 1].Trim(); de = $i; ate = $i + 1; x = $null; y = $null; r = $null }; $ents.Add($cur) }
+            elseif ($cur) {
+                $cur.ate = $i + 1
+                $c = $L[$i].Trim(); $val = $L[$i + 1].Trim()
+                if ($c -eq "10") { $cur.x = [double]::Parse($val, [Globalization.CultureInfo]::InvariantCulture) }
+                elseif ($c -eq "20") { $cur.y = [double]::Parse($val, [Globalization.CultureInfo]::InvariantCulture) }
+                elseif ($c -eq "40") { $cur.r = [double]::Parse($val, [Globalization.CultureInfo]::InvariantCulture) }
+            }
+        }
+        $circ = @($ents | Where-Object { ($_.tipo -eq "CIRCLE" -or $_.tipo -eq "ARC") -and $null -ne $_.r })
+        $tirar = @{}
+        foreach ($e in $circ) {
+            if ($e.tipo -ne "CIRCLE") { continue }
+            foreach ($o in $circ) {
+                if ($o -eq $e -or $tirar.ContainsKey($o.de)) { continue }
+                $mesmoCentro = ([math]::Abs($o.x - $e.x) -lt 0.01 -and [math]::Abs($o.y - $e.y) -lt 0.01)
+                if ($mesmoCentro -and $o.r -gt $e.r + 0.001 -and $o.r -le 2.2 * $e.r) { $tirar[$o.de] = $true }
+            }
+        }
+        if ($tirar.Count -eq 0) { Log "   (DXF: nenhuma circunferência dupla de rosca/rebaixo para remover)" "DarkGray"; return }
+        $out = New-Object System.Collections.Generic.List[string]
+        $pular = @{}; foreach ($e in $ents) { if ($tirar.ContainsKey($e.de)) { for ($j = $e.de; $j -le $e.ate; $j++) { $pular[$j] = $true } } }
+        for ($i = 0; $i -lt $L.Count; $i++) { if (-not $pular.ContainsKey($i)) { $out.Add($L[$i]) } }
+        [IO.File]::WriteAllLines($arq, $out, $enc)
+        Log "   DXF: $($tirar.Count) circunferência(s) de rosca/rebaixo removida(s) - ficou só o pré-furo" "DarkGray"
+    } catch { Log "   (DXF: não consegui deixar só o pré-furo: $($_.Exception.Message))" "DarkYellow" }
 }

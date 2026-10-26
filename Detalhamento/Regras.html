@@ -1,0 +1,225 @@
+<title>Regras de Detalhamento ProEstamp</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Semi+Condensed:wght@500;600;700&family=Barlow:wght@400;500;600&family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+/* Layout: folha técnica — cabeçalho tipo carimbo, uma faixa por classe (1 a 4) com código grande à esquerda e regras à direita */
+:root {
+  --bg: #f3f5f7; --paper: #ffffff; --ink: #18212b; --muted: #5a6876; --line: #d5dce3;
+  --accent: #0b6e8a; --accent-soft: #e3f1f5;
+  --ok: #1d7a46; --ok-bg: #e2f3e9; --part: #8a5a00; --part-bg: #fbf0d9; --pend: #a1302a; --pend-bg: #fbe5e3; --ask: #5b4aa8; --ask-bg: #ece8fa;
+  --red: #c62828;
+  --f-display: "Barlow Semi Condensed", "Arial Narrow", Arial, sans-serif;
+  --f-body: "Barlow", "Segoe UI", Arial, sans-serif;
+  --f-mono: "JetBrains Mono", Consolas, "Courier New", monospace;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #11171d; --paper: #172029; --ink: #e4eaf0; --muted: #98a6b3; --line: #2a3742;
+  --accent: #4fb3d1; --accent-soft: #15303a;
+  --ok: #6fd39a; --ok-bg: #173325; --part: #f0c063; --part-bg: #3a2e14; --pend: #ff8a80; --pend-bg: #3d1f1d; --ask: #b6a8ff; --ask-bg: #2a2546;
+  --red: #ff6b6b; color-scheme: dark } }
+:root[data-theme="dark"] {
+  --bg: #11171d; --paper: #172029; --ink: #e4eaf0; --muted: #98a6b3; --line: #2a3742;
+  --accent: #4fb3d1; --accent-soft: #15303a;
+  --ok: #6fd39a; --ok-bg: #173325; --part: #f0c063; --part-bg: #3a2e14; --pend: #ff8a80; --pend-bg: #3d1f1d; --ask: #b6a8ff; --ask-bg: #2a2546;
+  --red: #ff6b6b; color-scheme: dark }
+* { box-sizing: border-box }
+body { background: var(--bg); color: var(--ink); font: 400 15.5px/1.55 var(--f-body);
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); padding-block: 28px 56px }
+.wrap { max-width: 1080px; margin: 0 auto; display: grid; gap: 22px }
+h1, h2, h3 { font-family: var(--f-display); text-wrap: balance; margin: 0 }
+.carimbo { background: var(--paper); border: 1.5px solid var(--ink); display: grid; grid-template-columns: 1fr auto; }
+.carimbo .t { padding: 18px 20px; border-right: 1.5px solid var(--ink); min-width: 0 }
+.carimbo h1 { font-size: clamp(26px, 4vw, 38px); font-weight: 700; letter-spacing: .01em; line-height: 1.1 }
+.carimbo p { margin: 8px 0 0; color: var(--muted); max-width: 68ch }
+.carimbo dl { margin: 0; display: grid; grid-template-columns: auto auto; font-size: 13px; align-content: stretch }
+.carimbo dt, .carimbo dd { margin: 0; padding: 6px 12px; border-bottom: 1px solid var(--line) }
+.carimbo dt { text-transform: uppercase; letter-spacing: .08em; font-size: 11px; color: var(--muted); align-self: center }
+.carimbo dd { font-family: var(--f-mono); font-size: 12.5px }
+@media (max-width: 680px) { .carimbo { grid-template-columns: 1fr } .carimbo .t { border-right: 0; border-bottom: 1.5px solid var(--ink) } }
+.legenda { display: flex; flex-wrap: wrap; gap: 8px 14px; align-items: center; font-size: 13px; color: var(--muted) }
+.chip { display: inline-block; font: 600 11px/1 var(--f-body); letter-spacing: .06em; text-transform: uppercase; padding: 5px 8px; border-radius: 3px; white-space: nowrap }
+.ok { color: var(--ok); background: var(--ok-bg) } .part { color: var(--part); background: var(--part-bg) }
+.pend { color: var(--pend); background: var(--pend-bg) } .ask { color: var(--ask); background: var(--ask-bg) }
+.fluxo { background: var(--paper); border: 1px solid var(--line); padding: 18px 20px; display: grid; gap: 12px }
+.fluxo h2 { font-size: 22px }
+.passos { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 10px; margin: 0; padding: 0; list-style: none; counter-reset: p }
+.passos li { border-left: 3px solid var(--accent); padding: 4px 0 4px 12px; counter-increment: p; min-width: 0 }
+.passos li::before { content: "Passo " counter(p); display: block; font: 600 11px var(--f-body); letter-spacing: .08em; text-transform: uppercase; color: var(--accent) }
+.classe { background: var(--paper); border: 1px solid var(--line); display: grid; grid-template-columns: 150px 1fr }
+.classe > .num { border-right: 1px solid var(--line); padding: 18px 16px; display: grid; align-content: start; gap: 6px; background: var(--accent-soft) }
+.classe > .num b { font: 700 64px/0.9 var(--f-display); color: var(--accent) }
+.classe > .num span { font: 600 15px/1.2 var(--f-display); text-transform: uppercase; letter-spacing: .04em }
+.classe > .corpo { padding: 18px 20px; display: grid; gap: 16px; min-width: 0 }
+@media (max-width: 680px) { .classe { grid-template-columns: 1fr } .classe > .num { border-right: 0; border-bottom: 1px solid var(--line); grid-auto-flow: column; justify-content: start; align-items: end; gap: 14px } .classe > .num b { font-size: 46px } }
+.ident { font-size: 14.5px; color: var(--muted); margin: 0 }
+.ident code, td code, li code, p code { font-family: var(--f-mono); font-size: .86em; background: var(--bg); border: 1px solid var(--line); padding: 1px 5px; border-radius: 3px; color: var(--ink) }
+.sub { display: flex; flex-wrap: wrap; gap: 8px }
+.sub div { border: 1px solid var(--line); padding: 8px 12px; min-width: 0; flex: 1 1 210px }
+.sub div b { font: 600 13px var(--f-mono); color: var(--accent); display: block }
+.sub div small { color: var(--muted); font-size: 13px }
+.tab { overflow-x: auto }
+table { width: 100%; border-collapse: collapse; font-size: 14.5px }
+th { text-align: left; font: 600 11px var(--f-body); letter-spacing: .08em; text-transform: uppercase; color: var(--muted); border-bottom: 1.5px solid var(--ink); padding: 6px 8px }
+td { border-bottom: 1px solid var(--line); padding: 9px 8px; vertical-align: top }
+td:last-child { width: 1%; white-space: nowrap } td:first-child { min-width: 260px }
+td small { display: block; color: var(--muted); font-size: 13px; margin-top: 3px }
+.aviso { color: var(--red); border: 1.5px solid var(--red); padding: 1px 6px; font-weight: 600; white-space: nowrap; font-size: 13px }
+.nota { background: var(--paper); border: 1px solid var(--line); border-left: 4px solid var(--ask); padding: 14px 18px; display: grid; gap: 6px }
+.nota h3 { font-size: 18px }
+.nota ul, .rodape ul { margin: 0; padding-left: 20px } .nota li, .rodape li { margin: 4px 0 }
+.rodape { color: var(--muted); font-size: 14px; display: grid; gap: 8px }
+.rodape h3 { font-size: 17px; color: var(--ink) }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px }
+</style>
+
+<div class="wrap">
+
+<header class="carimbo">
+  <div class="t">
+    <h1>Regras de Detalhamento — Setor de Projetos</h1>
+    <p>Como o gerador automático decide o tipo de cada peça e o que entra no desenho, no PDF e no DXF. Baseado na organização do setor (<code>REGRAS_DETALHAMENTO.txt</code>) e no que já foi ajustado no Monitor SW.</p>
+  </div>
+  <dl>
+    <dt>Empresa</dt><dd>ProEstamp</dd>
+    <dt>Software</dt><dd>SolidWorks 2016</dd>
+    <dt>Gerador</dt><dd>DetalharSW.ps1</dd>
+    <dt>Revisão</dt><dd>26/10/2026</dd>
+    <dt>Situação</dt><dd>sem teste no SW</dd>
+  </dl>
+</header>
+
+<div class="legenda">
+  <span class="chip ok">Implementado</span> pronto no código
+  <span class="chip part">Parcial</span> funciona em parte
+  <span class="chip pend">Pendente</span> ainda não automático
+  <span class="chip ask">A confirmar</span> decisão sua
+</div>
+
+<section class="fluxo">
+  <h2>Antes de detalhar</h2>
+  <ol class="passos">
+    <li><strong>Conferir propriedades.</strong> Precisa de <code>DESCRIÇÃO</code>, <code>ACABAMENTO</code> e pelo menos um processo com valor (ex.: <code>02</code> em SOLDA, TORNO CNC, FRESA CNC, ACAB. MANUAL). Se faltar, aparece um aviso e o desenho não é gerado.</li>
+    <li><strong>Classificar.</strong> Pela descrição, pelos processos e pela geometria (caixa, espessura, chapa metálica, furos roscados e com rebaixo). O log mostra a classe, ex.: <code>Classificação: 1.1.1 LASER</code>.</li>
+    <li><strong>Detalhar pela classe.</strong> Cada classe chama o seu fluxo: chapa, usinada, tabela de furos, perfil ou solda.</li>
+    <li><strong>Saídas.</strong> Laser: desenho + PDF + DXF. Demais: desenho + PDF.</li>
+  </ol>
+  <div class="tab"><table>
+    <thead><tr><th>Regra geral</th><th>Situação</th></tr></thead>
+    <tbody>
+      <tr><td>Aviso e bloqueio quando a tabela de propriedades está incompleta<small>Janela de aviso + mensagem no Monitor. Pode ser desligado em <code>ExigirPropriedades</code> no detalhamento.ini.</small></td><td><span class="chip ok">Implementado</span></td></tr>
+      <tr><td>Escala ajustada ao tamanho da peça para aproveitar a folha<small>Escala automática de 5:1 a 1:50, escolhendo a maior que cabe.</small></td><td><span class="chip ok">Implementado</span></td></tr>
+      <tr><td>Vista principal = a que mostra mais detalhes (furos, rasgos, rebaixos)<small>Hoje a principal é a face maior (usinada e chapa). Ainda não conta furos e rasgos em cada face para escolher.</small></td><td><span class="chip part">Parcial</span></td></tr>
+      <tr><td>Tabelas nunca maiores que as vistas<small>A tabela de furos é achatada para até ~100 x 90 mm antes de escolher a escala. Ainda falta testar no 02124106.</small></td><td><span class="chip part">Parcial</span></td></tr>
+    </tbody>
+  </table></div>
+</section>
+
+<section class="classe" id="laser">
+  <div class="num"><b>1</b><span>Laser</span></div>
+  <div class="corpo">
+    <p class="ident">Descrição com <code>LASER</code>, <code>OXICORTE</code> ou <code>CHAPA</code>. Plana ou dobrada pela geometria; "com usinagem" quando TORNO CNC, FRESA CNC ou ELETRO têm valor.</p>
+    <div class="sub">
+      <div><b>1.1</b>Chapa plana, sem dobra<small>Fluxo de chapa: principal + espessura, cotas totais</small></div>
+      <div><b>1.1.1</b>Plana + usinagem<small>Tratativa de usinada completa (tabela se &gt; 8 furos)</small></div>
+      <div><b>1.2</b>Chapa dobrada<small>Fluxo de chapa dobrada: planificada, raio, espessura</small></div>
+      <div><b>1.2.1</b>Dobrada + usinagem<small>Fluxo de dobrada + posição dos furos</small></div>
+    </div>
+    <div class="tab"><table>
+      <thead><tr><th>Regra</th><th>Situação</th></tr></thead>
+      <tbody>
+        <tr><td>Desenho, PDF e DXF obrigatórios</td><td><span class="chip ok">Implementado</span></td></tr>
+        <tr><td>Furos roscados ou com rebaixo: mostrar o detalhe do furo<small>Chamada de furo nos furos feitos pelo Assistente de Furação (rosca cosmética também conta).</small></td><td><span class="chip ok">Implementado</span></td></tr>
+        <tr><td>Furos sem rosca e sem usinagem: não cotar (1.1 e 1.2)</td><td><span class="chip ok">Implementado</span></td></tr>
+        <tr><td>Com usinagem e mais de 8 furos: tabela de furos<small>Pronto no 1.1.1. No 1.2.1, a peça dobrada ainda usa o fluxo de dobra.</small></td><td><span class="chip part">Parcial</span></td></tr>
+        <tr><td>Com usinagem e furos alinhados: cota em um só furo do padrão que se repete</td><td><span class="chip pend">Pendente</span></td></tr>
+        <tr><td>Laser com usinagem: ponto 0 (coordenada de marcação CNC) no canto superior esquerdo da frontal<small>Exemplo 0214215. Já é a origem da tabela de furos; falta a marca do ponto 0 quando não há tabela.</small></td><td><span class="chip pend">Pendente</span></td></tr>
+        <tr><td>DXF planificado e cotado; com dobra (1.2 e 1.2.1) mostrar linhas de dobra<small>Cotas totais com ±0,1 em escala 1:1. Conferir se as linhas de dobra saem em todas as peças.</small></td><td><span class="chip part">Parcial</span></td></tr>
+        <tr><td>DXF com usinagem: <span class="aviso">Avaliar sobremetal - Recurso Offset</span></td><td><span class="chip ok">Implementado</span></td></tr>
+        <tr><td>DXF com rosca ou rebaixo e espessura ≤ 4,76 mm: só a circunferência do pré-furo<small>Remove a circunferência concêntrica maior (rosca ou rebaixo) e mantém a menor.</small></td><td><span class="chip ok">Implementado</span></td></tr>
+        <tr><td>DXF com rosca ou rebaixo e espessura &gt; 4,76 mm: só o pré-furo + <span class="aviso">Avaliar furação no CNC - Espessura &gt; 4,76mm</span></td><td><span class="chip ok">Implementado</span></td></tr>
+        <tr><td>DXF com rosca de diâmetro menor que 70% da espessura: <span class="aviso">Avaliar furação no CNC - Diâmetro pequeno</span><small>Usa o diâmetro da rosca do Assistente de Furação.</small></td><td><span class="chip ok">Implementado</span></td></tr>
+      </tbody>
+    </table></div>
+  </div>
+</section>
+
+<section class="classe" id="usinagem">
+  <div class="num"><b>2</b><span>Usinagem</span></div>
+  <div class="corpo">
+    <p class="ident">TORNO CNC, FRESA CNC ou ELETRO com valor (ex.: <code>02</code>). Materiais típicos na descrição: BARRA CHATA, TRIF, TRIFILADO, LAMINADO, SEXTAVADO, TARUGO, POLIACETAL, TECNNYL, BRONZE, ALUMÍNIO.</p>
+    <div class="sub">
+      <div><b>2.1</b>Peça usinada<small>Prismática: principal + baixo + isométrica. Redonda: fluxo de torneada. Mais de 8 furos: tabela de furos (padrão 02124106).</small></div>
+    </div>
+    <div class="tab"><table>
+      <thead><tr><th>Regra</th><th>Situação</th></tr></thead>
+      <tbody>
+        <tr><td>Desenho e PDF obrigatórios</td><td><span class="chip ok">Implementado</span></td></tr>
+        <tr><td>No desenho: <span class="aviso">Adicionar acabamento nas faces e precisões necessárias</span><small>Balão vermelho no canto superior esquerdo da área útil.</small></td><td><span class="chip ok">Implementado</span></td></tr>
+        <tr><td>Mais de 8 furos dispersos: tabela de furos com X e Y de cada furo, origem no canto superior esquerdo da vista</td><td><span class="chip ok">Implementado</span></td></tr>
+        <tr><td>Peça laser com FRESA CNC ou TORNO CNC usa a tratativa de usinada</td><td><span class="chip ok">Implementado</span></td></tr>
+        <tr><td>Furos e circunferências maiores que 12 mm com precisão +0,1 / −0,1</td><td><span class="chip pend">Pendente</span></td></tr>
+      </tbody>
+    </table></div>
+  </div>
+</section>
+
+<section class="classe" id="solda">
+  <div class="num"><b>3</b><span>Solda</span></div>
+  <div class="corpo">
+    <p class="ident">Montagens com código começando em <code>1301</code> ou descrição com <code>SOLDA</code> / <code>MONTAGEM DE SOLDA</code>. Padrão 13011773: uma isométrica, lista de peças e balões com o código.</p>
+    <div class="sub">
+      <div><b>3.1</b>Solda sem usinagem<small>Só balões e lista de peças</small></div>
+      <div><b>3.2</b>Solda com usinagem<small>Exemplo 13011828</small></div>
+    </div>
+    <div class="tab"><table>
+      <thead><tr><th>Regra</th><th>Situação</th></tr></thead>
+      <tbody>
+        <tr><td>Desenho e PDF obrigatórios</td><td><span class="chip ok">Implementado</span></td></tr>
+        <tr><td>3.1: apenas balões e lista de peças da montagem</td><td><span class="chip ok">Implementado</span></td></tr>
+        <tr><td>3.2: furos alinhados com cota em um só furo do padrão que se repete</td><td><span class="chip pend">Pendente</span></td></tr>
+        <tr><td>Balão com o nome da peça preso na FACE da peça, não na aresta</td><td><span class="chip pend">Pendente</span></td></tr>
+      </tbody>
+    </table></div>
+  </div>
+</section>
+
+<section class="classe" id="perfis">
+  <div class="num"><b>4</b><span>Perfis</span></div>
+  <div class="corpo">
+    <p class="ident">Descrição com <code>METALON</code>, <code>METALOM</code>, <code>CANTONEIRA</code> ou <code>BARRA</code>. Mesma lógica do metalon (padrão 02123721): vista lateral com quebras, perfil, isométrica e cotas dos furos encadeadas.</p>
+    <div class="sub">
+      <div><b>4.1</b>Sem usinagem<small>Metalon, barra ou cantoneira</small></div>
+      <div><b>4.2</b>Com usinagem<small>Mesmo fluxo + balão de acabamento</small></div>
+    </div>
+    <div class="tab"><table>
+      <thead><tr><th>Regra</th><th>Situação</th></tr></thead>
+      <tbody>
+        <tr><td>Desenho e PDF obrigatórios</td><td><span class="chip ok">Implementado</span></td></tr>
+        <tr><td>Metalon comprido ou curto: quebras de seção e detalhamento já definidos</td><td><span class="chip ok">Implementado</span></td></tr>
+        <tr><td>Barras e cantoneiras com a mesma lógica do metalon<small>Agora entram no mesmo fluxo. A cantoneira tem perfil em L e precisa de teste.</small></td><td><span class="chip part">Parcial</span></td></tr>
+      </tbody>
+    </table></div>
+  </div>
+</section>
+
+<aside class="nota">
+  <h3>Decisões a confirmar</h3>
+  <ul>
+    <li><span class="chip ask">A confirmar</span> <strong>BARRA CHATA</strong> está nas regras de usinagem e de perfis. Com usinagem, ficou como <strong>2.1 usinada</strong> (como o 02124106). Sem usinagem, ficou como <strong>4.1</strong>. Outras barras com usinagem ficaram como <strong>4.2</strong>.</li>
+    <li><span class="chip ask">A confirmar</span> <strong>CHAPA</strong> como palavra de laser vale para qualquer descrição com "CHAPA". Se houver chapa que não vai ao laser, ela precisa de outra palavra.</li>
+    <li><span class="chip ask">A confirmar</span> Na usinagem, quem decide é o processo (TORNO CNC, FRESA CNC, ELETRO). O material na descrição só aparece no log. Peça sem nenhuma regra segue o fluxo antigo, com aviso no log.</li>
+    <li><span class="chip ask">A confirmar</span> Balões vermelhos no desenho ficam no canto superior esquerdo da área útil. Confira se não encostam nas vistas.</li>
+  </ul>
+</aside>
+
+<footer class="rodape">
+  <h3>Onde ajustar</h3>
+  <ul>
+    <li>Palavras-chave, limite de furos para tabela (9), espessura de 4,76 mm e fator de 70%: <code>Detalhamento\detalhamento.ini</code>.</li>
+    <li>Regras de classificação: <code>Modulos\Nucleo\Classificar.ps1</code>. Avisos vermelhos, furos e validação: <code>Modulos\Nucleo\Regras.ps1</code>.</li>
+    <li>Texto original das regras: <code>Detalhamento\REGRAS_DETALHAMENTO.txt</code>. Histórico das decisões: <code>HISTORICO.md</code> no GitHub.</li>
+  </ul>
+</footer>
+
+</div>

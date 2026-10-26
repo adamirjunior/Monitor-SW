@@ -22,7 +22,6 @@ function Prop($model, $nome) {
     if ($v -match '^\$PRP') { $v = "" }
     return "$v"
 }
-function EhLaser($desc) { foreach ($p in $PalavrasLaser) { if ($p -and $desc.ToUpper().Contains($p.ToUpper())) { return $true } }; return $false }
 function TemChapa($model) {
     try {
         $f = X $model "FirstFeature"

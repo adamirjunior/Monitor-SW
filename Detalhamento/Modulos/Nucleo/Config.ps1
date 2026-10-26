@@ -46,7 +46,7 @@ $TabelaSolda   = C "TemplateListaSolda" ""
 $NotaDxf       = Sim (C "NotaDescricaoNoDxf" "sim")
 $VistaLateralDxf = Sim (C "VistaEspessuraNoDxf" "sim")
 $FecharDesenho = Sim (C "FecharDesenhoAoTerminar" "sim")
-$FurosParaTabela = [int](C "FurosParaTabela" "6")   # usinada com esta quantidade de furos (ou mais) na vista principal: tabela de furos
+$FurosParaTabela = [int](C "FurosParaTabela" "9")   # usinada com MAIS DE 8 furos na vista principal: tabela de furos (regra do setor)
 $script:dxfDesenhos = @()
 # chamado pelo Monitor (botão Gerar detalhamento)
 if ($Destino -eq "servidor") { $PastaSaida = "" }

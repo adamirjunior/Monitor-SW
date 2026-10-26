@@ -1,25 +1,27 @@
-﻿# Classificar.ps1 - análise rápida da peça ANTES de detalhar: decide o TIPO e qual módulo de Tipos\ detalha.
+﻿# Classificar.ps1 - análise rápida da peça ANTES de detalhar: decide a CLASSE (regras do setor) e o fluxo.
+# Regras completas: Detalhamento\REGRAS_DETALHAMENTO.txt e Detalhamento\Regras.html
 # Carregado pelo DetalharSW.ps1 (dot-source). Não rodar sozinho.
 #
-# Ordem das regras (a primeira que bate decide):
-#   1. metalon          descrição contém METALON / METALOM                       -> Tipos\Metalon.ps1
-#   2. chapa-dobrada    tem chapa metálica (planificado) e a caixa é maior que a espessura -> Tipos\Peca.ps1 (fluxo padrão + planificada)
-#   3. chapa-plana      chapa fina: menor medida < 10% da maior e (laser ou <= 6,5 mm), ou chapa metálica sem dobra
-#   4. torneada         duas medidas da caixa iguais (peça de revolução)          -> fluxo padrão, sem vista superior
-#   5. usinada          tem propriedade de usinagem preenchida e é prismática     -> fluxo padrão de usinada;
-#                       com FurosParaTabela furos ou mais na vista principal       -> Tipos\UsinadaTabelaFuros.ps1
-#   6. generica         nenhuma das anteriores                                   -> fluxo padrão com cotas do modelo
+# Ordem (a primeira que bate decide):
+#   4) PERFIS     descrição com METALON/METALOM/CANTONEIRA/BARRA  -> 4.1 sem usinagem | 4.2 com usinagem (Tipos\Metalon.ps1)
+#                 exceção: BARRA CHATA com usinagem vai para 2.1 (usinada)
+#   1) LASER      descrição com LASER/OXICORTE/CHAPA              -> 1.1 plana | 1.1.1 plana + usinagem
+#                                                                    1.2 dobrada | 1.2.1 dobrada + usinagem
+#   2) USINAGEM   TORNO CNC / FRESA CNC / ELETRO preenchido        -> 2.1 (prismática ou torneada; tabela de furos se > 8 furos)
+#   -) SEM CLASSE nenhuma regra: fluxo padrão antigo + aviso no log
+#   3) SOLDA      montagens (.SLDASM) -> Tipos\Solda.ps1 (3.1 sem usinagem | 3.2 com usinagem)
 #
-# Para criar um tipo novo: acrescente a regra aqui (antes da que hoje pegaria a peça), crie Tipos\<Tipo>.ps1
-# com a função Detalhar<Tipo>, ponha o arquivo na lista de módulos do DetalharSW.ps1 e chame-a em DetalharPeca.
+# Campos devolvidos: Classe (ex.: "1.1.1"), Grupo (laser/usinagem/perfil/sem-classe), Fluxo (metalon/chapa-plana/
+# chapa-dobrada/usinada/torneada/generica), Usinagem (CNC), Furos (roscados/rebaixos), Laser, Plana, Redonda...
 
 function ClassificarPeca($caminho, $peca) {
     $desc = [string](Prop $peca $PropDesc)
     $k = [ordered]@{
-        Tipo = "generica"; Motivo = ""; Descricao = $desc
-        Laser = (EhLaser $desc); Chapa = (TemChapa $peca); Usinagem = (TemUsinagem $peca)
+        Classe = ""; Grupo = "sem-classe"; Fluxo = "generica"; Motivo = ""; Descricao = $desc
+        Laser = $false; Chapa = (TemChapa $peca); Usinagem = (TemUsinagemCnc $peca); UsinagemAntiga = (TemUsinagem $peca)
         Espessura = 0.0; X = 0.0; Y = 0.0; Z = 0.0; Maior = 0.0; Menor = 0.0; Caixa = $null
-        Plana = $false; Redonda = $false; UsinPrisma = $false
+        Plana = $false; Dobrada = $false; Redonda = $false; UsinPrisma = $false
+        Furos = $null; Avisos = @(); FazDxf = $false
     }
     # caixa da peça
     $b = XD (X $peca "GetPartBox" $true)
@@ -40,21 +42,66 @@ function ClassificarPeca($caminho, $peca) {
         if ($mEsp.Success) { $k.Espessura = [double]($mEsp.Groups[1].Value.Replace(",", ".")) / 1000 }
     }
     $mx = $k.Maior; $mn = $k.Menor
-    # chapa plana: a principal olha na direção da espessura; chapa metálica só é plana se a menor medida for a espessura
-    $k.Plana = ($mn -lt 0.1 * $mx) -and ($k.Laser -or $mn -le 0.0065)
-    if ($k.Chapa -and $k.Espessura -gt 0) { $k.Plana = ($mn -le $k.Espessura * 1.1 + 0.0001) }
-    $k.Redonda = (-not $k.Laser) -and (([math]::Abs($k.Y - $k.Z) -lt 0.01 * $mx) -or ([math]::Abs($k.X - $k.Z) -lt 0.01 * $mx))
-    $k.UsinPrisma = $k.Usinagem -and -not $k.Laser -and -not $k.Redonda -and -not $k.Plana
+    $k.Furos = InfoFuros $peca
+    if ($k.Espessura -le 0 -and $mn -lt 0.1 * $mx) { $k.Espessura = $mn }
 
-    # ---- regras (a primeira que bate decide)
-    if (EhMetalon $desc) { $k.Tipo = "metalon"; $k.Motivo = "descrição com METALON" }
-    elseif ($k.Chapa -and -not $k.Plana) { $k.Tipo = "chapa-dobrada"; $k.Motivo = "chapa metálica com dobra" }
-    elseif ($k.Plana) { $k.Tipo = "chapa-plana"; $k.Motivo = $(if ($k.Chapa) { "chapa metálica sem dobra" } elseif ($k.Laser) { "chapa fina de laser" } else { "chapa fina (<= 6,5 mm)" }) }
-    elseif ($k.Redonda) { $k.Tipo = "torneada"; $k.Motivo = "peça de revolução (duas medidas iguais)" }
-    elseif ($k.UsinPrisma) { $k.Tipo = "usinada"; $k.Motivo = "usinagem preenchida, prismática" }
-    else { $k.Tipo = "generica"; $k.Motivo = "nenhuma regra específica" }
+    $pPerfil = TemPalavra $desc $PalavrasPerfil
+    $pBarraUsin = TemPalavra $desc $PalavrasBarraUsin
+    $pLaser = TemPalavra $desc $PalavrasLaser
+    $u = $k.Usinagem
+    $k.Redonda = (([math]::Abs($k.Y - $k.Z) -lt 0.01 * $mx) -or ([math]::Abs($k.X - $k.Z) -lt 0.01 * $mx) -or ([math]::Abs($k.X - $k.Y) -lt 0.01 * $mx))
 
-    Log ("   Classificação: {0} ({1}) | caixa {2:N1} x {3:N1} x {4:N1} mm | laser: {5} | chapa metálica: {6} | usinagem: {7}" -f `
-        $k.Tipo.ToUpper(), $k.Motivo, ($k.X * 1000), ($k.Y * 1000), ($k.Z * 1000), $k.Laser, $k.Chapa, $k.Usinagem) "Cyan"
+    if ($pPerfil -and -not ($pBarraUsin -and $u)) {
+        # 4) metalons, barras e cantoneiras: mesma lógica de quebras e cotas do metalon (padrão 02123721)
+        $k.Grupo = "perfil"; $k.Fluxo = "metalon"; $k.Classe = $(if ($u) { "4.2" } else { "4.1" })
+        $k.Motivo = "descrição com $pPerfil" + $(if ($u) { " + usinagem" } else { "" })
+    } elseif ($pLaser) {
+        # 1) laser: plana ou dobrada pela geometria; com usinagem CNC usa a tratativa de usinada
+        $k.Grupo = "laser"; $k.Laser = $true; $k.FazDxf = $true
+        $plana = ($mn -lt 0.1 * $mx) -or ($mn -le 0.0065)
+        if ($k.Chapa -and $k.Espessura -gt 0) { $plana = ($mn -le $k.Espessura * 1.1 + 0.0001) }
+        $k.Plana = $plana; $k.Dobrada = -not $plana
+        if ($plana) { $k.Classe = $(if ($u) { "1.1.1" } else { "1.1" }); $k.Fluxo = $(if ($u) { "usinada" } else { "chapa-plana" }) }
+        else { $k.Classe = $(if ($u) { "1.2.1" } else { "1.2" }); $k.Fluxo = "chapa-dobrada" }
+        $k.Motivo = "descrição com $pLaser, " + $(if ($plana) { "plana" } else { "dobrada" }) + $(if ($u) { " + usinagem" } else { "" })
+        if ($k.Fluxo -eq "usinada") { $k.UsinPrisma = $true; $k.Plana = $false }
+    } elseif ($u) {
+        # 2) usinagem
+        $k.Grupo = "usinagem"; $k.Classe = "2.1"
+        $k.Fluxo = $(if ($k.Redonda) { "torneada" } else { "usinada" })
+        $k.UsinPrisma = -not $k.Redonda
+        $mat = TemPalavra $desc $PalavrasUsinagem
+        $k.Motivo = "TORNO CNC / FRESA CNC / ELETRO preenchido" + $(if ($mat) { ", material $mat" } else { "" })
+    } else {
+        # sem classe: fluxo antigo (chapa fina / torneada / genérica)
+        $plana = ($mn -lt 0.1 * $mx) -and ($mn -le 0.0065)
+        if ($k.Chapa -and $k.Espessura -gt 0) { $plana = ($mn -le $k.Espessura * 1.1 + 0.0001) }
+        $k.Plana = $plana
+        $k.UsinPrisma = $k.UsinagemAntiga -and -not $k.Redonda -and -not $plana
+        $k.Fluxo = $(if ($k.Chapa -and -not $plana) { "chapa-dobrada" } elseif ($plana) { "chapa-plana" } elseif ($k.Redonda) { "torneada" } elseif ($k.UsinPrisma) { "usinada" } else { "generica" })
+        $k.Motivo = "nenhuma regra do setor bateu (sem LASER/CHAPA/OXICORTE, sem TORNO CNC/FRESA CNC/ELETRO, não é perfil)"
+        Log "   Aviso: peça sem classe nas regras do setor; detalhando pelo fluxo padrão ($($k.Fluxo))." "Yellow"
+    }
+    if ($k.Redonda -and $k.Fluxo -ne "torneada" -and $k.Grupo -ne "perfil" -and -not $k.Laser) { $k.UsinPrisma = $false }
+
+    # avisos em vermelho do DESENHO
+    if ($u) { $k.Avisos += "Adicionar acabamento nas faces e precisões necessárias" }
+
+    $f = $k.Furos
+    Log ("   Classificação: {0} {1} ({2}) | fluxo {3} | caixa {4:N1} x {5:N1} x {6:N1} mm | esp. {7:N2} mm | furos: {8} roscado(s), {9} rebaixo(s), {10} simples" -f `
+        $k.Classe, $k.Grupo.ToUpper(), $k.Motivo, $k.Fluxo, ($k.X * 1000), ($k.Y * 1000), ($k.Z * 1000), ($k.Espessura * 1000), $f.Roscados, $f.Rebaixos, $f.Simples) "Cyan"
     return [pscustomobject]$k
+}
+
+# montagem de solda: 3.1 sem usinagem | 3.2 com usinagem
+function ClassificarMontagem($caminho, $asm) {
+    $desc = [string](Prop $asm $PropDesc)
+    $cod = Codigo $caminho
+    $porNome = $false; foreach ($p in $PrefixosSolda) { if ($p -and $cod.StartsWith($p)) { $porNome = $true } }
+    $porDesc = TemPalavra $desc $PalavrasSolda
+    $u = TemUsinagemCnc $asm
+    $classe = $(if ($u) { "3.2" } else { "3.1" })
+    $motivo = $(if ($porNome) { "código $cod" } elseif ($porDesc) { "descrição com $porDesc" } elseif (EhPastaSolda $caminho) { "pasta de solda" } else { "montagem fora das regras de solda" })
+    Log ("   Classificação: {0} SOLDA ({1}){2}" -f $classe, $motivo, $(if ($u) { " + usinagem" } else { "" })) "Cyan"
+    return [pscustomobject]@{ Classe = $classe; Usinagem = $u; Motivo = $motivo; EhSolda = ($porNome -or [bool]$porDesc -or (EhPastaSolda $caminho)) }
 }
