@@ -46,13 +46,25 @@ function CotaEspessura($dm, $vistas, $xVert = $null, $yHoriz = $null) {
                     elseif ([math]::Abs($p1[1] - $p2[1]) -lt 1e-6) { $lin += ,@($e, "h", $p1[1], [math]::Min($p1[0], $p2[0]), [math]::Max($p1[0], $p2[0])) }
                 } catch { }
             }
-            $best = $null; $bestOv = 0
+            # par de linhas paralelas na distância da espessura, de preferência numa EXTREMIDADE da peça
+            # (no lado onde a cota fica: direita para cota vertical, embaixo para horizontal; à esquerda quando alinha com a principal),
+            # assim a cota nunca puxa linha de chamada pelo meio da peça (ex.: 02204262)
+            $hx = @($lin | Where-Object { $_[1] -eq "h" }); $vx = @($lin | Where-Object { $_[1] -eq "v" })
+            $maxX = if ($hx.Count) { ($hx | ForEach-Object { $_[4] } | Measure-Object -Maximum).Maximum } else { 0 }
+            $minX = if ($hx.Count) { ($hx | ForEach-Object { $_[3] } | Measure-Object -Minimum).Minimum } else { 0 }
+            $minY = if ($vx.Count) { ($vx | ForEach-Object { $_[3] } | Measure-Object -Minimum).Minimum } else { 0 }
+            $best = $null; $bestNota = -1.0
             for ($i = 0; $i -lt $lin.Count; $i++) { for ($j = $i + 1; $j -lt $lin.Count; $j++) {
                 $A = $lin[$i]; $B = $lin[$j]
                 if ($A[1] -ne $B[1]) { continue }
                 if ([math]::Abs([math]::Abs($A[2] - $B[2]) - $T) -gt 0.00003) { continue }
-                $ov = [math]::Min($A[4], $B[4]) - [math]::Max($A[3], $B[3])
-                if ($ov -gt $bestOv) { $bestOv = $ov; $best = @($A, $B) }
+                $ini = [math]::Max($A[3], $B[3]); $fim = [math]::Min($A[4], $B[4]); $ov = $fim - $ini
+                if ($ov -le 0) { continue }
+                $ponta = $false
+                if ($A[1] -eq "h") { if ($null -ne $xVert) { $ponta = ([math]::Abs($ini - $minX) -lt 0.0001) } else { $ponta = ([math]::Abs($fim - $maxX) -lt 0.0001) } }
+                else { $ponta = ([math]::Abs($ini - $minY) -lt 0.0001) }
+                $nota = $ov + $(if ($ponta) { 1000.0 } else { 0.0 })
+                if ($nota -gt $bestNota) { $bestNota = $nota; $best = @($A, $B) }
             } }
             if (-not $best) { continue }
             X $dm "ClearSelection2" $true | Out-Null

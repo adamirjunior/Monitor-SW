@@ -97,7 +97,8 @@ function CotaTotal($dm, $v, [bool]$horiz, [bool]$vert) {
         if ($fx -gt 0 -and $fx -lt 0.05) { $cx1 = $o.x1 + $fx; $cx2 = $o.x2 - $fx }
         if ($fy -gt 0 -and $fy -lt 0.05) { $cy1 = $o.y1 + $fy; $cy2 = $o.y2 - $fy }
     } catch { }
-    $tol = 0.0002
+    # extremo de verdade: só vértices a menos de 0,02 mm do extremo (com 0,2 mm pegava o fim do arco da dobra: 26,82 em vez de 27)
+    $tol = 0.00002
     if ($horiz) {
         # extremos em X; entre vértices empatados usa o mais alto (linha de chamada curta até a cota em cima)
         $minX = ($pts | ForEach-Object { $_[1][0] } | Measure-Object -Minimum).Minimum
