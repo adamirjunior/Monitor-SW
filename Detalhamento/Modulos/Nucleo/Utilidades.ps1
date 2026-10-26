@@ -53,8 +53,12 @@ function NovoDesenho {
 }
 function Selecionar($dm, $vista) {
     X $dm "ClearSelection2" $true | Out-Null
-    $ext = XG $dm "Extension"
-    return (X $ext "SelectByID2" (X $vista "GetName2") "DRAWINGVIEW" 0.0 0.0 0.0 $false 0 ([SwCom]::NullDisp()) 0)
+    $nome = X $vista "GetName2"
+    $ok = $false
+    try { $ext = XG $dm "Extension"; $ok = [bool](X $ext "SelectByID2" $nome "DRAWINGVIEW" 0.0 0.0 0.0 $false 0 ([SwCom]::NullDisp()) 0) } catch { }
+    # SelectByID2 pela ponte COM às vezes dá DISP_E_TYPEMISMATCH: usa o SelectByID antigo do ModelDoc
+    if (-not $ok) { try { $ok = [bool](X $dm "SelectByID" $nome "DRAWINGVIEW" 0.0 0.0 0.0) } catch { } }
+    return $ok
 }
 function VistaModelo($drw, $caminho, [string[]]$nomes, $x, $y) {
     $erros = @()

@@ -320,10 +320,31 @@ function GerarDxf($caminhoPeca, $peca, $destinoDxf, $desc) {
         $lat = $null
         if ($VistaLateralDxf) {
             try {
-                Selecionar $d $v | Out-Null
-                $lat = X $d "CreateUnfoldedViewAt3" ($o.x2 + 0.05) (($o.y1 + $o.y2) / 2) 0.0 $false
-                if ($lat) { Modo $lat $DispHidden $true }
-            } catch { Log "   (sem vista de espessura no DXF: $($_.Exception.Message))" "DarkYellow" }
+                if (Selecionar $d $v) { $lat = X $d "CreateUnfoldedViewAt3" ($o.x2 + 0.05) (($o.y1 + $o.y2) / 2) 0.0 $false }
+            } catch { Log "   (vista projetada de espessura falhou: $($_.Exception.Message))" "DarkGray" }
+            if (-not $lat) {
+                # plano B (ex.: chapa plana 1.1): vista de modelo de lado, mostrando a espessura, à direita da peça em 1:1
+                try {
+                    $b = XD (X $peca "GetPartBox" $true)
+                    $dx = [math]::Abs($b[3] - $b[0]); $dy = [math]::Abs($b[4] - $b[1]); $dz = [math]::Abs($b[5] - $b[2])
+                    $lado = @("*Superior", "*Top")
+                    if ($dy -le $dx -and $dy -le $dz) { $lado = @("*Frontal", "*Front") } elseif ($dx -le $dy -and $dx -le $dz) { $lado = @("*Frontal", "*Front") }
+                    $lat = VistaModelo $d $caminhoPeca $lado ($o.x2 + 0.05) (($o.y1 + $o.y2) / 2)
+                    if ($lat) {
+                        try { XS $lat "UseSheetScale" $false } catch { }
+                        try { XS $lat "ScaleDecimal" 1.0 } catch { }
+                        Rebuild $d
+                        $ol = Contorno $lat
+                        # espessura na horizontal (vista em pé, ao lado da peça)
+                        if ($ol.w -gt $ol.h) { try { XS $lat "Angle" ([math]::PI / 2); Rebuild $d } catch { } }
+                        # encosta à direita da peça, centralizada na altura
+                        $ol = Contorno $lat
+                        try { MoverPara $lat ($o.x2 + 0.05) ((($o.y1 + $o.y2) / 2) + $ol.h / 2); Rebuild $d } catch { }
+                        Log "   (DXF: vista de espessura criada pela vista de modelo)" "DarkGray"
+                    }
+                } catch { Log "   (sem vista de espessura no DXF: $($_.Exception.Message))" "DarkYellow"; $lat = $null }
+            }
+            if ($lat) { Modo $lat $DispHidden $true } else { Log "   (DXF sem vista de espessura)" "DarkYellow" }
         }
         # cotas totais como nos DXFs de referência (comprimento x largura na planificada + medidas da vista lateral)
         $script:xfCache = @{}; $script:xfModo = @{}
