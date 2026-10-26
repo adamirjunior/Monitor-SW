@@ -327,11 +327,21 @@ function CotaRaioDobra($dm, $v) {
         $rmm = [math]::Round($r * 1000, 2)
         if ($feitos.ContainsKey($rmm)) { continue }
         try {
-            $q = NaFolha $v ([double[]](XD (X $ar[2] "GetPoint")))
-            $dx = $q[0] - $cx; $dy = $q[1] - $cy; $len = [math]::Sqrt($dx * $dx + $dy * $dy); if ($len -lt 1e-6) { $len = 1 }
+            # cota no MEIO da dobra, entre as duas faces: linha de chamada na bissetriz do arco (do centro para fora,
+            # passando pelo meio do arco), texto além do arco externo
+            $q0 = NaFolha $v ([double[]]@($cp[0], $cp[1], $cp[2]))
+            $qs = NaFolha $v ([double[]](XD (X $ar[2] "GetPoint")))
+            $ev = $null; try { $ev = X $ar[0] "GetEndVertex" } catch { }
+            $qe = if ($ev) { NaFolha $v ([double[]](XD (X $ev "GetPoint"))) } else { $qs }
+            $ux = ($qs[0] - $q0[0]) + ($qe[0] - $q0[0]); $uy = ($qs[1] - $q0[1]) + ($qe[1] - $q0[1])
+            $lu = [math]::Sqrt($ux * $ux + $uy * $uy)
+            if ($lu -lt 1e-7) { $ux = $qs[0] - $cx; $uy = $qs[1] - $cy; $lu = [math]::Sqrt($ux * $ux + $uy * $uy); if ($lu -lt 1e-7) { $lu = 1 } }
+            $rFolha = [math]::Sqrt([math]::Pow($qs[0] - $q0[0], 2) + [math]::Pow($qs[1] - $q0[1], 2))
+            $escV = 1.0; try { $escV = [double](XG $v "ScaleDecimal") } catch { }
+            $dist = $rFolha + $esp * $escV + 0.010
             X $dm "ClearSelection2" $true | Out-Null
             if (-not (SelecionarEntidade $dm $v $ar[0] $false)) { continue }
-            $tx = $q[0] + $dx / $len * 0.012; $ty = $q[1] + $dy / $len * 0.010
+            $tx = $q0[0] + $ux / $lu * $dist; $ty = $q0[1] + $uy / $lu * $dist
             $tx = [math]::Max($o.x1 - 0.015, [math]::Min($o.x2 + 0.015, $tx)); $ty = [math]::Max($o.y1 - 0.012, [math]::Min($o.y2 + 0.012, $ty))
             $d = $null; try { $d = X $dm "AddRadialDimension2" ([double]$tx) ([double]$ty) 0.0 } catch { }
             if ($d) { $feitos[$rmm] = 1; $n++; Log ("   Raio de dobra R{0} cotado na vista {1}" -f $rmm, (X $v "GetName2")) "DarkGray" }
