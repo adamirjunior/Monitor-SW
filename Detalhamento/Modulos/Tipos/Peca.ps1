@@ -96,10 +96,45 @@ function DetalharPeca($caminho, $peca) {
         foreach ($v in @($front, $left, $top)) { if ($v) { Modo $v $DispHidden $true } }
         Rebuild $dm
     }
+    # 1.2/1.2.1: vista principal = PERFIL DA DOBRA (mostra como a peça foi dobrada; ex.: 02124099), a face da chapa
+    # vai embaixo dela; a lateral só repetiria a largura (a planificada mostra a aba de frente) e sai
+    $script:perfilPrincipal = $false
+    if ($laser -and $chapa -and -not $plana -and $flat) {
+        try {
+            Rebuild $dm; $script:xfCache = @{}; $script:xfModo = @{}
+            $cands = @(@($front, $left, $top) | Where-Object { $_ } | ForEach-Object { ,@($_, (ArcosDeDobra $_)) })
+            $pf = @($cands | Sort-Object { -$_[1] })[0]
+            if ($pf -and $pf[1] -gt 0) {
+                if (-not [object]::ReferenceEquals($pf[0], $front)) {
+                    $nmP = OrientacaoDaVista $pf[0]
+                    if ($nmP) {
+                        Log "   Vista principal = perfil da dobra ($nmP)" "DarkGray"
+                        foreach ($v in @($front, $left, $top)) { if ($v) { try { Selecionar $dm $v | Out-Null; X $dm "EditDelete" | Out-Null } catch { } } }
+                        $front = VistaModelo $dm $caminho @($nmP) 0.08 0.15
+                        if (-not $front) { throw "não consegui recriar a vista principal (perfil)" }
+                        Deitar $dm $front
+                        $left = $null; $top = $null
+                        try { Selecionar $dm $front | Out-Null; $left = X $dm "CreateUnfoldedViewAt3" 0.20 0.15 0.0 $false } catch { }
+                        try { Selecionar $dm $front | Out-Null; $top = X $dm "CreateUnfoldedViewAt3" 0.08 0.07 0.0 $false } catch { }
+                        foreach ($v in @($front, $left, $top)) { if ($v) { Modo $v $DispHidden $true } }
+                        Rebuild $dm; $script:xfCache = @{}; $script:xfModo = @{}
+                    }
+                }
+                if ((ArcosDeDobra $front) -gt 0) {
+                    $script:perfilPrincipal = $true
+                    # lateral: sai, a não ser no 1.2.1 com furos que só ela mostra
+                    $furosL = 0; if ($left -and $cls.Usinagem) { try { $furosL = (FurosDaVista $left).Count } catch { } }
+                    if ($left -and $furosL -eq 0) { try { Selecionar $dm $left | Out-Null; X $dm "EditDelete" | Out-Null; $left = $null; Rebuild $dm; Log "   Dobrada: sem vista lateral (perfil + face + planificada mostram tudo)" "DarkGray" } catch { } }
+                }
+            }
+        } catch { Log "   (vista de perfil: $($_.Exception.Message))" "DarkYellow" }
+    }
     Deitar $dm $flat
     AlinharPlanificada $dm $front $flat
     $of0 = Contorno $front
     $longa = ($of0.w -gt 2.5 * $of0.h)
+    # perfil como principal: arranjo normal (perfil em cima, face embaixo, isométrica em cima à direita, planificada embaixo à direita)
+    if ($script:perfilPrincipal) { $longa = $false }
     if ($longa) { Log "   Disposição para peça longa (vistas empilhadas)" "DarkGray" }
     # chapa dobrada longa: principal + vista de baixo + planificada já mostram tudo; a lateral só repetiria a largura
     # (e ficaria sem cota - nenhuma vista pode ficar sem cota)
@@ -155,13 +190,20 @@ function DetalharPeca($caminho, $peca) {
     if ($InserirCotas -and $laser -and -not $usinPrisma) {
         # 1.1 / 1.2 (e 1.2.1): cotas totais; furos sem rosca/rebaixo e sem usinagem NÃO são cotados
         try { CotasLaser $dm $front $left $top $flat } catch { Log "   Aviso: cotas de laser falharam ($($_.Exception.Message))" "Yellow" }
+        # vista dos furos: a principal; com o perfil da dobra como principal, a vista com mais furos (face da chapa)
+        $vFuros = $front
+        if ($script:perfilPrincipal) {
+            $mf = -1
+            foreach ($vv in @($front, $top, $left)) { if ($vv) { $nf = 0; try { $script:xfCache = @{}; $script:xfModo = @{}; $nf = (FurosDaVista $vv).Count } catch { }; if ($nf -gt $mf) { $mf = $nf; $vFuros = $vv } } }
+            $script:xfCache = @{}; $script:xfModo = @{}
+        }
         # furos roscados ou com rebaixo: chamada de furo (detalhe do furo)
         if ($cls.Furos.Roscados + $cls.Furos.Rebaixos -gt 0) {
-            try { ChamadasFuro $dm $front | Out-Null } catch { Log "   Aviso: chamadas de furo falharam ($($_.Exception.Message))" "Yellow" }
+            try { ChamadasFuro $dm $vFuros | Out-Null } catch { Log "   Aviso: chamadas de furo falharam ($($_.Exception.Message))" "Yellow" }
         }
         # 1.2.1: dobrada com usinagem -> posição dos furos também
         if ($usinagem) {
-            try { CotasPosicaoFuros $dm $front | Out-Null } catch { Log "   Aviso: cotas dos furos falharam ($($_.Exception.Message))" "Yellow" }
+            try { CotasPosicaoFuros $dm $vFuros | Out-Null } catch { Log "   Aviso: cotas dos furos falharam ($($_.Exception.Message))" "Yellow" }
             # oblongos (rasgos) em qualquer vista dobrada: raio, comprimento e posição
             $nob = 0
             foreach ($vo in @($front, $left, $top)) { if ($vo) { try { $script:xfCache = @{}; $script:xfModo = @{}; $nob += CotasOblongo $dm $vo } catch { Log "   (oblongo: $($_.Exception.Message))" "DarkYellow" } } }

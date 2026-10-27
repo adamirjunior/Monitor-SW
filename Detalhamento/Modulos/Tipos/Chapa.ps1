@@ -219,6 +219,157 @@ function CotasLinhasDobra($dm, $v) {
     X $dm "ClearSelection2" $true | Out-Null
     return $n
 }
+# chapa dobrada (1.2/1.2.1), planificada: cotas EM CADEIA numa linha só - borda -> 1ª dobra -> 2ª dobra ... -> outra borda
+# (ex.: 02124099: 250,86 / 116,21 / 52,62, com o total 419,68 logo acima). Pedido do usuário em 27/10: conferir com
+# paquímetro depois de dobrar, entre uma ponta e a dobra, entre as dobras e entre a dobra e a outra ponta.
+function CotaPar($dm, $v, $e1, $e2, [bool]$somarSel, [string]$metodo, [double]$x, [double]$y) {
+    X $dm "ClearSelection2" $true | Out-Null
+    if (-not (SelecionarEntidade $dm $v $e1 $false)) { return $null }
+    SelecionarEntidade $dm $v $e2 $true | Out-Null
+    if ((QtdSelecionados $dm) -ne 2) { X $dm "ClearSelection2" $true | Out-Null; return $null }
+    $dd = $null; try { $dd = X $dm $metodo $x $y 0.0 } catch { }
+    X $dm "ClearSelection2" $true | Out-Null
+    return $dd
+}
+function CotasCadeiaDobras($dm, $v) {
+    if (-not $v) { return 0 }
+    $a = DadosXf $v; $esc = 1.0; try { $esc = [double](XG $v "ScaleDecimal") } catch { }
+    $pts = @()
+    foreach ($vx in (Entidades $v "swViewEntityType_Vertex" 2)) { try { $pts += ,@($vx, (Rot $a ([double[]](XD (X $vx "GetPoint"))))) } catch { } }
+    if ($pts.Count -lt 2) { return 0 }
+    $bls = @(); try { $bls = @(X $v "GetBendLines") | Where-Object { $_ } } catch { }
+    $itens = @(); $k = 0
+    foreach ($nt in @(X $v "GetNotes")) {
+        if (-not $nt) { continue }
+        if ([string](X $nt "GetText") -notmatch "(?i)PARA (CIMA|BAIXO)") { continue }
+        $ang = 0.0; try { $ang = [double](XG $nt "Angle") } catch { }
+        $linha = $null; foreach ($e in (AnexosDaNota (X $nt "GetAnnotation"))) { $linha = $e; break }
+        if (-not $linha -and $k -lt $bls.Count) { $linha = $bls[$k] }
+        $k++
+        if ($linha) { $itens += ,@($linha, ([math]::Abs([math]::Sin($ang)) -gt 0.7)) }
+    }
+    if ($itens.Count -eq 0) { return 0 }
+    $cr = CaixaReal $v; $n = 0; $tol = 0.00002
+    foreach ($vertical in $true, $false) {
+        $grupo = @($itens | Where-Object { $_[1] -eq $vertical })
+        if ($grupo.Count -eq 0) { continue }
+        # linha de dobra em pé -> cadeia horizontal em cima; deitada -> cadeia vertical à direita
+        $eixo = if ($vertical) { 0 } else { 1 }; $o2 = 1 - $eixo
+        $metodo = if ($vertical) { "AddHorizontalDimension2" } else { "AddVerticalDimension2" }
+        $mn = ($pts | ForEach-Object { $_[1][$eixo] } | Measure-Object -Minimum).Minimum
+        $mx = ($pts | ForEach-Object { $_[1][$eixo] } | Measure-Object -Maximum).Maximum
+        # pontas de verdade; entre vértices empatados, o mais perto da linha da cadeia (em cima / à direita)
+        $ini = @($pts | Where-Object { $_[1][$eixo] -le $mn + $tol } | Sort-Object { $_[1][$o2] })[-1]
+        $fim = @($pts | Where-Object { $_[1][$eixo] -ge $mx - $tol } | Sort-Object { $_[1][$o2] })[-1]
+        $lin = if ($vertical) { [double]($cr.y2 + $DistCota) } else { [double]($cr.x2 + $DistCota) }
+        $base = if ($vertical) { $cr.x1 } else { $cr.y1 }
+        $xy = { param($p) if ($vertical) { @([double]($base + $p * $esc), $lin) } else { @($lin, [double]($base + $p * $esc)) } }
+        # posição de cada dobra: cota da ponta inicial até ela (a menor fica como 1º elo da cadeia)
+        $dobras = @()
+        foreach ($it in $grupo) {
+            $q = & $xy (($mx - $mn) / 2)
+            $dd = CotaPar $dm $v $ini[0] $it[0] $true $metodo $q[0] $q[1]
+            if (-not $dd) { continue }
+            $val = ValorCota $dd
+            if ($val -le 0.0001 -or ($dobras | Where-Object { [math]::Abs($_[1] - $val) -lt 0.00005 })) { ApagarCota $dm $dd; continue }
+            $dobras += ,@($it[0], $val, $dd)
+        }
+        if ($dobras.Count -eq 0) { continue }
+        $dobras = @($dobras | Sort-Object { $_[1] })
+        for ($i = 1; $i -lt $dobras.Count; $i++) { ApagarCota $dm $dobras[$i][2] }
+        $partes = @()
+        $q = & $xy ($dobras[0][1] / 2)
+        try { X (X $dobras[0][2] "GetAnnotation") "SetPosition" $q[0] $q[1] 0.0 | Out-Null } catch { }
+        $partes += $dobras[0][1]; $n++
+        for ($i = 1; $i -lt $dobras.Count; $i++) {
+            $q = & $xy (($dobras[$i - 1][1] + $dobras[$i][1]) / 2)
+            $dd = CotaPar $dm $v $dobras[$i - 1][0] $dobras[$i][0] $true $metodo $q[0] $q[1]
+            if ($dd) { $n++; $partes += (ValorCota $dd) }
+        }
+        $resto = ($mx - $mn) - $dobras[-1][1]
+        if ($resto -gt 0.0001) {
+            $q = & $xy (($dobras[-1][1] + ($mx - $mn)) / 2)
+            $dd = CotaPar $dm $v $dobras[-1][0] $fim[0] $true $metodo $q[0] $q[1]
+            if ($dd) { $n++; $partes += (ValorCota $dd) }
+        }
+        Log ("   Dobras em cadeia ({0}): {1}" -f $(if ($vertical) { "horizontal, em cima" } else { "vertical, à direita" }), (($partes | ForEach-Object { "{0:N2}" -f ($_ * 1000) }) -join " / ")) "DarkGray"
+    }
+    X $dm "ClearSelection2" $true | Out-Null
+    return $n
+}
+# vista de perfil da dobra = a que mostra os arcos da dobra de lado (arco interno + externo concêntricos, raio + espessura)
+function ArcosDeDobra($v) {
+    $esp = [double]$script:espessura; if (-not $v -or $esp -le 0) { return 0 }
+    $a = DadosXf $v; $arcos = @()
+    foreach ($e in (Entidades $v "swViewEntityType_Edge" 1)) {
+        try {
+            $c = X $e "GetCurve"; if (-not (X $c "IsCircle")) { continue }
+            if (-not (X $e "GetStartVertex")) { continue }
+            $cp = [double[]](XD (XG $c "CircleParams"))
+            $ex = Rot $a @($cp[3], $cp[4], $cp[5])
+            if ([math]::Abs($ex[0]) -gt 0.05 -or [math]::Abs($ex[1]) -gt 0.05) { continue }
+            $arcos += ,$cp
+        } catch { }
+    }
+    $n = 0
+    foreach ($p in $arcos) {
+        if ($arcos | Where-Object { ([math]::Abs($_[6] - ($p[6] + $esp)) -lt 0.0002) -and ([math]::Sqrt([math]::Pow($_[0] - $p[0], 2) + [math]::Pow($_[1] - $p[1], 2) + [math]::Pow($_[2] - $p[2], 2)) -lt 0.002) }) { $n++ }
+    }
+    return $n
+}
+# nome da vista padrão do modelo que olha na mesma direção da vista (eixo do modelo que vira um ponto na folha)
+function OrientacaoDaVista($v) {
+    $a = DadosXf $v
+    $nomes = @(@(@("*Direita", "*Right"), @("*Esquerda", "*Left")), @(@("*Superior", "*Top"), @("*Inferior", "*Bottom")), @(@("*Frontal", "*Front"), @("*Posterior", "*Back")))
+    for ($k = 0; $k -lt 3; $k++) {
+        $e = @(0.0, 0.0, 0.0); $e[$k] = 1.0
+        $r = Rot $a $e
+        if ([math]::Abs($r[0]) + [math]::Abs($r[1]) -lt 0.05) { $z = [double]$a[3 * $k + 2]; return $(if ($z -ge 0) { $nomes[$k][0] } else { $nomes[$k][1] }) }
+    }
+    return $null
+}
+# vista de perfil como principal (1.2/1.2.1): cotas das abas na horizontal, numa linha em cima, entre as faces EXTERNAS
+# (ponta -> face de fora da dobra ...), sem a menor: o comprimento total já está na vista de baixo (ex.: 02124099: 252,50).
+function CotasAbasPerfil($dm, $v) {
+    if (-not $v) { return 0 }
+    $T = [double]$script:espessura; if ($T -le 0) { return 0 }
+    $a = DadosXf $v; $cr = CaixaReal $v; $n = 0
+    $esc = 1.0; try { $esc = [double](XG $v "ScaleDecimal") } catch { }
+    $lin = @()
+    foreach ($e in (Entidades $v "swViewEntityType_Edge" 1)) {
+        try {
+            $c = X $e "GetCurve"; if (-not (X $c "IsLine")) { continue }
+            $p1 = Rot $a ([double[]](XD (X (X $e "GetStartVertex") "GetPoint"))); $p2 = Rot $a ([double[]](XD (X (X $e "GetEndVertex") "GetPoint")))
+            if ([math]::Abs($p1[0] - $p2[0]) -lt 1e-6) { $lin += ,@($e, $p1[0], [math]::Abs($p1[1] - $p2[1])) }
+        } catch { }
+    }
+    $pos = @()
+    foreach ($l in (@($lin) | Sort-Object { -$_[2] })) { if (-not ($pos | Where-Object { [math]::Abs($_[1] - $l[1]) -lt 0.00005 })) { $pos += ,$l } }
+    $pos = @($pos | Sort-Object { $_[1] })
+    if ($pos.Count -lt 3) { return 0 }
+    $min = $pos[0][1]; $max = $pos[-1][1]
+    $ext = @()
+    foreach ($p in $pos) {
+        $par = $pos | Where-Object { [math]::Abs([math]::Abs($_[1] - $p[1]) - $T) -lt 0.00003 } | Select-Object -First 1
+        if ($par -and $p[1] -ne $min -and $p[1] -ne $max) {
+            # face de dentro: a que fica do lado da ponta mais distante
+            $interna = if ([math]::Abs($p[1] - $min) -lt [math]::Abs($p[1] - $max)) { $p[1] -gt $par[1] } else { $p[1] -lt $par[1] }
+            if ($interna) { continue }
+        }
+        $ext += ,$p
+    }
+    if ($ext.Count -lt 3) { return 0 }
+    $seg = @(); for ($i = 0; $i -lt $ext.Count - 1; $i++) { if ([math]::Abs($ext[$i + 1][1] - $ext[$i][1]) -ge $T * 1.5) { $seg += ,@($ext[$i], $ext[$i + 1], [math]::Abs($ext[$i + 1][1] - $ext[$i][1])) } }
+    if ($seg.Count -lt 2) { return 0 }
+    $menor = @($seg | Sort-Object { $_[2] })[0]
+    foreach ($s in $seg) {
+        if ([object]::ReferenceEquals($s, $menor)) { continue }
+        $x = [double]($cr.x1 + (($s[0][1] + $s[1][1]) / 2 - $min) * $esc)
+        $dd = CotaPar $dm $v $s[0][0] $s[1][0] $true "AddHorizontalDimension2" $x ([double]($cr.y2 + $DistCota))
+        if ($dd) { $n++; Log ("   Aba na vista de perfil: {0:N2} mm (ponta/dobra até a face de fora)" -f ($s[2] * 1000)) "DarkGray" }
+    }
+    return $n
+}
 # chapa dobrada, vista de perfil (onde aparece a espessura): cota de cada aba (distância entre as faces externas),
 # para conferir com paquímetro depois de dobrar. Só quando há mais de 2 faces na direção (2 faces = cota total).
 function CotasAbas($dm, $v) {
@@ -301,13 +452,26 @@ function AjustarNotasDobra($dm, $v) {
 }
 function CotasLaserInterno($dm, $front, $left, $top, $flat) {
     $n = 0
+    $perfil = [bool]$script:perfilPrincipal
+    if ($perfil -and $front) {
+        # 1.2/1.2.1 com a vista de perfil como principal: altura total + abas (ponta -> face de fora da dobra) em cima;
+        # o comprimento total vai na vista de baixo (face da chapa). Ex.: 02124099 (119,50 e 252,50; 304,76 e 157 embaixo)
+        $n += CotaTotal $dm $front $false $true
+        $na = 0; try { $na = CotasAbasPerfil $dm $front } catch { Log "   (abas no perfil: $($_.Exception.Message))" "DarkYellow" }
+        if ($na -eq 0) { $na = CotaTotal $dm $front $true $false }
+        $n += $na
+        if ($top) { $n += CotaTotal $dm $top $true $true }
+        if ($left) { $n += CotaTotal $dm $left $true $false }
+    } else {
     if ($front) { $n += CotaTotal $dm $front $true $true }
     if ($left) { $n += CotaTotal $dm $left $true $false }
     # vista de baixo: na chapa plana leva comprimento + espessura; nas outras, só a profundidade (se não houver lateral)
     # chapa plana: a vista de baixo mostra a ESPESSURA (duas linhas paralelas na distância da espessura)
     if ($script:planaAtual -and ($top -or $left)) { $xAl = $null; try { $xAl = (CaixaReal $front).x1 - $DistCota } catch { }; $ne = CotaEspessura $dm @($top, $left) $xAl; if ($ne -eq 0 -and $top) { $ne = CotaTotal $dm $top $false $true }; $n += $ne }
     elseif ($top -and -not $left) { $n += CotaTotal $dm $top $false $true }
-    if ($flat) { $n += CotaTotal $dm $flat $true $true }
+    }
+    # planificada da dobrada: total um pouco mais alto, a cadeia das dobras fica logo abaixo dele
+    if ($flat) { $n += CotaTotal $dm $flat $true $true 0.008 }
     # chapa dobrada: espessura + linha de dobra até a extremidade mais próxima + notas de dobra harmonizadas
     if ($flat) {
         $script:vistaPerfil = $null
@@ -327,8 +491,12 @@ function CotasLaserInterno($dm, $front, $left, $top, $flat) {
         # 2) ESPESSURA na MESMA vista do raio de dobra (se não der lá, tenta as outras)
         $ordem = @($vistaRaio) + @(@($front, $left, $top) | Where-Object { $_ -and $_ -ne $vistaRaio })
         $n += CotaEspessura $dm @($ordem | Where-Object { $_ })
-        # 3) linha de dobra até a aresta mais próxima (na planificada) - pedido do usuário em 26/10
-        try { $nl = CotasLinhasDobra $dm $flat; $n += $nl; if ($nl -gt 0) { Log "   $nl cota(s) de linha de dobra até a aresta mais próxima" "DarkGray" } } catch { Log "   (linha de dobra: $($_.Exception.Message))" "DarkYellow" }
+        # 3) dobras EM CADEIA na planificada: ponta -> dobra -> dobra -> outra ponta (pedido do usuário em 27/10);
+        #    se não sair, volta para a linha de dobra até a aresta mais próxima (26/10)
+        $nl = 0
+        try { $nl = CotasCadeiaDobras $dm $flat } catch { Log "   (dobras em cadeia: $($_.Exception.Message))" "DarkYellow" }
+        if ($nl -eq 0) { try { $nl = CotasLinhasDobra $dm $flat; if ($nl -gt 0) { Log "   $nl cota(s) de linha de dobra até a aresta mais próxima" "DarkGray" } } catch { Log "   (linha de dobra: $($_.Exception.Message))" "DarkYellow" } }
+        $n += $nl
 
         Rebuild $dm
         AjustarNotasDobra $dm $flat

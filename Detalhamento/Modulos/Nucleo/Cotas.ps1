@@ -74,7 +74,7 @@ function CotaEntre($dm, $v, $a, $b, $x, $y, [string]$nome) {
     Log "   (cota $nome de $(X $v 'GetName2'): o SolidWorks não criou)" "DarkYellow"
     return 0
 }
-function CotaTotal($dm, $v, [bool]$horiz, [bool]$vert) {
+function CotaTotal($dm, $v, [bool]$horiz, [bool]$vert, [double]$folgaH = 0) {
     $verts = Entidades $v "swViewEntityType_Vertex" 2
     if ($verts.Count -lt 2) { return (CotaTotalSemVertices $dm $v $horiz $vert) }
     $modelo = @(); $okVerts = @()
@@ -105,7 +105,7 @@ function CotaTotal($dm, $v, [bool]$horiz, [bool]$vert) {
         $maxX = ($pts | ForEach-Object { $_[1][0] } | Measure-Object -Maximum).Maximum
         $a = @($pts | Where-Object { $_[1][0] -le $minX + $tol } | Sort-Object { $_[1][1] })[-1]
         $b = @($pts | Where-Object { $_[1][0] -ge $maxX - $tol } | Sort-Object { $_[1][1] })[-1]
-        if ([math]::Abs($maxX - $minX) -gt 0.001) { $n += CotaEntre $dm $v $a $b (($cx1 + $cx2) / 2) ($cy2 + $DistCota) "horizontal" }
+        if ([math]::Abs($maxX - $minX) -gt 0.001) { $n += CotaEntre $dm $v $a $b (($cx1 + $cx2) / 2) ($cy2 + $DistCota + $folgaH) "horizontal" }
     }
     if ($vert) {
         # extremos em Y; entre vértices empatados usa o mais à esquerda (cota fica à esquerda)
