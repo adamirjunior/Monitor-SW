@@ -114,7 +114,7 @@ function CorDxf($arq) {
         $enc = [Text.Encoding]::Default
         $L = [IO.File]::ReadAllLines($arq, $enc)
         $out = New-Object System.Collections.Generic.List[string]
-        $sec = ""; $n = 0; $lfac = $false; $aviso = $false
+        $sec = ""; $n = 0; $lfac = $false; $aviso = $false; $ent = ""; $zin = $false
         for ($i = 0; $i -lt $L.Count - 1; $i += 2) {
             $c = $L[$i].Trim(); $v = $L[$i + 1]
             if ($c -eq "0" -and $v.Trim() -eq "SECTION") { $sec = "?" }
@@ -125,6 +125,13 @@ function CorDxf($arq) {
             if ($sec -eq "TABLES" -and $c -eq "144") { $v = "1.0" }
             if ($c -eq "1040" -and $lfac) { $v = "1.0" }
             $lfac = ($c -eq "1070" -and $v.Trim() -eq "144")
+            # cotas com as casas decimais sempre visíveis (12,70 e não 12; 390,00 e não 390): o SolidWorks grava
+            # DIMZIN = 12 (tira zeros à direita). Zera no cabeçalho, nos estilos de cota e nas sobreposições das cotas.
+            if ($c -eq "0") { $ent = $v.Trim() }
+            if ($c -eq "9" -and $v.Trim() -eq "`$DIMZIN") { $out.Add($L[$i]); $out.Add($v); $out.Add($L[$i + 2]); $out.Add("     0"); $i += 2; continue }
+            if ($sec -eq "TABLES" -and $ent -eq "DIMSTYLE" -and $c -eq "78") { $v = "     0" }
+            if ($c -eq "1070" -and $zin) { $v = "     0" }
+            $zin = ($c -eq "1070" -and $v.Trim() -eq "78")
             if ($sec -eq "ENTITIES" -or $sec -eq "BLOCKS") {
                 # camada AVISOS (balões vermelhos do setor): mantém a camada e força vermelho (cor 1)
                 if ($c -eq "0") { $aviso = $false }
@@ -164,7 +171,8 @@ function ToleranciaDxf($d, $vistas, $altCota) {
                 $dd = X $a "GetSpecificAnnotation"
                 $dim = X $dd "GetDimension2" 0
                 $mm = [math]::Round([math]::Abs([double](XG $dim "SystemValue")) * 1000, 3)
-                $casas = 0; if ([math]::Abs($mm - [math]::Round($mm, 0)) -gt 0.0005) { $casas = 1 }; if ([math]::Abs($mm - [math]::Round($mm, 1)) -gt 0.0005) { $casas = 2 }
+                # sempre 2 casas (pedido do usuário em 27/10: 12,70 ±0,1 e não 12 ±0,1; inteiro sai 390,00)
+                $casas = 2
                 try { X $dd "SetPrecision3" $casas -1 1 -1 | Out-Null } catch { try { X $dd "SetPrecision2" $casas -1 1 -1 | Out-Null } catch { } }
                 if ($altCota -gt 0) { try { $tf = X $a "GetTextFormat" 0; XS $tf "CharHeight" $altCota; X $a "SetTextFormat" 0 $false $tf | Out-Null } catch { } }
                 $tol = XG $dim "Tolerance"

@@ -76,6 +76,7 @@ Formato: `- AAAA-MM-DD — o que mudou — motivo / pedido do usuário`. Itens *
 - Layout de balões em escadinha/fileiras: várias tentativas; ficou a versão aprovada (commit b4c2400) — "ficou bom aparentemente".
 
 ## DXF / AutoCAD
+- 2026-10-27 — Cotas do DXF sempre com 2 casas (12,70 ±0,1 / 390,00 ±0,1): precisão 2 em todas as cotas e DIMZIN = 0 no cabeçalho e nos estilos de cota (o SolidWorks gravava DIMZIN = 12, que tira os zeros à direita: 12,70 virava 12,7 e 390,00 virava 390). Tolerância continua ±0,1. Conferido no arquivo (02124100, 02204262). Pedido do usuário. **PENDENTE testar.**
 - 2026-10-26 — DXF: se o DXF anterior estiver aberto no AutoCAD (arquivo travado: "sendo usado por outro processo"), fecha sem salvar antes de gravar o novo.
 - 2026-10-26 — DXF: cota da espessura (vista de lado) na mesma reta da cota horizontal de cima da peça (ex.: 1,5 alinhado com o 390), em vez de embaixo. Pedido do usuário. **PENDENTE testar.**
 - 2026-10-26 — DXF: a vista de lado saiu, mas sem cota (usuário: "não ficou legal"). Espessura no DXF agora cotada entre as duas linhas paralelas da vista de lado (mesma CotaEspessura do desenho); Ø do furo cotado no furo mais perto do canto superior direito (linha de chamada curta, não atravessa a peça). **PENDENTE testar.**
