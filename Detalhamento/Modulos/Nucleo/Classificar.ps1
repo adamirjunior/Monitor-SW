@@ -38,12 +38,16 @@ function ClassificarPeca($caminho, $peca) {
         }
     } catch { }
     if ($k.Espessura -le 0) {
-        $mEsp = [regex]::Match($desc, "(?i)ESP\.?\s*([0-9]+(?:[\.,][0-9]+)?)")
-        if ($mEsp.Success) { $k.Espessura = [double]($mEsp.Groups[1].Value.Replace(",", ".")) / 1000 }
+        # mesma leitura da conferência (mm ou polegada: ESP. 3/16" = 4,76 mm; antes lia "3")
+        # só em descrição de chapa (ESP./E= ou laser): "TREF RED 1/2\" X 17" não é espessura
+        $eD = $null; if ($desc -match '(?i)ESP|\bE\s*=' -or (EhLaser $desc)) { try { $eD = EspessuraDaDescricao $desc } catch { } }
+        if ($eD) { $k.Espessura = [double]$eD }
     }
     $mx = $k.Maior; $mn = $k.Menor
     $k.Furos = InfoFuros $peca
     if ($k.Espessura -le 0 -and $mn -lt 0.1 * $mx) { $k.Espessura = $mn }
+    # descrição em polegada arredondada (3/16" = 4,7625) e o 3D com 4,8: vale a medida do 3D (as cotas procuram a espessura real)
+    elseif ($k.Espessura -gt 0 -and [math]::Abs($mn - $k.Espessura) -le 0.00011 -and [math]::Abs($mn - $k.Espessura) -gt 0.000001) { $k.Espessura = $mn }
 
     $pPerfil = TemPalavra $desc $PalavrasPerfil
     $pBarraUsin = TemPalavra $desc $PalavrasBarraUsin

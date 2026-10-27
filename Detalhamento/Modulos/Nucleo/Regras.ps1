@@ -139,19 +139,49 @@ function AvisosDesenho($dm, [string[]]$textos) {
 # ---------------------------------------------------------------- conferência da ESPESSURA (laser)
 $ToleranciaEspessura = [double](C "ToleranciaEspessuraMm" "0.05").Replace(",", ".") / 1000
 $ConferirEspessura   = Sim (C "ConferirEspessuraLaser" "sim")
-# espessura escrita na descrição (m): 1º "ESP. 2" / "ESPESSURA 2MM" / "E=2"; senão a MENOR medida com mm ("2MM", "3,00 mm");
-# maiúsculas ou minúsculas. $null se não achar.
-function EspessuraDaDescricao([string]$desc) {
+$ToleranciaEspessuraPol = [double](C "ToleranciaEspessuraPolegadaMm" "0.1").Replace(",", ".") / 1000
+# espessura escrita na descrição, em mm ou em POLEGADA (pedido do usuário em 27/10: 3D 12,7 e descrição 1/2"):
+#   1º depois de "ESP." / "ESPESSURA" / "E=": 3/16"  1/2'  1.1/4"  1 1/4"  1-1/4"  0,5"  1/2 POL  1/2 (fração = polegada)  2MM  2
+#   2º senão a MENOR medida do texto com unidade (mm, " , ', '', POL) ou fração com marca de polegada
+# Devolve { m = metros; pol = $true se veio em polegada; texto = como estava escrito } ou $null.
+$script:rxPol = '(?:(?<int>\d{1,2})\s*(?:[\.\-]|\s)\s*)?(?<num>\d+)\s*/\s*(?<den>\d+)|(?<dec>\d+(?:[\.,]\d+)?)'
+$script:rxMarcaPol = '\s*(?:"|\u201D|\u2033|\u2019\u2019|\u0027\u0027|\u0027|\u2019|\u2032|POLEGADAS?\b|POL\b\.?)'
+function ValorPolegada($m) {
+    if ($m.Groups["den"].Success -and $m.Groups["den"].Value -ne "") {
+        $den = [double]$m.Groups["den"].Value; if ($den -le 0) { return $null }
+        $v = [double]$m.Groups["num"].Value / $den
+        if ($m.Groups["int"].Success -and $m.Groups["int"].Value -ne "") { $v += [double]$m.Groups["int"].Value }
+        return $v * 0.0254
+    }
+    return [double]($m.Groups["dec"].Value.Replace(",", ".")) * 0.0254
+}
+function LerEspessuraDescricao([string]$desc) {
     if (-not $desc) { return $null }
     $num = '([0-9]+(?:[\.,][0-9]+)?)'
-    foreach ($pad in @("(?i)ESPESSURA\s*[:=]?\s*$num", "(?i)\bESP(?![A-Z])\.?\s*[:=]?\s*$num", "(?i)\bE\s*=\s*$num")) {
-        $m = [regex]::Match($desc, $pad)
-        if ($m.Success) { return [double]($m.Groups[1].Value.Replace(",", ".")) / 1000 }
+    # 1) depois da palavra-chave
+    foreach ($chave in @("(?i)ESPESSURA\s*[:=]?\s*", "(?i)\bESP(?![A-Z])\.?\s*[:=]?\s*", "(?i)\bE\s*=\s*")) {
+        $k = [regex]::Match($desc, $chave)
+        if (-not $k.Success) { continue }
+        $resto = $desc.Substring($k.Index + $k.Length)
+        # polegada: fração (com ou sem marca) ou número com marca de polegada
+        $mp = [regex]::Match($resto, "(?i)^(?:$($script:rxPol))(?<marca>$($script:rxMarcaPol))?")
+        if ($mp.Success -and (($mp.Groups["den"].Success -and $mp.Groups["den"].Value -ne "") -or $mp.Groups["marca"].Value -ne "")) {
+            $mm = [regex]::Match($resto, "(?i)^$num\s*MM(?![A-Z])")
+            if (-not $mm.Success) { return [pscustomobject]@{ m = (ValorPolegada $mp); pol = $true; texto = $mp.Value.Trim() } }
+        }
+        $mn = [regex]::Match($resto, "^$num")
+        if ($mn.Success) { return [pscustomobject]@{ m = [double]($mn.Groups[1].Value.Replace(",", ".")) / 1000; pol = $false; texto = $mn.Value } }
     }
-    $vals = @([regex]::Matches($desc, "(?i)$num\s*MM(?![A-Z])") | ForEach-Object { [double]($_.Groups[1].Value.Replace(",", ".")) })
-    if ($vals.Count -gt 0) { return ($vals | Measure-Object -Minimum).Minimum / 1000 }
+    # 2) menor medida do texto com unidade
+    $cands = @()
+    foreach ($m in [regex]::Matches($desc, "(?i)$num\s*MM(?![A-Z])")) { $cands += [pscustomobject]@{ m = [double]($m.Groups[1].Value.Replace(",", ".")) / 1000; pol = $false; texto = $m.Value.Trim() } }
+    foreach ($m in [regex]::Matches($desc, "(?i)(?<![\d\.,/])(?:$($script:rxPol))(?<marca>$($script:rxMarcaPol))")) {
+        $v = ValorPolegada $m; if ($v -and $v -gt 0) { $cands += [pscustomobject]@{ m = $v; pol = $true; texto = $m.Value.Trim() } }
+    }
+    if ($cands.Count -gt 0) { return ($cands | Sort-Object m | Select-Object -First 1) }
     return $null
 }
+function EspessuraDaDescricao([string]$desc) { $r = LerEspessuraDescricao $desc; if ($r) { return $r.m }; return $null }
 # espessura do 3D (m): recurso de chapa metálica; senão a menor medida da caixa (chapa plana). $null se não der para saber
 function EspessuraDo3D($peca) {
     try {
@@ -170,14 +200,18 @@ function ConferirEspessuraLaser($peca, $caminho) {
     if (-not $ConferirEspessura) { return }
     $desc = [string](Prop $peca $PropDesc)
     $e3d = EspessuraDo3D $peca
-    $eDesc = EspessuraDaDescricao $desc
+    $ld = LerEspessuraDescricao $desc
+    $eDesc = if ($ld) { $ld.m } else { $null }
     if ($null -eq $e3d) { Log "   (espessura do 3D não identificada: conferência da descrição pulada)" "DarkYellow"; return }
-    $f = { param($x) ("{0:0.##} mm" -f ($x * 1000)) }
+    $f = { param($x) ("{0:0.###} mm" -f ($x * 1000)) }
+    # em polegada a chapa comercial é arredondada (3/16" = 4,7625 -> 4,75 ou 4,76; 1/4" = 6,35 -> 6,3): tolerância maior
+    $tol = $ToleranciaEspessura; $comoDesc = ""
+    if ($ld -and $ld.pol) { $tol = [math]::Max($ToleranciaEspessura, $ToleranciaEspessuraPol); $comoDesc = " ($($ld.texto) = $(& $f $eDesc))" }
     if ($null -eq $eDesc) {
         $msg = "A descrição não informa a espessura da chapa. Espessura do 3D: $(& $f $e3d). Escreva na descrição, por exemplo: ESP. $(& $f $e3d)"
-    } elseif ([math]::Abs($eDesc - $e3d) -gt $ToleranciaEspessura) {
-        $msg = "Espessura diferente: descrição $(& $f $eDesc), 3D $(& $f $e3d). Corrija a descrição (ou o modelo) para a espessura do 3D antes de detalhar."
-    } else { Log ("   Espessura conferida: descrição = 3D = {0}" -f (& $f $e3d)) "DarkGray"; return }
+    } elseif ([math]::Abs($eDesc - $e3d) -gt $tol + 1e-9) {
+        $msg = "Espessura diferente: descrição $(if ($ld.pol) { $ld.texto + ' = ' + (& $f $eDesc) } else { & $f $eDesc }), 3D $(& $f $e3d). Corrija a descrição (ou o modelo) para a espessura do 3D antes de detalhar."
+    } else { Log ("   Espessura conferida: descrição{0} = 3D = {1}" -f $comoDesc, (& $f $e3d)) "DarkGray"; return }
     Log "   $msg" "Red"
     try {
         Add-Type -AssemblyName System.Windows.Forms

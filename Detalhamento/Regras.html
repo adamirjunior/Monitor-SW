@@ -169,7 +169,7 @@ const REGRAS = [
   ["geral", "Escala ajustada ao tamanho da peça", "ok", "2026-10-20", "5:1 a 1:50, a maior que cabe."],
   ["geral", "Vista principal pela face com mais detalhes (furos, rasgos, rebaixos)", "part", "2026-10-26", "Hoje é a face maior."],
   ["geral", "Tabelas nunca maiores que as vistas", "part", "2026-10-21", "Tabela de furos achatada até ~100 x 90 mm; falta testar no 02124106."],
-  ["laser", "Antes de detalhar: espessura da descrição tem que ser igual à do 3D (aviso e bloqueio se diferente ou faltando)", "teste", "2026-10-26", "Lê ESP. 2MM, ESPESSURA 2, 2mm e também colado: 3mm1020, ESP3MM. Vale também ao gerar só o DXF."],
+  ["laser", "Antes de detalhar: espessura da descrição tem que ser igual à do 3D (aviso e bloqueio se diferente ou faltando)", "teste", "2026-10-27", "Lê mm (ESP. 2MM, 3mm1020, ESP3MM) e POLEGADA (3/16\", 1/2', 1.1/4\", 1 1/4\", 3/8 POL; fração depois de ESP.). Em polegada aceita até 0,1 mm de diferença. Vale também ao gerar só o DXF."],
   ["laser", "1.1: chapa plana sempre deitada (lado maior na horizontal) e vistas da espessura mais perto da principal = escala maior", "ok", "2026-10-26", "02124100 (390 x 290 x 1,5) tinha saído em 1:7,5."],
   ["laser", "1.1: espessura da chapa cotada na vista de baixo/lateral", "ok", "2026-10-26", "Não tinha vindo no 02124100."],
   ["laser", "1.1: cota da espessura alinhada na mesma reta da cota vertical da vista principal (à esquerda)", "teste", "2026-10-26", "Antes saía do outro lado da peça."],
@@ -214,6 +214,7 @@ const REGRAS = [
   ["perfil", "Barras e cantoneiras com a lógica do metalon", "teste", "2026-10-26", "Cantoneira (perfil em L) precisa de teste."]
 ];
 const ALTERACOES = [
+  ["2026-10-27", "Espessura em polegada na descrição", "Gerador", ["Conferência da espessura entende 3/16\", 1/2', 1.1/4\", 3/8 POL e frações depois de ESP.", "Polegada aceita até 0,1 mm de diferença do 3D (chapa comercial arredondada)", "Ref. 02124097: ESP. 3/16\" com o 3D em 4,8 mm passa e a espessura sai cotada"]],
   ["2026-10-27", "Balões da montagem em colunas", "Gerador", ["Textos dos balões alinhados numa coluna ao lado da peça, um embaixo do outro", "Na ordem da altura das setas (linhas de chamada não se cruzam)", "Nunca em cima de outro texto, da peça ou da lista", "Ref. 13011900 e 13011773"]],
   ["2026-10-27", "Lista da montagem conforme os processos das peças", "Gerador", ["Antes de gerar, lê os processos de todas as peças da montagem", "Coluna de processo que nenhuma peça tem sai da lista; a que falta entra, na ordem do carimbo", "Ref. 13011900: FRESA CNC saiu, TORNO CNC entrou"]],
   ["2026-10-27", "Isométrica maior na chapa dobrada", "Gerador", ["Isométrica cresce até ocupar o espaço livre (sem encostar nas cotas)", "Face da chapa e planificada descem até a base da folha para dar lugar"]],
