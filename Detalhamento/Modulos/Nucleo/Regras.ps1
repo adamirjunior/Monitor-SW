@@ -30,15 +30,37 @@ function TemUsinagemCnc($model) {
     return $false
 }
 
+# nome da propriedade sem espaço/ponto/acento: "ACAB. MANUAL", "ACAB.MANUAL" e "ACABAMENTO MANUAL" ficam iguais
+function NomeProcNorm([string]$n) {
+    $t = $n.ToUpperInvariant().Normalize([Text.NormalizationForm]::FormD)
+    return ($t -replace '[^A-Z0-9]', '') -replace '^ACABAMENTO', 'ACAB'
+}
+# algum processo com valor? confere os nomes REAIS das propriedades da peça (config + geral) contra a lista,
+# sem depender da grafia (ex. 02124107: "ACABAMENTO MANUAL" = 02 e "ACABAMENTO FINAL" = 03, a lista só tinha ACAB.MANUAL)
+function TemAlgumProcesso($model) {
+    foreach ($p in $PropsProcesso) { if ($p -and ([string](Prop $model $p)).Trim() -ne "") { return $true } }
+    $aceitos = @{}
+    foreach ($p in $PropsProcesso) { if ($p) { $aceitos[(NomeProcNorm $p)] = 1 } }
+    $aceitos["ACABMANUAL"] = 1; $aceitos["ACABFINAL"] = 1
+    foreach ($cfg in @((NomeConfig $model), "")) {
+        $nomes = @(); try { $nomes = @(X $model "GetCustomInfoNames2" $cfg) } catch { }
+        foreach ($n in $nomes) {
+            if (-not $n -or -not $aceitos.ContainsKey((NomeProcNorm ([string]$n)))) { continue }
+            $v = ""; try { $v = [string](X $model "GetCustomInfoValue" $cfg ([string]$n)) } catch { }
+            if ($v.Trim() -ne "" -and $v -notmatch '^\$PRP') { return $true }
+        }
+    }
+    return $false
+}
+
 # ---------------------------------------------------------------- validação (antes de gerar)
 # só detalha se DESCRIÇÃO e ACABAMENTO estiverem preenchidos e pelo menos um processo tiver valor (ex.: 02)
 function FaltaPropriedades($model) {
     $falta = @()
     if (([string](Prop $model $PropDesc)).Trim() -eq "") { $falta += $PropDesc }
     if (([string](Prop $model $PropAcabamento)).Trim() -eq "") { $falta += $PropAcabamento }
-    $algum = $false
-    foreach ($p in $PropsProcesso) { if ($p -and ([string](Prop $model $p)).Trim() -ne "") { $algum = $true; break } }
-    if (-not $algum) { $falta += "um processo (SOLDA, TORNO CNC, FRESA CNC, ACAB. MANUAL...)" }
+    $algum = TemAlgumProcesso $model
+    if (-not $algum) { $falta += "um processo (SOLDA, TORNO CNC, FRESA CNC, ACABAMENTO MANUAL/FINAL...)" }
     return ,$falta
 }
 function ValidarPropriedades($model, $caminho) {
