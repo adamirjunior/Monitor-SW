@@ -196,6 +196,7 @@ const REGRAS = [
   ["laser", "Cota do raio de dobra no meio da dobra, entre as duas faces (chamada na bissetriz do arco)", "ok", "2026-10-26", "Testado: 45° pelo lado de fora da dobra (3º ajuste)."],
   ["laser", "1.2 / 1.2.1: espessura da chapa cotada na MESMA vista do raio de dobra", "ok", "2026-10-26", "Antes saía na vista frontal."],
   ["laser", "1.2 / 1.2.1: dobras EM CADEIA na planificada — ponta → dobra → dobra → outra ponta, com o total acima", "teste", "2026-10-27", "Ref. 02124099: 250,86 / 116,21 / 52,62 e 419,68. Substitui a cota até a aresta mais próxima."],
+  ["laser", "Chapa dobrada: isométrica do maior tamanho que couber no espaço livre da folha", "teste", "2026-10-27", "Cresce até a escala da folha sem encostar nas cotas das outras vistas. 02124099 +131%, 02204262 +166%, Peça3 +32%."],
   ["laser", "1.2 / 1.2.1: vista principal = PERFIL DA DOBRA; face da chapa embaixo com os totais; sem lateral repetida", "teste", "2026-10-27", "Perfil com altura, abas até a face de fora da dobra (252,50), espessura e raio. 1.2.1: furos cotados na vista com mais furos."],
   ["laser", "Cotas de cada aba (todas as medidas das dobras)", "rej", "2026-10-20", "Gerou muita informação."],
   ["usin", "No desenho: <span class=\"aviso\">Adicionar acabamento nas faces e precisões necessárias</span>", "ok", "2026-10-26", "Apareceu na Peça2; posição ajustada depois."],
@@ -211,6 +212,7 @@ const REGRAS = [
   ["perfil", "Barras e cantoneiras com a lógica do metalon", "teste", "2026-10-26", "Cantoneira (perfil em L) precisa de teste."]
 ];
 const ALTERACOES = [
+  ["2026-10-27", "Isométrica maior na chapa dobrada", "Gerador", ["Isométrica cresce até ocupar o espaço livre (sem encostar nas cotas)", "Face da chapa e planificada descem até a base da folha para dar lugar"]],
   ["2026-10-27", "Dobrada (1.2 / 1.2.1): vista ideal e cotas entre dobras", "Gerador", ["Vista principal é o perfil da dobra (mostra como a peça foi dobrada), com altura, abas e espessura", "Face da chapa logo embaixo com comprimento e largura; vista lateral repetida sai", "Planificada: cotas em cadeia ponta → dobras → outra ponta, com o total acima", "Conferido em 02124099, Peça3 e 02204262"]],
   ["2026-10-26", "Um detalhamento por vez + espessura do DXF em cima", "Gerador + Monitor 2.15", ["Enquanto alguém gera (em qualquer PC), ninguém mais gera: aparece quem está gerando e qual peça", "DXF: espessura de novo em cima, alinhada com a cota horizontal"]],
   ["2026-10-26", "Cota total exata e espessura na ponta", "Gerador", ["Cota total no extremo real da peça (27 e não 26,82)", "Espessura sempre numa ponta livre da chapa, nunca no meio", "Duas pessoas gerando ao mesmo tempo não interrompe mais as cotas"]],

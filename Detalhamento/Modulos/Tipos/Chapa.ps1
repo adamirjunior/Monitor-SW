@@ -343,6 +343,11 @@ function CotasAbasPerfil($dm, $v) {
             if ([math]::Abs($p1[0] - $p2[0]) -lt 1e-6) { $lin += ,@($e, $p1[0], [math]::Abs($p1[1] - $p2[1])) }
         } catch { }
     }
+    # só linhas DENTRO da peça (extremos pelos vértices da vista)
+    $vxs = @(); foreach ($vx in (Entidades $v "swViewEntityType_Vertex" 2)) { try { $vxs += (Rot $a ([double[]](XD (X $vx "GetPoint"))))[0] } catch { } }
+    if ($vxs.Count -lt 2) { return 0 }
+    $vMin = ($vxs | Measure-Object -Minimum).Minimum; $vMax = ($vxs | Measure-Object -Maximum).Maximum
+    $lin = @($lin | Where-Object { $_[1] -ge $vMin - 0.00002 -and $_[1] -le $vMax + 0.00002 })
     $pos = @()
     foreach ($l in (@($lin) | Sort-Object { -$_[2] })) { if (-not ($pos | Where-Object { [math]::Abs($_[1] - $l[1]) -lt 0.00005 })) { $pos += ,$l } }
     $pos = @($pos | Sort-Object { $_[1] })
@@ -369,6 +374,8 @@ function CotasAbasPerfil($dm, $v) {
         if ([object]::ReferenceEquals($s, $menor)) { continue }
         $x = [double]($cr.x1 + (($s[0][1] + $s[1][1]) / 2 - $min) * $esc)
         $dd = CotaPar $dm $v $s[0][0] $s[1][0] $true "AddHorizontalDimension2" $x ([double]($cr.y2 + $DistCota))
+        # confere o valor: se o SolidWorks criou outra coisa (ex.: cota de ângulo), apaga
+        if ($dd -and [math]::Abs((ValorCota $dd) - $s[2]) -gt 0.00005) { Log ("   (aba {0:N2} mm: cota saiu diferente, apagada)" -f ($s[2] * 1000)) "DarkYellow"; ApagarCota $dm $dd; $dd = $null }
         if ($dd) { $n++; Log ("   Aba na vista de perfil: {0:N2} mm (ponta/dobra até a face de fora)" -f ($s[2] * 1000)) "DarkGray" }
     }
     return $n

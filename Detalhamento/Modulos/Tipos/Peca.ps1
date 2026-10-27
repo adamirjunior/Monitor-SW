@@ -178,11 +178,15 @@ function DetalharPeca($caminho, $peca) {
             if ($iso) { try { XS $iso "UseSheetScale" $false } catch { try { XS $iso "UseSheetScale" 0 } catch { } }; try { XS $iso "ScaleDecimal" (($num / $den) * $fi) } catch { } }
             Rebuild $dm
             $cabe = if ($arr -like "longa*") { LayoutPecaLonga $dm $front $left $top $iso $flat } else { LayoutPeca $dm $front $left $top $iso $flat }
-            if ($cabe) { $ok = $true; Log "   Escala $num`:$den (arranjo $arr)"; break }
+            if ($cabe) { $ok = $true; $arrOk = $arr; $escOk = $num / $den; Log "   Escala $num`:$den (arranjo $arr)"; break }
         }
     }
     if (-not $ok) { Log "   Aviso: as vistas não couberam perfeitamente; confira a disposição." "Yellow" }
-    else { Centralizar $dm @($front, $left, $top, $flat, $iso) $AreaB }
+    else {
+        # chapa dobrada: isométrica do maior tamanho que couber no espaço livre (pedido do usuário em 27/10)
+        if ($iso -and $laser -and $chapa -and -not $plana) { try { AumentarIso $dm $iso @($front, $left, $top, $flat) ($arrOk -like "longa*") $escOk $flat $top } catch { Log "   (isométrica maior: $($_.Exception.Message))" "DarkYellow" } }
+        Centralizar $dm @($front, $left, $top, $flat, $iso) $AreaB
+    }
     EspalharNotasDobra $dm $flat
     $script:isoAtual = $iso
 
@@ -238,4 +242,50 @@ function DetalharPeca($caminho, $peca) {
     if ($fazDxf) { $dxf = Join-Path $destDir "$cod.DXF"; GerarDxf $caminho $peca $dxf $desc; Log "   DXF: $dxf" "Green"; AbrirAutoCAD $dxf; $dxfMsg = " + DXF" }
     if ($FecharDesenho) { Fechar $dm }
     Relatorio $caminho "peça" "detalhar" "ok" ("desenho" + $pdfMsg + $dxfMsg)
+}
+
+# isométrica cresce de 15 em 15% enquanto couber no canto dela (em cima à direita; embaixo à direita na peça longa),
+# longe das outras vistas o suficiente para as cotas delas (Gap); no máximo a escala da folha
+function AumentarIso($dm, $iso, $outras, [bool]$embaixo, [double]$escFolha, $flat = $null, $baixo = $null) {
+    $m = $script:MargemCotas
+    $esc0 = [double](XG $iso "ScaleDecimal"); if ($esc0 -le 0) { return }
+    # planificada desce até alinhar a base com a vista de baixo (como no 02124099 do usuário): sobra espaço para a isométrica
+    if (-not $embaixo -and $flat -and $baixo) {
+        try {
+            $of = Contorno $flat; $ob = Contorno $baixo
+            if ($of.y1 -gt $ob.y1 + 0.001 -and $of.x1 -gt $ob.x2) { MoverPara $flat $of.x1 ($of.y2 - ($of.y1 - $ob.y1)); Rebuild $dm }
+            # e as duas descem juntas até a base da área útil (sobra mais altura para a isométrica em cima)
+            $of = Contorno $flat; $ob = Contorno $baixo
+            # pela peça desenhada (o contorno tem folga em volta)
+            $rf = $of; $rb = $ob; try { $rf = CaixaReal $flat; $rb = CaixaReal $baixo } catch { }
+            $desce = [math]::Min($rf.y1, $rb.y1) - ($AreaB + $m)
+            if ($desce -gt 0.001) { MoverPara $flat $of.x1 ($of.y2 - $desce); MoverPara $baixo $ob.x1 ($ob.y2 - $desce); Rebuild $dm }
+        } catch { }
+    }
+    $folga = 0.022   # espaço das cotas das outras vistas (total + cadeia da planificada)
+    $os = @(@($outras | Where-Object { $_ }) | ForEach-Object { $c = Contorno $_; try { $c = CaixaReal $_ } catch { }; [pscustomobject]@{ x1 = $c.x1 - $folga; y1 = $c.y1 - $folga; x2 = $c.x2 + $folga; y2 = $c.y2 + $folga } })
+    $por = {
+        $oi = Contorno $iso
+        if ($embaixo) { MoverPara $iso ($AreaR - $m - $oi.w) ($AreaB + $m + $oi.h + 0.002) } else { MoverPara $iso ($AreaR - $m - $oi.w) ($AreaT - $m) }
+        Rebuild $dm
+        # o contorno da isométrica tem muita folga em volta: encosta a PEÇA DESENHADA no canto e confere por ela
+        $or = $null; try { $or = CaixaReal $iso } catch { }
+        if ($or) {
+            $oi = Contorno $iso
+            $dx = ($AreaR - $m) - $or.x2
+            $dy = if ($embaixo) { ($AreaB + $m + 0.002) - $or.y1 } else { ($AreaT - $m) - $or.y2 }
+            if ([math]::Abs($dx) + [math]::Abs($dy) -gt 0.0005) { MoverPara $iso ($oi.x1 + $dx) ($oi.y2 + $dy); Rebuild $dm }
+            try { $or = CaixaReal $iso } catch { $or = Contorno $iso }
+        } else { $or = Contorno $iso }
+        if (-not (DentroDaArea $or $AreaB)) { $script:isoMotivo = ("fora da área ({0:N3};{1:N3})-({2:N3};{3:N3})" -f $or.x1, $or.y1, $or.x2, $or.y2); return $false }
+        foreach ($o in $os) { if (Sobrepoe $or $o) { $script:isoMotivo = ("encosta numa vista ({0:N3};{1:N3})-({2:N3};{3:N3})" -f $o.x1, $o.y1, $o.x2, $o.y2); return $false } }
+        return $true
+    }
+    $bom = $esc0; $f = 1.15
+    while ($esc0 * $f -le $escFolha * 1.001) {
+        XS $iso "ScaleDecimal" ($esc0 * $f); Rebuild $dm
+        if (& $por) { $bom = $esc0 * $f; $f *= 1.15 } else { Log "   [dbg] isométrica parou de crescer: $($script:isoMotivo)" "DarkGray"; break }
+    }
+    XS $iso "ScaleDecimal" $bom; Rebuild $dm; & $por | Out-Null
+    if ($bom -gt $esc0 * 1.01) { Log ("   Isométrica aumentada {0:N0}% (espaço livre na folha)" -f (($bom / $esc0 - 1) * 100)) "DarkGray" }
 }
