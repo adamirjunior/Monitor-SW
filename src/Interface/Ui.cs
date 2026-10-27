@@ -15,8 +15,8 @@ using Microsoft.Win32;
 [assembly: AssemblyTitle("Monitor")]
 [assembly: AssemblyDescription("BOM dos projetos SolidWorks com status de PDF/DXF")]
 [assembly: AssemblyProduct("Monitor")]
-[assembly: AssemblyVersion("2.17.2.0")]
-[assembly: AssemblyFileVersion("2.17.2.0")]
+[assembly: AssemblyVersion("2.17.3.0")]
+[assembly: AssemblyFileVersion("2.17.3.0")]
 
 namespace MonitorSW
 {
@@ -362,6 +362,33 @@ namespace MonitorSW
         protected override void OnRenderToolStripBorder(ToolStripRenderEventArgs e)
         {
             if (e.ToolStrip is ToolStripDropDown) base.OnRenderToolStripBorder(e);
+        }
+        // botão principal (Tag "primario", ex.: Gerar detalhamento): fundo cheio na cor de destaque, cantos arredondados,
+        // mais claro com o mouse em cima e mais escuro ao clicar - cara de botão de verdade
+        protected override void OnRenderButtonBackground(ToolStripItemRenderEventArgs e)
+        {
+            if (e.Item.Tag as string != "primario") { base.OnRenderButtonBackground(e); return; }
+            var b = e.Item;
+            var r = new Rectangle(1, 2, b.Width - 3, b.Height - 5);
+            Color c = Theme.Accent;
+            if (!b.Enabled) c = Theme.Muted;
+            else if (b.Pressed) c = ControlPaint.Dark(Theme.Accent, 0.1f);
+            else if (b.Selected) c = ControlPaint.Light(Theme.Accent, 0.25f);
+            var g = e.Graphics;
+            g.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
+            int rad = 6;
+            using (var path = new System.Drawing.Drawing2D.GraphicsPath())
+            {
+                path.AddArc(r.Left, r.Top, rad * 2, rad * 2, 180, 90);
+                path.AddArc(r.Right - rad * 2, r.Top, rad * 2, rad * 2, 270, 90);
+                path.AddArc(r.Right - rad * 2, r.Bottom - rad * 2, rad * 2, rad * 2, 0, 90);
+                path.AddArc(r.Left, r.Bottom - rad * 2, rad * 2, rad * 2, 90, 90);
+                path.CloseFigure();
+                // sombra leve embaixo
+                using (var sh = new SolidBrush(Color.FromArgb(40, 0, 0, 0))) { g.TranslateTransform(0, 1.5f); g.FillPath(sh, path); g.TranslateTransform(0, -1.5f); }
+                using (var br = new SolidBrush(c)) g.FillPath(br, path);
+            }
+            g.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.Default;
         }
         protected override void OnRenderArrow(ToolStripArrowRenderEventArgs e)
         {
@@ -781,8 +808,13 @@ namespace MonitorSW
             ts.Items.Add(Btn("PDF", (s, a) => OpenSel(2)));
             ts.Items.Add(Btn("DXF", (s, a) => OpenSel(4)));
             ts.Items.Add(new ToolStripSeparator());
-            var gen = Btn("Gerar detalhamento", (s, a) => GenerateDetail());
-            gen.ForeColor = Theme.Accent;
+            var gen = Btn("▶  Gerar detalhamento", (s, a) => GenerateDetail());
+            gen.Tag = "primario";            // desenhado como botão cheio (DarkRenderer)
+            gen.ForeColor = Color.White;
+            gen.Font = new Font(Theme.UiFont, FontStyle.Bold);
+            gen.Padding = new Padding(10, 3, 10, 3);
+            gen.Margin = new Padding(6, 2, 6, 2);
+            gen.ToolTipText = "Gera o detalhamento do item selecionado (desenho do SolidWorks, PDF e/ou DXF)";
             ts.Items.Add(gen);
             ts.Items.Add(new ToolStripSeparator { Margin = new Padding(14, 0, 6, 0) });
             var upd = Btn("⟳  Atualizar lista", (s, a) => ForceRefreshList());
