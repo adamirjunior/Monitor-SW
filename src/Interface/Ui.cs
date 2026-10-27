@@ -15,8 +15,8 @@ using Microsoft.Win32;
 [assembly: AssemblyTitle("Monitor")]
 [assembly: AssemblyDescription("BOM dos projetos SolidWorks com status de PDF/DXF")]
 [assembly: AssemblyProduct("Monitor")]
-[assembly: AssemblyVersion("2.16.0.0")]
-[assembly: AssemblyFileVersion("2.16.0.0")]
+[assembly: AssemblyVersion("2.17.0.0")]
+[assembly: AssemblyFileVersion("2.17.0.0")]
 
 namespace MonitorSW
 {
@@ -732,11 +732,14 @@ namespace MonitorSW
         }
 
         // opções do Filtro -> modo interno da lista
-        // 0 BOM completa, 10 comerciais, 2 todas as pendências, 11/12/13 pendências laser/usinagem/submontagens,
-        // 4 fabricadas, 6 exceções, 7 pendente, 8 revisado
-        static readonly int[] FilterModes = { 0, 10, 2, 11, 12, 13, 6, 7, 8 };
+        // 0 BOM completa, 10 comerciais, 2 todas as pendências, 14 arquivos faltantes, 15 conferência (desatualizados),
+        // 11/12/13 pendências laser/usinagem/submontagens, 4 fabricadas, 6 exceções, 7 pendente, 8 revisado
+        static readonly int[] FilterModes = { 0, 10, 2, 14, 15, 11, 12, 13, 6, 7, 8 };
+        const int F_FALTANTES = 3, F_CONFERENCIA = 4;   // posições no Filtro
         int Mode { get { int i = filter.SelectedIndex; return i >= 0 && i < FilterModes.Length ? FilterModes[i] : 0; } }
-        bool TreeMode { get { return Mode <= 2; } }
+        bool TreeMode { get { int m = Mode; return m <= 2 || m == 14 || m == 15; } }
+        // conferência: pendência que não é falta de arquivo nem marcação de revisão (PDF/DXF desatualizado, divergência)
+        static bool EhConferencia(Item it) { return !it.Ignored && it.Sev == 2 && !it.FaltaDet && !it.Mark.StartsWith("PEND", StringComparison.OrdinalIgnoreCase); }
 
         // ------------------------------------------------------------ montagem da tela
         void BuildUi()
@@ -783,16 +786,21 @@ namespace MonitorSW
             var upd = Btn("⟳  Atualizar lista", (s, a) => ForceRefreshList());
             upd.ToolTipText = "Confere de novo agora se cada item tem desenho, PDF e DXF (F5)";
             ts.Items.Add(upd);
-            // liga/desliga mostrar a conferência (desatualizados) na lista; o resultado da conferência fica guardado
-            chkConf.Text = "Mostrar conferência";
-            chkConf.ForeColor = Theme.ConfText;
+            // atalho do Filtro "Arquivos faltantes": o que falta detalhar (desenho/PDF/DXF) - a 1ª etapa.
+            // Desatualizados ficam na Conferência (Filtro > Conferência ou botão Conferência).
+            chkConf.Text = "Mostrar pendências";
+            chkConf.ForeColor = Theme.WarnText;
             chkConf.BackColor = Color.Transparent;
             chkConf.Font = Theme.UiFont;
             chkConf.AutoSize = true;
             chkConf.Margin = new Padding(8, 3, 0, 0);
-            chkConf.CheckedChanged += (s, a) => { if (miCheck.Checked != chkConf.Checked) miCheck.Checked = chkConf.Checked; };
+            chkConf.CheckedChanged += (s, a) =>
+            {
+                if (chkConf.Checked) { if (filter.SelectedIndex != F_FALTANTES) filter.SelectedIndex = F_FALTANTES; }
+                else if (filter.SelectedIndex == F_FALTANTES) filter.SelectedIndex = 0;
+            };
             var confHost = new ToolStripControlHost(chkConf);
-            confHost.ToolTipText = "Marcado: mostra também o que está desatualizado (PDF/DXF antigos, divergências da Conferência). Desmarcado: só se tem ou não tem detalhamento";
+            confHost.ToolTipText = "Marcado: mostra só os itens com arquivo faltando (sem desenho, PDF ou DXF), em laranja. Desatualizados ficam na Conferência.";
             ts.Items.Add(confHost);
             var conf = Btn("✔  Conferência", (s, a) => ConferirProjeto());
             conf.ForeColor = Theme.ConfText;
@@ -808,6 +816,8 @@ namespace MonitorSW
                 "LISTA DE PEÇAS (BOM completa)",
                 "LISTA DE PEÇAS (Comercial)",
                 "Todas as pendências",
+                "Arquivos faltantes (sem desenho / PDF / DXF)",
+                "Conferência (PDF/DXF desatualizados, divergências)",
                 "Pendências LASER",
                 "Pendências USINAGEM",
                 "Pendências SUBMONTAGENS",
@@ -815,7 +825,14 @@ namespace MonitorSW
                 "Marcados para revisão (pendente)",
                 "Marcados como revisado" });
             filter.SelectedIndex = 0;
-            filter.SelectedIndexChanged += (s, a) => { ApplySortMode(); FillGrid(); };
+            filter.SelectedIndexChanged += (s, a) =>
+            {
+                // Conferência no Filtro liga o modo conferência (datas); sair dela desliga
+                bool emConf = filter.SelectedIndex == F_CONFERENCIA;
+                if (emConf != miCheck.Checked) { miCheck.Checked = emConf; if (emConf && !miCheck.Checked) { filter.SelectedIndex = F_FALTANTES; return; } }
+                if (chkConf.Checked != (filter.SelectedIndex == F_FALTANTES)) chkConf.Checked = filter.SelectedIndex == F_FALTANTES;
+                ApplySortMode(); FillGrid();
+            };
 
             // ---- menu Ferramentas (lado direito)
             var toolsMenu = new ContextMenuStrip();
@@ -837,12 +854,12 @@ namespace MonitorSW
                 var vi = Mi(filter.Items[i].ToString(), (s, a) => { filter.SelectedIndex = idx; });
                 vi.Checked = i == 0;
                 viewItems.Add(vi);
-                if (i == 2 || i == 6) viewMenu.Items.Add(new ToolStripSeparator());
+                if (i == 2 || i == 5 || i == 8) viewMenu.Items.Add(new ToolStripSeparator());
                 viewMenu.Items.Add(vi);
             }
             filter.SelectedIndexChanged += (s, a) => { for (int i = 0; i < viewItems.Count; i++) viewItems[i].Checked = i == filter.SelectedIndex; };
             DarkMenus(viewMenu);
-            if (viewItems.Count > 8) { viewItems[6].ForeColor = Purple; viewItems[7].ForeColor = Theme.PendText; viewItems[8].ForeColor = Theme.OkText; }   // exceção roxo, marcado para revisão vermelho, revisado verde
+            if (viewItems.Count > 10) { viewItems[F_FALTANTES].ForeColor = Theme.WarnText; viewItems[F_CONFERENCIA].ForeColor = Theme.ConfText; viewItems[8].ForeColor = Purple; viewItems[9].ForeColor = Theme.PendText; viewItems[10].ForeColor = Theme.OkText; }   // faltantes laranja, conferência verde-azulado, exceção roxo, revisão vermelho, revisado verde
             var filterBtn = new ToolStripButton("Filtro");
             filterBtn.Image = FunnelIcon(Theme.Text);
             filterBtn.DisplayStyle = ToolStripItemDisplayStyle.ImageAndText;
@@ -870,8 +887,10 @@ namespace MonitorSW
             {
                 // conferência só depois que não falta nenhum detalhamento na montagem aberta
                 if (miCheck.Checked && !PodeConferir()) { miCheck.Checked = false; return; }
-                if (chkConf.Checked != miCheck.Checked) chkConf.Checked = miCheck.Checked;
                 SetCheckMode(miCheck.Checked);
+                // menu Opções > Conferência anda junto com o Filtro
+                if (miCheck.Checked && filter.SelectedIndex != F_CONFERENCIA) filter.SelectedIndex = F_CONFERENCIA;
+                else if (!miCheck.Checked && filter.SelectedIndex == F_CONFERENCIA) filter.SelectedIndex = 0;
             };
             mCheck.DropDownItems.Add(miCheck);
             toolsMenu.Items.Add(mCheck);
@@ -2229,7 +2248,7 @@ namespace MonitorSW
                     BeginInvoke(new Action(() =>
                     {
                         conferindo = false;
-                        if (!miCheck.Checked) miCheck.Checked = true;   // liga o modo conferência (datas + resultado)
+                        if (filter.SelectedIndex != F_CONFERENCIA) filter.SelectedIndex = F_CONFERENCIA;   // mostra a conferência (liga o modo de datas)
                         else System.Threading.ThreadPool.QueueUserWorkItem(__ => engine.SetCheckUpdates(true));
                         string msg = itens.Count + " item(ns) conferido(s): " + (prob == 0 ? "nenhuma divergência nos PDF/DXF." : prob + " com divergência.");
                         if (err != null) msg += " (não gravou o resultado: " + err + ")";
@@ -2800,7 +2819,7 @@ namespace MonitorSW
                 itemCount = p.Items.Count;
                 if (TreeMode)
                 {
-                    bool filtered = mode == 2 || q.Length > 0;
+                    bool filtered = mode == 2 || mode == 14 || mode == 15 || q.Length > 0;
                     Item root;
                     if (p.Items.TryGetValue(p.MainPath, out root))
                     {
@@ -2895,7 +2914,7 @@ namespace MonitorSW
             var me = new RowData(); me.It = it; me.Level = level; me.Qty = qty; me.Tag = t; me.Num = num;
             int pos = outRows.Count;
             outRows.Add(me);
-            bool selfMatch = !filtered || (q.Length > 0 ? Match(it, q) : (!it.Ignored && it.Sev == 2));
+            bool selfMatch = !filtered || (q.Length > 0 ? Match(it, q) : mode == 14 ? it.FaltaDet : mode == 15 ? EhConferencia(it) : (!it.Ignored && it.Sev == 2));
             // todas as submontagens começam fechadas (como no SolidWorks); o conjunto guarda as que o usuário abriu
             bool inSet = collapsedIds.Contains(id);
             bool open = filtered || inSet;
