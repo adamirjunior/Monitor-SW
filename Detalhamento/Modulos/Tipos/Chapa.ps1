@@ -350,7 +350,10 @@ function CotasAbasPerfil($dm, $v) {
     $min = $pos[0][1]; $max = $pos[-1][1]
     $ext = @()
     foreach ($p in $pos) {
-        $par = $pos | Where-Object { [math]::Abs([math]::Abs($_[1] - $p[1]) - $T) -lt 0.00003 } | Select-Object -First 1
+        # no meio só contam as faces das abas dobradas (linha comprida); recortes/encaixes na borda da aba
+        # aparecem como tracinhos do tamanho da espessura e não são dobra (02124099: 30,30 / 129,90 / 7,75)
+        if ($p[1] -ne $min -and $p[1] -ne $max -and $p[2] -lt 3 * $T) { continue }
+        $par = $pos | Where-Object { [math]::Abs([math]::Abs($_[1] - $p[1]) - $T) -lt 0.00003 -and $_[2] -ge 3 * $T } | Select-Object -First 1
         if ($par -and $p[1] -ne $min -and $p[1] -ne $max) {
             # face de dentro: a que fica do lado da ponta mais distante
             $interna = if ([math]::Abs($p[1] - $min) -lt [math]::Abs($p[1] - $max)) { $p[1] -gt $par[1] } else { $p[1] -lt $par[1] }
