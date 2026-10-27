@@ -15,8 +15,8 @@ using Microsoft.Win32;
 [assembly: AssemblyTitle("Monitor")]
 [assembly: AssemblyDescription("BOM dos projetos SolidWorks com status de PDF/DXF")]
 [assembly: AssemblyProduct("Monitor")]
-[assembly: AssemblyVersion("2.18.1.0")]
-[assembly: AssemblyFileVersion("2.18.1.0")]
+[assembly: AssemblyVersion("2.18.2.0")]
+[assembly: AssemblyFileVersion("2.18.2.0")]
 
 namespace MonitorSW
 {
@@ -774,7 +774,7 @@ namespace MonitorSW
         // revisão: pendência que não é falta de arquivo (PDF/DXF desatualizado, divergência/fora de padrão, marcado para revisão)
         static bool EhRevisao(Item it) { return !it.Ignored && it.Sev == 2 && !it.FaltaDet; }
         // conferência: itens que têm detalhamento (mostra ✓ se já foi marcado como revisado)
-        static bool EhConferivel(Item it) { return !it.Ignored && !it.IsException && !it.FaltaDet && (it.NeedPdf || it.NeedDxf || it.Drw != DateTime.MinValue); }
+        static bool EhConferivel(Item it) { return !it.Ignored && !it.IsException && (it.Missing || it.NeedPdf || it.NeedDxf || it.Drw != DateTime.MinValue); }
         static bool Revisado(Item it) { return it.Mark.StartsWith("REVIS", StringComparison.OrdinalIgnoreCase); }
 
         // ------------------------------------------------------------ montagem da tela
@@ -841,13 +841,13 @@ namespace MonitorSW
                 };
                 var h = new ToolStripControlHost(cb); h.ToolTipText = dica; ts.Items.Add(h);
             };
-            chk(chkMiss, "Mostrar pendências", Theme.PendText, F_FALTANTES, "Só os itens com arquivo faltando (sem desenho, PDF ou DXF), em vermelho.");
-            chk(chkRev, "Mostrar desatualizados", Theme.WarnText, F_REVISOES, "Só os itens desatualizados (PDF/DXF mais antigo, fora de padrão, marcado para revisão), em amarelo. Liga a conferência das datas.");
-            chk(chkConf, "Mostrar à conferir", Theme.ConfText, F_CONFERENCIA, "Só os itens detalhados que ainda NÃO foram marcados como revisado. Os revisados têm um ✓ verde ao lado do Nº do item. Só libera quando não falta detalhamento.");
+            chk(chkMiss, "Pendências", Theme.PendText, F_FALTANTES, "Só os itens com arquivo faltando (sem desenho, PDF ou DXF), em vermelho.");
+            chk(chkRev, "Desatualizados", Theme.WarnText, F_REVISOES, "Só os itens desatualizados (PDF/DXF mais antigo, fora de padrão, marcado para revisão), em amarelo. Liga a conferência das datas.");
+            chk(chkConf, "À conferir", Theme.ConfText, F_CONFERENCIA, "Só os itens que ainda NÃO foram marcados como revisado. Os revisados têm um ✓ verde ao lado do Nº do item.");
             var conf = Btn("✔  Conferência", (s, a) => ConferirProjeto());
             conf.ForeColor = Theme.ConfText;
             conf.ToolTipText = "Confere a montagem aberta: datas de 3D/desenho/PDF/DXF, carimbo do PDF e descrição/escala do DXF";
-            ts.Items.Add(conf);
+            // ts.Items.Add(conf);   // botão Conferência fora da barra por enquanto (pedido do usuário)
             var mail = Btn("✉  E-mail", (s, a) => GerarEmail());
             mail.ToolTipText = "E-mail de alteração de cadastro: o que SAIU e o que ENTROU nas montagens entre duas datas";
             // ts.Items.Add(mail);   // botão E-mail desligado por enquanto (não está sendo usado)
@@ -870,8 +870,6 @@ namespace MonitorSW
             filter.SelectedIndex = 0;
             filter.SelectedIndexChanged += (s, a) =>
             {
-                // conferência só depois que não falta nenhum detalhamento na montagem aberta
-                if (filter.SelectedIndex == F_CONFERENCIA && !PodeConferir()) { filter.SelectedIndex = F_FALTANTES; return; }
                 // Revisões liga a conferência das datas (desatualizados); sair dela desliga
                 bool emRev = filter.SelectedIndex == F_REVISOES;
                 if (emRev != miCheck.Checked) miCheck.Checked = emRev;
