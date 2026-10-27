@@ -95,7 +95,7 @@ td.rg { min-width: 300px }
     <p>Acompanhamento das regras do gerador automático: o que já funciona, o que espera teste no SolidWorks, o que falta, e a linha do tempo das alterações.</p>
   </div>
   <dl>
-    <dt>Monitor SW</dt><dd>2.17.0.0</dd>
+    <dt>Monitor SW</dt><dd>2.17.1.0</dd>
     <dt>Gerador</dt><dd id="ultima">—</dd>
     <dt>Regras</dt><dd>REGRAS_DETALHAMENTO.txt</dd>
     <dt>Último teste</dt><dd>1.2.1 · 26/10</dd>
@@ -190,7 +190,7 @@ const REGRAS = [
   ["geral", "Monitor: três cores — falta detalhamento (laranja), marcado para revisão (vermelho) e conferência (verde-azulado)", "teste", "2026-10-27", "Marcar como conferido não liga mais o \"Mostrar conferência\" sozinho."],
   ["geral", "Monitor: \"Mostrar pendências\" na barra = Filtro Arquivos faltantes (laranja); Conferência (desatualizados) fica só no Filtro, em verde-azulado", "teste", "2026-10-27", "Substitui o \"Mostrar conferência\"."],
   ["geral", "Monitor: conferência só libera quando não falta nenhum detalhamento na montagem aberta", "teste", "2026-10-27", "Senão aparece: Providencie os detalhamentos que ainda faltam antes de conferir (com a lista)."],
-  ["geral", "Monitor: submontagem fechada mostra se falta detalhamento dentro dela (em qualquer nível)", "teste", "2026-10-27", "⚠ falta detalhamento em N itens dentro, com o nome em laranja."],
+  ["geral", "Monitor: submontagem fechada mostra se falta detalhamento dentro dela (em qualquer nível)", "teste", "2026-10-27", "Só um triângulo ⚠ depois do código (laranja = falta detalhamento dentro; vermelho = outra pendência). Mouse em cima explica."],
   ["geral", "Um detalhamento por vez: enquanto alguém gera, os outros recebem aviso de quem está gerando e aguardam", "teste", "2026-10-26", "Arquivo gerando.lock no servidor; se a geração cair, libera sozinho."],
   ["laser", "DXF com rosca/rebaixo: só a circunferência do pré-furo", "teste", "2026-10-26", "Remove a circunferência concêntrica maior. Vale para qualquer espessura."],
   ["laser", "DXF com rosca/rebaixo e espessura > 5 mm: <span class=\"aviso\">Avaliar furação no CNC - Espessura &gt; 5mm</span>", "teste", "2026-10-26", "Limite mudou de 4,76 para 5 mm. Até 5 mm continua como estava."],
@@ -218,6 +218,7 @@ const REGRAS = [
   ["perfil", "Barras e cantoneiras com a lógica do metalon", "teste", "2026-10-26", "Cantoneira (perfil em L) precisa de teste."]
 ];
 const ALTERACOES = [
+  ["2026-10-27", "Monitor 2.17.1: triângulo na submontagem", "Monitor", ["Submontagem com pendência dentro mostra só um ⚠ depois do código", "A cor da linha fica só no item que realmente tem a pendência"]],
   ["2026-10-27", "Monitor 2.17: Mostrar pendências", "Monitor", ["Barra: \"Mostrar pendências\" mostra só os arquivos faltantes (sem desenho, PDF ou DXF)", "Conferência (desatualizados) passou a ser uma opção do Filtro, com a cor dela", "Botão Conferência termina abrindo esse filtro"]],
   ["2026-10-27", "Monitor 2.16: conferência por último e submontagens que escondem pendências", "Monitor", ["Cor própria para a conferência (verde-azulado); falta = laranja, revisão = vermelho", "Marcar como conferido não liga mais o modo conferência sozinho", "Conferência só libera sem nenhum detalhamento faltando na montagem", "Submontagem fechada avisa quando falta detalhamento dentro dela"]],
   ["2026-10-27", "Espessura em polegada na descrição", "Gerador", ["Conferência da espessura entende 3/16\", 1/2', 1.1/4\", 3/8 POL e frações depois de ESP.", "Polegada aceita até 0,1 mm de diferença do 3D (chapa comercial arredondada)", "Ref. 02124097: ESP. 3/16\" com o 3D em 4,8 mm passa e a espessura sai cotada"]],

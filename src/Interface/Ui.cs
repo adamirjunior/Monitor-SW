@@ -15,8 +15,8 @@ using Microsoft.Win32;
 [assembly: AssemblyTitle("Monitor")]
 [assembly: AssemblyDescription("BOM dos projetos SolidWorks com status de PDF/DXF")]
 [assembly: AssemblyProduct("Monitor")]
-[assembly: AssemblyVersion("2.17.0.0")]
-[assembly: AssemblyFileVersion("2.17.0.0")]
+[assembly: AssemblyVersion("2.17.1.0")]
+[assembly: AssemblyFileVersion("2.17.1.0")]
 
 namespace MonitorSW
 {
@@ -647,6 +647,7 @@ namespace MonitorSW
     {
         public string Id, Key;
         public bool HasKids, Open;
+        public int Aviso;   // submontagem com algo DENTRO: 1 = falta detalhamento (laranja), 2 = outra pendência (vermelho)
     }
 
     public class MainForm : Form
@@ -2358,8 +2359,10 @@ namespace MonitorSW
             var t = grid.Rows[e.RowIndex].Tag as NodeTag;
             if (t == null) return;
             int level = t.Id.Count(ch => ch == '>') - 1;
-            if (level <= 0) return;
+            if (level <= 0 && t.Aviso == 0) return;
             e.Paint(e.CellBounds, DataGridViewPaintParts.All);
+            if (t.Aviso > 0) PintarAviso(e, t.Aviso);
+            if (level <= 0) { e.Handled = true; return; }
             using (var pen = new Pen(Theme.Border))
             using (var acc = new Pen(Color.FromArgb(70, Theme.Accent)))
             {
@@ -2374,6 +2377,19 @@ namespace MonitorSW
                 e.Graphics.DrawLine(acc, xl, ym, xl + IndentStep / 2 - 2, ym);
             }
             e.Handled = true;
+        }
+
+        // triângulo de aviso logo depois do código da submontagem (laranja: falta detalhamento dentro; vermelho: outra pendência)
+        void PintarAviso(DataGridViewCellPaintingEventArgs e, int aviso)
+        {
+            string nome = Convert.ToString(e.FormattedValue ?? "");
+            var font = e.CellStyle.Font ?? grid.Font;
+            const TextFormatFlags fl = TextFormatFlags.NoPadding | TextFormatFlags.SingleLine;
+            int w = TextRenderer.MeasureText(e.Graphics, nome, font, new Size(int.MaxValue, int.MaxValue), fl).Width;
+            int x = e.CellBounds.Left + e.CellStyle.Padding.Left + 4 + w + 6;
+            if (x > e.CellBounds.Right - 14) return;
+            var r = new Rectangle(x, e.CellBounds.Top, 18, e.CellBounds.Height);
+            TextRenderer.DrawText(e.Graphics, "⚠", font, r, aviso == 1 ? Theme.WarnText : Theme.PendText, fl | TextFormatFlags.VerticalCenter);
         }
 
         // tela responsiva: se sobrar espaço, alarga Nº DA PEÇA e DESCRIÇÃO para ocupar a largura do monitor
@@ -2945,13 +2961,17 @@ namespace MonitorSW
             r.Cells[C_TOG].Value = tog;
             r.Cells[C_NUM].Value = d.Num;
             // submontagem: avisa o que falta DENTRO dela (em qualquer nível), mesmo fechada
+            // submontagem com pendência DENTRO (qualquer nível, mesmo fechada): só um triângulo depois do código
+            // (desenhado em PaintTreeGuides); a linha não muda de cor - cor só no item que tem a pendência
             string abaixo = "";
+            d.Tag.Aviso = 0;
             if (TreeMode && it.IsAsm && !principal)
             {
-                if (it.MissBelow > 0) abaixo = "   ⚠ falta detalhamento em " + it.MissBelow + (it.MissBelow == 1 ? " item" : " itens") + " dentro";
-                else if (it.PendBelow > 0) abaixo = "   (" + it.PendBelow + " pend. dentro)";
+                if (it.MissBelow > 0) { d.Tag.Aviso = 1; abaixo = "Falta detalhamento em " + it.MissBelow + (it.MissBelow == 1 ? " item" : " itens") + " dentro desta submontagem"; }
+                else if (it.PendBelow > 0) { d.Tag.Aviso = 2; abaixo = it.PendBelow + (it.PendBelow == 1 ? " pendência" : " pendências") + " dentro desta submontagem"; }
             }
-            r.Cells[C_ITEM].Value = it.Name + abaixo;
+            r.Cells[C_ITEM].Value = it.Name;
+            if (abaixo.Length > 0) r.Cells[C_ITEM].ToolTipText = abaixo;
             r.Cells[C_DESC].Value = desc;
             r.Cells[C_QTD].Value = d.Qty;
             foreach (var kv in propCols) r.Cells[kv.Key].Value = it.P(kv.Value);
@@ -2995,8 +3015,6 @@ namespace MonitorSW
                 r.Cells[C_ITEM].Style.BackColor = bg;
                 r.Cells[C_SIT].Style.ForeColor = revisao ? Theme.PendText : falta ? Theme.WarnText : Theme.ConfText;
             }
-            else if (abaixo.Length > 0 && it.MissBelow > 0) { r.Cells[C_ITEM].Style.BackColor = OrangeBg; r.Cells[C_ITEM].Style.ForeColor = Theme.WarnText; }
-            else if (abaixo.Length > 0) r.Cells[C_ITEM].Style.ForeColor = Theme.PendText;
             if (it.Sev == 0 && !it.Ignored && it.NeedPdf) r.Cells[C_SIT].Style.ForeColor = Theme.OkText;
             if (it.PdfSt == "Falta") r.Cells[C_PDF].Style.ForeColor = Theme.WarnText; else if (it.PdfSt.StartsWith("Desatualizado")) r.Cells[C_PDF].Style.ForeColor = Theme.ConfText;
             if (it.DxfSt == "Falta") r.Cells[C_DXF].Style.ForeColor = Theme.WarnText; else if (it.DxfSt.StartsWith("Desatualizado")) r.Cells[C_DXF].Style.ForeColor = Theme.ConfText;
