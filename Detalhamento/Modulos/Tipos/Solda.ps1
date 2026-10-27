@@ -176,6 +176,88 @@ function TemplateSolda($caminhoAsm) {
     Log "   (não consegui salvar o template da lista a partir de $(Split-Path -Leaf $ref))" "DarkYellow"
     return ""
 }
+# ---------------------------------------------------------------- colunas de processo da lista (pedido do usuário em 27/10)
+# A lista de materiais mostra uma coluna para cada processo que ALGUMA peça da montagem tem (TORNO, FRESA...).
+# Pré-análise: lê os processos das peças; depois tira da lista as colunas de processo que nenhuma peça usa e
+# acrescenta as que faltam, na ordem do carimbo. Ex.: 13011900 só tem TORNO CNC e ACAB.MANUAL.
+$ColunasProcesso = @((C "ColunasProcessoLista" "SERRA|TORNO|TORNO CNC|FRESA|FRESA CNC|FURADEIRA|ELETRO|SOLDA|ACAB.MANUAL").Split("|") | ForEach-Object { $_.Trim() } | Where-Object { $_ })
+function ChaveProcesso([string]$t) { return ($t.ToUpper() -replace '[\s\.]', '') }
+function ProcessosDaMontagem($asm) {
+    $achados = @{}   # chave -> nome da propriedade como está nas peças
+    $comps = @(); try { $comps = @(X $asm "GetComponents" $false) } catch { }
+    $vistos = @{}
+    foreach ($c in $comps) {
+        if (-not $c) { continue }
+        try { if ([bool](X $c "IsSuppressed")) { continue } } catch { }
+        $md = $null; try { $md = X $c "GetModelDoc2" } catch { }
+        if (-not $md) { continue }
+        $tipo = 0; try { $tipo = [int](X $md "GetType") } catch { }
+        if ($tipo -ne $DocPART) { continue }
+        $cfg = ""; try { $cfg = [string](XG $c "ReferencedConfiguration") } catch { }
+        $chaveP = ([string](X $md "GetPathName")) + "|" + $cfg
+        if ($vistos.ContainsKey($chaveP)) { continue }; $vistos[$chaveP] = 1
+        foreach ($p in $PropsProcesso) {
+            if (-not $p) { continue }
+            $k = ChaveProcesso $p
+            if ($achados.ContainsKey($k)) { continue }
+            $v = ""
+            try { $v = [string](X $md "GetCustomInfoValue" $cfg $p) } catch { }
+            if (-not $v.Trim()) { try { $v = [string](X $md "GetCustomInfoValue" "" $p) } catch { } }
+            if ($v -match '^\$PRP') { $v = "" }
+            if ($v.Trim()) { $achados[$k] = $p }
+        }
+    }
+    return $achados
+}
+function AjustarColunasProcesso($tab, $achados) {
+    if (-not $tab) { return }
+    $ordem = @{}; for ($i = 0; $i -lt $ColunasProcesso.Count; $i++) { $ordem[(ChaveProcesso $ColunasProcesso[$i])] = $i }
+    $nomeCol = {
+        param($c)
+        $pr = ""; try { $pr = [string](X $tab "GetColumnCustomProperty" $c) } catch { }
+        if (-not $pr) { try { $pr = [string](X $tab "GetColumnTitle" $c) } catch { } }
+        return $pr
+    }
+    $larg = 0.0; $tirou = @(); $pos = @(); $sobras = @()
+    # 1) tira as colunas de processo que nenhuma peça tem (da direita para a esquerda)
+    $nc = [int](XG $tab "ColumnCount")
+    for ($c = $nc - 1; $c -ge 0; $c--) {
+        $k = ChaveProcesso (& $nomeCol $c)
+        if (-not $ordem.ContainsKey($k)) { continue }
+        $wc = 0.0; try { $wc = [double](X $tab "GetColumnWidth" $c) } catch { }
+        if ($wc -gt 0 -and ($larg -le 0 -or $wc -lt $larg)) { $larg = $wc }   # a mais estreita das colunas de processo
+        if (-not $achados.ContainsKey($k)) {
+            $ok = $false; try { $ok = [bool](X $tab "DeleteColumn" $c) } catch { }
+            if ($ok -and $wc -gt 0) { $sobras += $wc }   # largura que ficou livre: a coluna nova ocupa o mesmo espaço
+            if ($ok) { $tirou += $ColunasProcesso[$ordem[$k]] }
+        }
+    }
+    # 2) acrescenta as que faltam, na ordem do carimbo (antes da primeira coluna de processo que vem depois dela)
+    $pos = @()
+    foreach ($k in ($achados.Keys | Where-Object { $ordem.ContainsKey($_) } | Sort-Object { $ordem[$_] })) {
+        $nc = [int](XG $tab "ColumnCount"); $tem = $false; $antes = -1; $ultimaProc = -1
+        for ($c = 0; $c -lt $nc; $c++) {
+            $kc = ChaveProcesso (& $nomeCol $c)
+            if ($kc -eq $k) { $tem = $true; break }
+            if ($ordem.ContainsKey($kc)) { $ultimaProc = $c; if ($antes -lt 0 -and $ordem[$kc] -gt $ordem[$k]) { $antes = $c } }
+        }
+        if ($tem) { continue }
+        $titulo = $ColunasProcesso[$ordem[$k]]
+        $ok = $false
+        try {
+            if ($antes -ge 0) { $ok = [bool](X $tab "InsertColumn2" 2 $antes $titulo 0); $novo = $antes }
+            else { $ref = if ($ultimaProc -ge 0) { $ultimaProc } else { $nc - 1 }; $ok = [bool](X $tab "InsertColumn2" 3 $ref $titulo 0); $novo = $ref + 1 }
+        } catch { Log "   (coluna $titulo : $($_.Exception.Message))" "DarkYellow" }
+        if (-not $ok) { continue }
+        try { X $tab "SetColumnCustomProperty" $novo $achados[$k] | Out-Null } catch { Log "   (propriedade da coluna $titulo : $($_.Exception.Message))" "DarkYellow" }
+        try { X $tab "SetColumnTitle" $novo $titulo | Out-Null } catch { }
+        $wn = $larg; if ($sobras.Count -gt 0) { $wn = $sobras[0]; $sobras = @($sobras | Select-Object -Skip 1) }
+        if ($wn -gt 0) { try { X $tab "SetColumnWidth" $novo $wn 0 | Out-Null } catch { } }
+        $pos += $titulo
+    }
+    $usados = @($achados.Keys | Where-Object { $ordem.ContainsKey($_) } | Sort-Object { $ordem[$_] } | ForEach-Object { $ColunasProcesso[$ordem[$_]] })
+    Log ("   Colunas de processo da lista: {0}{1}{2}" -f $(if ($usados.Count) { $usados -join ", " } else { "nenhuma" }), $(if ($tirou.Count) { " | tiradas: " + ($tirou -join ", ") } else { "" }), $(if ($pos.Count) { " | acrescentadas: " + ($pos -join ", ") } else { "" })) "DarkGray"
+}
 function DetalharMontagem($caminho, $asm) {
     $cod = Codigo $caminho
     $destDir = PastaDestino $caminho
@@ -204,6 +286,8 @@ function DetalharMontagem($caminho, $asm) {
     if (-not $v1) { throw "não consegui criar a vista isométrica" }
     Modo $v1 $DispShaded $true
 
+    # pré-análise: processos que as peças da montagem têm (colunas da lista)
+    $procs = @{}; try { $procs = ProcessosDaMontagem $asm } catch { Log "   (processos das peças: $($_.Exception.Message))" "DarkYellow" }
     $nLinhas = 8; $tabW = 0.155; $tabH = 0.0
     try {
         $tpl = TemplateSolda $caminho
@@ -211,6 +295,7 @@ function DetalharMontagem($caminho, $asm) {
         if ($tpl -eq "") { Log "   Aviso: sem template da lista de solda; usando a lista padrão do SolidWorks." "Yellow" } else { Log "   Lista de materiais pelo template: $tpl" "DarkGray" }
         $tab = X $v1 "InsertBomTable4" $false 0.2917 0.0345 $AnchorBR $BomParts (NomeConfig $asm) $tpl $false $NumNone $false
         if (-not $tab) { Log "   (InsertBomTable4 devolveu vazio)" "DarkYellow" }
+        if ($tab) { try { AjustarColunasProcesso $tab $procs; Rebuild $dm } catch { Log "   (colunas de processo: $($_.Exception.Message))" "DarkYellow" } }
         if ($tab) {
             try { $nLinhas = [int](XG $tab "RowCount") } catch { }
             # tamanho real da tabela (soma das larguras das colunas e alturas das linhas)
