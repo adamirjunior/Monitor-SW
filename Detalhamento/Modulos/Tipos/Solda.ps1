@@ -145,6 +145,102 @@ function OrganizarBaloes($dm, $v, $notas) {
     }
     Log "   $mov balão(ões) em escadinha, paralelos à peça" "DarkGray"
 }
+# balões em COLUNAS (pedido do usuário em 27/10, ref. 13011900 com textos encavalados): textos alinhados numa coluna
+# à esquerda da peça (alinhados pela direita) e outra à direita (alinhados pela esquerda), na ordem da altura de
+# onde a seta pega (linhas de chamada não se cruzam), um embaixo do outro sem encostar. A vista anda para o lado
+# se precisar de espaço para a coluna da esquerda (sem encostar na lista). Devolve $false se não couber.
+# retângulo só do TEXTO do balão (o GetExtent inclui a linha de chamada: 16 x 22 mm para um texto de 3 mm de altura)
+function RetTextoBalao($n) {
+    # pela POSIÇÃO do texto (no balão de texto ela fica no MEIO do texto na horizontal e no alto na vertical) +
+    # altura da letra e número de caracteres: todos os textos de uma coluna ficam com a mesma referência
+    # (o GetExtentAtIndex variava com o lado da linha de chamada; 13011900: textos longos invadiam a peça)
+    try {
+        $p = XD (X (AnnOf $n) "GetPosition"); $ch = 0.0025; try { $ch = [double](X $n "GetHeight") } catch { }
+        if ($ch -le 0 -or $ch -gt 0.02) { $ch = 0.0025 }
+        $t = [string](X $n "GetText"); $ls = @($t -split "`n"); $nl = [math]::Max(1, $ls.Count); $nc = ($ls | Measure-Object -Property Length -Maximum).Maximum
+        $w = $nc * $ch * 0.6   # largura média do caractere na fonte do balão (medido no 13011900)
+        return [pscustomobject]@{ x1 = $p[0] - $w / 2; y1 = $p[1] - $nl * $ch * 1.4; x2 = $p[0] + $w / 2; y2 = $p[1] }
+    } catch { }
+    return (RetNota $n)
+}
+function OrganizarBaloesColunas($dm, $v, $notas) {
+    $mesa = $script:mesaSolda
+    $h = $script:hullSolda
+    if (-not $h -or $h.Count -lt 3) { $o = Contorno $v; $h = @(@($o.x1, $o.y1), @($o.x2, $o.y1), @($o.x2, $o.y2), @($o.x1, $o.y2)) }
+    $hx1 = ($h | ForEach-Object { $_[0] } | Measure-Object -Minimum).Minimum; $hx2 = ($h | ForEach-Object { $_[0] } | Measure-Object -Maximum).Maximum
+    $hy1 = ($h | ForEach-Object { $_[1] } | Measure-Object -Minimum).Minimum; $hy2 = ($h | ForEach-Object { $_[1] } | Measure-Object -Maximum).Maximum
+    $cx = ($hx1 + $hx2) / 2
+    $its = @()
+    foreach ($n in $notas) {
+        if (-not $n) { continue }
+        $r = RetTextoBalao $n; if (-not $r) { continue }
+        # ponta da seta (último ponto da linha de chamada, na peça); sem ela, o ponto do balão
+        $p = $null
+        try { $lp = XD (X (AnnOf $n) "GetLeaderPointsAtIndex" 0); if ($lp -and $lp.Count -ge 3) { $k3 = $lp.Count - 3; $p = @($lp[$k3], $lp[$k3 + 1]) } } catch { }
+        if (-not $p) { $p = PontoBalao $n }; if (-not $p) { continue }
+        $its += ,[pscustomobject]@{ n = $n; r = $r; px = $p[0]; py = $p[1]; w = ($r.x2 - $r.x1); h = ($r.y2 - $r.y1); lado = $(if ($p[0] -lt $cx) { -1 } else { 1 }) }
+    }
+    if ($its.Count -eq 0) { return $true }
+    $folgaP = 0.008; $vao = 0.003; $bord = 0.004
+    # quanto a vista pode andar para a direita (abre espaço para a coluna da esquerda) sem encostar na lista nem sair da área
+    $wE = 0.0; $wD = 0.0
+    foreach ($it in $its) { if ($it.lado -lt 0) { $wE = [math]::Max($wE, $it.w) } else { $wD = [math]::Max($wD, $it.w) } }
+    $precisa = ($AreaL + $bord + $wE + $folgaP) - $hx1
+    $dx = 0.0
+    if ($precisa -gt 0) {
+        $lim = ($AreaR - $bord) - $hx2
+        for ($t = 0.002; $t -le [math]::Min($precisa, $lim) + 1e-9; $t += 0.002) {
+            if ($mesa -and (DistHullRet $h $t 0 $mesa) -lt 0.010) { break }
+            $dx = $t
+        }
+    }
+    # o que não couber à esquerda vai para a direita (e vice-versa)
+    $espE = ($hx1 + $dx) - $folgaP - ($AreaL + $bord); $espD = ($AreaR - $bord) - ($hx2 + $dx + $folgaP)
+    foreach ($it in $its) {
+        if ($it.lado -lt 0 -and $it.w -gt $espE) { $it.lado = 1 }
+        elseif ($it.lado -gt 0 -and $it.w -gt $espD) { $it.lado = -1 }
+        if ($it.lado -lt 0 -and $it.w -gt $espE) { Log "   [dbg] balões em coluna: texto largo demais para os dois lados" "DarkGray"; return $false }
+    }
+    # alturas: cada coluna precisa caber entre a base (ou o topo da lista, se a coluna passa sobre ela) e o topo da área
+    $plano = @()
+    foreach ($lado in -1, 1) {
+        $col = @($its | Where-Object { $_.lado -eq $lado } | Sort-Object py -Descending)
+        if ($col.Count -eq 0) { continue }
+        $xc = if ($lado -lt 0) { $hx1 + $dx - $folgaP } else { $hx2 + $dx + $folgaP }
+        $cx1 = if ($lado -lt 0) { $xc - ($col | Measure-Object w -Maximum).Maximum } else { $xc }
+        $cx2 = if ($lado -lt 0) { $xc } else { $xc + ($col | Measure-Object w -Maximum).Maximum }
+        $ylo = $AreaB + $bord; $yhi = $AreaT - $bord
+        if ($mesa -and $cx2 -gt $mesa.x1 - 0.002 -and $cx1 -lt $mesa.x2) { $ylo = $mesa.y2 + $bord }
+        $alt = ($col | Measure-Object h -Sum).Sum + $vao * ($col.Count - 1)
+        if ($alt -gt $yhi - $ylo) { Log ("   [dbg] balões em coluna: não cabem na altura ({0} textos, lado {1}, precisa {2:N1} mm, tem {3:N1} mm; alturas {4})" -f $col.Count, $lado, ($alt * 1000), (($yhi - $ylo) * 1000), (($col | ForEach-Object { "{0:N1}x{1:N1}" -f ($_.w * 1000), ($_.h * 1000) }) -join " ")) "DarkGray"; return $false }
+        # centro de cada texto o mais perto possível da altura da seta (a vista ainda vai andar só na horizontal)
+        $yc = @(); foreach ($it in $col) { $yc += [double]$it.py }
+        for ($i = 0; $i -lt $col.Count; $i++) {
+            $yc[$i] = [math]::Min($yc[$i], $yhi - $col[$i].h / 2)
+            if ($i -gt 0) { $yc[$i] = [math]::Min($yc[$i], $yc[$i - 1] - ($col[$i - 1].h / 2 + $col[$i].h / 2 + $vao)) }
+        }
+        for ($i = $col.Count - 1; $i -ge 0; $i--) {
+            $yc[$i] = [math]::Max($yc[$i], $ylo + $col[$i].h / 2)
+            if ($i -lt $col.Count - 1) { $yc[$i] = [math]::Max($yc[$i], $yc[$i + 1] + ($col[$i + 1].h / 2 + $col[$i].h / 2 + $vao)) }
+        }
+        for ($i = 0; $i -lt $col.Count; $i++) { $plano += ,@($col[$i], $(if ($lado -lt 0) { $xc - $col[$i].w } else { $xc }), ($yc[$i] - $col[$i].h / 2)) }
+    }
+    # anda a vista (os balões vão junto) e coloca cada texto no lugar
+    if ($dx -gt 0.0005) {
+        $o = Contorno $v; MoverPara $v ($o.x1 + $dx) $o.y2; Rebuild $dm
+        $hs = @(); foreach ($q in $h) { $hs += ,@(($q[0] + $dx), $q[1]) }; $script:hullSolda = $hs
+        Log ("   Vista andou {0:N0} mm para a direita (espaço para os balões da esquerda)" -f ($dx * 1000)) "DarkGray"
+    }
+    $mov = 0
+    foreach ($pl in $plano) {
+        $it = $pl[0]
+        $r = RetTextoBalao $it.n; if (-not $r) { $r = $it.r }
+        try { MoverNota $it.n ($pl[1] - $r.x1) ($pl[2] - $r.y1); $mov++ } catch { Log "   (mover balão: $($_.Exception.Message))" "DarkYellow" }
+    }
+    $nE = @($its | Where-Object { $_.lado -lt 0 }).Count
+    Log ("   {0} balão(ões) em colunas: {1} à esquerda, {2} à direita" -f $mov, $nE, ($its.Count - $nE)) "DarkGray"
+    return $true
+}
 # deixa o desenho como documento ativo do SolidWorks (balões automáticos só funcionam no documento ativo).
 # O título de desenho vem como "Desenho3 - Folha1": o ActivateDoc quer só "Desenho3".
 function TemplateSolda($caminhoAsm) {
@@ -343,7 +439,11 @@ function DetalharMontagem($caminho, $asm) {
             $nb = 0; if ($bl) { $nb = @($bl).Count }
             if ($nb -eq 0) { Log "   Aviso: o SolidWorks não colocou nenhum balão (desenho não estava ativo?)" "Yellow" } else { Log "   Balões com o Nº DA PEÇA: $nb" }
             if ($nb -gt 0) { Rebuild $dm; try { $bl = SetasNoCentro $dm $v @($bl) } catch { Log "   (setas no centro: $($_.Exception.Message))" "DarkYellow" } }
-            if ($nb -gt 0) { Rebuild $dm; try { OrganizarBaloes $dm $v @($bl) } catch { Log "   (organizar balões: $($_.Exception.Message))" "DarkYellow" } }
+            if ($nb -gt 0) {
+                Rebuild $dm
+                $col = $false; try { $col = [bool](OrganizarBaloesColunas $dm $v @($bl)) } catch { Log "   (balões em coluna: $($_.Exception.Message))" "DarkYellow" }
+                if (-not $col) { try { OrganizarBaloes $dm $v @($bl) } catch { Log "   (organizar balões: $($_.Exception.Message))" "DarkYellow" } }
+            }
         } catch { Log "   Aviso: não coloquei balões ($($_.Exception.Message))" "Yellow" }
     }
     Rebuild $dm

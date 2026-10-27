@@ -205,6 +205,7 @@ const REGRAS = [
   ["usin", "Vistas maiores e centralizadas com a tabela de furos (02124106)", "pend", "2026-10-21", "Cotas dos degraus também faltam."],
   ["solda", "3.1: apenas balões e lista de peças", "ok", "2026-10-20", "Padrão 13011773."],
   ["solda", "Balões com o código da peça, um por peça diferente", "ok", "2026-10-20", ""],
+  ["solda", "Balões em colunas ao lado da peça: alinhados, na ordem das setas, sem encostar um no outro nem na peça", "teste", "2026-10-27", "Ref. 13011900 (textos encavalados) e 13011773. Se não couber, usa a escadinha antiga."],
   ["solda", "Lista de materiais só com as colunas de processo que as peças da montagem têm (acrescenta ou tira colunas)", "teste", "2026-10-27", "Ref. 13011900: saía FRESA CNC sem nenhuma peça com fresa; agora TORNO CNC e ACAB.MANUAL."],
   ["solda", "Balões numéricos 1, 2, 3", "rej", "2026-10-20", "Só o texto com o código."],
   ["solda", "3.2: furos alinhados com cota em um só furo do padrão", "pend", "", ""],
@@ -213,6 +214,7 @@ const REGRAS = [
   ["perfil", "Barras e cantoneiras com a lógica do metalon", "teste", "2026-10-26", "Cantoneira (perfil em L) precisa de teste."]
 ];
 const ALTERACOES = [
+  ["2026-10-27", "Balões da montagem em colunas", "Gerador", ["Textos dos balões alinhados numa coluna ao lado da peça, um embaixo do outro", "Na ordem da altura das setas (linhas de chamada não se cruzam)", "Nunca em cima de outro texto, da peça ou da lista", "Ref. 13011900 e 13011773"]],
   ["2026-10-27", "Lista da montagem conforme os processos das peças", "Gerador", ["Antes de gerar, lê os processos de todas as peças da montagem", "Coluna de processo que nenhuma peça tem sai da lista; a que falta entra, na ordem do carimbo", "Ref. 13011900: FRESA CNC saiu, TORNO CNC entrou"]],
   ["2026-10-27", "Isométrica maior na chapa dobrada", "Gerador", ["Isométrica cresce até ocupar o espaço livre (sem encostar nas cotas)", "Face da chapa e planificada descem até a base da folha para dar lugar"]],
   ["2026-10-27", "Dobrada (1.2 / 1.2.1): vista ideal e cotas entre dobras", "Gerador", ["Vista principal é o perfil da dobra (mostra como a peça foi dobrada), com altura, abas e espessura", "Face da chapa logo embaixo com comprimento e largura; vista lateral repetida sai", "Planificada: cotas em cadeia ponta → dobras → outra ponta, com o total acima", "Conferido em 02124099, Peça3 e 02204262"]],
