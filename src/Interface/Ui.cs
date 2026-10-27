@@ -15,8 +15,8 @@ using Microsoft.Win32;
 [assembly: AssemblyTitle("Monitor")]
 [assembly: AssemblyDescription("BOM dos projetos SolidWorks com status de PDF/DXF")]
 [assembly: AssemblyProduct("Monitor")]
-[assembly: AssemblyVersion("2.17.4.0")]
-[assembly: AssemblyFileVersion("2.17.4.0")]
+[assembly: AssemblyVersion("2.17.5.0")]
+[assembly: AssemblyFileVersion("2.17.5.0")]
 
 namespace MonitorSW
 {
@@ -803,10 +803,10 @@ namespace MonitorSW
             srvTimer.Interval = 600;
             srvTimer.Tick += (s, a) => { srvTimer.Stop(); ApplySearchMode(); };
             ts.Items.Add(new ToolStripSeparator());
-            ts.Items.Add(Btn("Abrir modelo", (s, a) => OpenSel(0)));
-            ts.Items.Add(Btn("Abrir detalhamento", (s, a) => OpenSel(1)));
-            ts.Items.Add(Btn("PDF", (s, a) => OpenSel(2)));
-            ts.Items.Add(Btn("DXF", (s, a) => OpenSel(4)));
+            var bModelo = Btn("Modelo 3D", (s, a) => OpenSel(0)); bModelo.ToolTipText = "Abre o modelo 3D (peça/montagem) no SolidWorks"; ts.Items.Add(bModelo);
+            var bDet = Btn("Detalhamento", (s, a) => OpenSel(1)); bDet.ToolTipText = "Abre o detalhamento (.SLDDRW) no SolidWorks"; ts.Items.Add(bDet);
+            var bPdf = Btn("PDF", (s, a) => OpenSel(2)); bPdf.ToolTipText = "Abre o PDF"; ts.Items.Add(bPdf);
+            var bDxf = Btn("DXF", (s, a) => OpenSel(4)); bDxf.ToolTipText = "Abre o DXF"; ts.Items.Add(bDxf);
             ts.Items.Add(new ToolStripSeparator());
             var gen = Btn("▶  Gerar detalhamento", (s, a) => GenerateDetail());
             gen.Tag = "primario";            // desenhado como botão cheio (DarkRenderer)

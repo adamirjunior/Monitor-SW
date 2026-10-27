@@ -84,6 +84,7 @@ Formato: `- AAAA-MM-DD — o que mudou — motivo / pedido do usuário`. Itens *
 - 2026-10-21 — DXF grava a extensão real ($EXTMIN/$EXTMAX e vista *Active) para abrir enquadrado; abre no AutoCAD JÁ ABERTO (não abre outro), substitui se o arquivo já estiver aberto, REGEN + ZOOM E. Usuário confirmou: "deu certo".
 
 ## Monitor SW (programa)
+- 2026-10-27 — 2.17.5: botões da barra renomeados para Modelo 3D, Detalhamento, PDF, DXF (antes "Abrir modelo", "Abrir detalhamento"). 2.17.4 TESTADO ("deu certo"). Pedido do usuário.
 - 2026-10-27 — 2.17.4: aviso da submontagem não aparecia quando o nome do arquivo é comprido (ex.: 01117032 - (KIT DE AUTOMAÇÃO PARA MESA DE MEDIÇÃO AUTOMATICA COM CREMALHEIRA) V2 ocupava a célula toda e o ⚠ era desenhado fora). Agora o espaço do aviso é reservado e o nome é encurtado com "…"; sem espaço para o texto, fica só o ⚠ (texto no mouse). Comercial marcado para revisão também conta como pendência dentro. **PENDENTE testar.**
 - 2026-10-27 — 2.17.3: "Gerar detalhamento" com cara de botão: fundo cheio na cor de destaque, cantos arredondados, sombra leve, texto branco em negrito com ▶; mais claro com o mouse e mais escuro ao clicar. Pedido do usuário. **PENDENTE testar.**
 - 2026-10-27 — 2.17.2: na lista normal a submontagem volta a mostrar o tipo de pendência ao lado ("⚠ falta detalhamento em N itens dentro"), na cor do aviso (laranja/vermelho) e sem pintar a linha; no filtro Mostrar pendências fica só o ⚠ (usuário: "não ficou tão poluído"). **PENDENTE testar.**

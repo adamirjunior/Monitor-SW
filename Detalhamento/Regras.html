@@ -95,7 +95,7 @@ td.rg { min-width: 300px }
     <p>Acompanhamento das regras do gerador automático: o que já funciona, o que espera teste no SolidWorks, o que falta, e a linha do tempo das alterações.</p>
   </div>
   <dl>
-    <dt>Monitor SW</dt><dd>2.17.4.0</dd>
+    <dt>Monitor SW</dt><dd>2.17.5.0</dd>
     <dt>Gerador</dt><dd id="ultima">—</dd>
     <dt>Regras</dt><dd>REGRAS_DETALHAMENTO.txt</dd>
     <dt>Último teste</dt><dd>1.2.1 · 26/10</dd>
@@ -190,7 +190,7 @@ const REGRAS = [
   ["geral", "Monitor: três cores — falta detalhamento (laranja), marcado para revisão (vermelho) e conferência (verde-azulado)", "teste", "2026-10-27", "Marcar como conferido não liga mais o \"Mostrar conferência\" sozinho."],
   ["geral", "Monitor: \"Mostrar pendências\" na barra = Filtro Arquivos faltantes (laranja); Conferência (desatualizados) fica só no Filtro, em verde-azulado", "teste", "2026-10-27", "Substitui o \"Mostrar conferência\"."],
   ["geral", "Monitor: conferência só libera quando não falta nenhum detalhamento na montagem aberta", "teste", "2026-10-27", "Senão aparece: Providencie os detalhamentos que ainda faltam antes de conferir (com a lista)."],
-  ["geral", "Monitor: submontagem fechada mostra se falta detalhamento dentro dela (em qualquer nível)", "teste", "2026-10-27", "Lista normal: ⚠ + o tipo de pendência ao lado, na cor do aviso, sem pintar a linha. Filtro Mostrar pendências: só o ⚠."],
+  ["geral", "Monitor: submontagem fechada mostra se falta detalhamento dentro dela (em qualquer nível)", "ok", "2026-10-27", "Lista normal: ⚠ + o tipo de pendência ao lado, na cor do aviso, sem pintar a linha. Filtro Mostrar pendências: só o ⚠."],
   ["geral", "Um detalhamento por vez: enquanto alguém gera, os outros recebem aviso de quem está gerando e aguardam", "teste", "2026-10-26", "Arquivo gerando.lock no servidor; se a geração cair, libera sozinho."],
   ["laser", "DXF com rosca/rebaixo: só a circunferência do pré-furo", "teste", "2026-10-26", "Remove a circunferência concêntrica maior. Vale para qualquer espessura."],
   ["laser", "DXF com rosca/rebaixo e espessura > 5 mm: <span class=\"aviso\">Avaliar furação no CNC - Espessura &gt; 5mm</span>", "teste", "2026-10-26", "Limite mudou de 4,76 para 5 mm. Até 5 mm continua como estava."],
@@ -218,6 +218,7 @@ const REGRAS = [
   ["perfil", "Barras e cantoneiras com a lógica do metalon", "teste", "2026-10-26", "Cantoneira (perfil em L) precisa de teste."]
 ];
 const ALTERACOES = [
+  ["2026-10-27", "Monitor 2.17.5: nomes dos botões", "Monitor", ["Barra: Modelo 3D, Detalhamento, PDF, DXF", "Aviso da submontagem de nome comprido: testado"]],
   ["2026-10-27", "Monitor 2.17.4: aviso em submontagem de nome comprido", "Monitor", ["O ⚠ ficava fora da célula quando o nome era longo (ex.: kit automação 01117032)", "Agora o nome é encurtado com … e o aviso sempre aparece"]],
   ["2026-10-27", "Monitor 2.17.3: botão Gerar detalhamento", "Monitor", ["Botão cheio na cor de destaque, cantos arredondados e texto branco em negrito"]],
   ["2026-10-27", "Monitor 2.17.2: aviso da submontagem com texto", "Monitor", ["Lista normal: ⚠ falta detalhamento em N itens dentro, em laranja, sem pintar a linha", "Filtro Mostrar pendências: só o ⚠"]],
