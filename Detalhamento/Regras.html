@@ -95,7 +95,7 @@ td.rg { min-width: 300px }
     <p>Acompanhamento das regras do gerador automático: o que já funciona, o que espera teste no SolidWorks, o que falta, e a linha do tempo das alterações.</p>
   </div>
   <dl>
-    <dt>Monitor SW</dt><dd>2.18.0.0</dd>
+    <dt>Monitor SW</dt><dd>2.18.1.0</dd>
     <dt>Gerador</dt><dd id="ultima">—</dd>
     <dt>Regras</dt><dd>REGRAS_DETALHAMENTO.txt</dd>
     <dt>Último teste</dt><dd>1.2.1 · 26/10</dd>
@@ -155,7 +155,7 @@ const CLASSES = [
     subs: [["4.1", "Sem usinagem", "Metalon, barra ou cantoneira"], ["4.2", "Com usinagem", "Mesmo fluxo + aviso de acabamento"]] }
 ];
 const REGRAS = [
-  ["geral", "Monitor: barra com Mostrar pendências (vermelho), Mostrar revisões (amarelo) e Mostrar conferência (verde), exclusivos", "teste", "2026-10-27", "Nenhum marcado = lista normal. Conferência só libera sem faltantes."],
+  ["geral", "Monitor: barra com Mostrar pendências (vermelho), Mostrar desatualizados (amarelo) e Mostrar à conferir (verde), exclusivos; ✓ verde no item revisado", "teste", "2026-10-27", "Nenhum marcado = lista normal. À conferir só libera sem faltantes e mostra só os não revisados."],
   ["geral", "Vista principal pelo lado em que abrem os escareados/rebaixos (chapa plana e usinada)", "teste", "2026-10-27", "Ref. 02124117. Sem escareado/rebaixo, continua a face de sempre."],
   ["geral", "Aviso e bloqueio quando falta DESCRIÇÃO, ACABAMENTO ou um processo", "ok", "2026-10-26", "Testado na Peça2. Desliga em ExigirPropriedades no ini."],
   ["geral", "Classificação automática pela descrição, processos e geometria", "ok", "2026-10-26", "Peça2 classificada como laser com usinagem."],
@@ -222,6 +222,7 @@ const REGRAS = [
   ["perfil", "Barras e cantoneiras com a lógica do metalon", "teste", "2026-10-26", "Cantoneira (perfil em L) precisa de teste."]
 ];
 const ALTERACOES = [
+  ["2026-10-27", "Monitor 2.18.1: Desatualizados, À conferir e ✓ de revisado", "Monitor", ["Mostrar desatualizados (amarelo) no lugar de Mostrar revisões", "Mostrar à conferir (verde): só os itens ainda não marcados como revisado", "Item revisado: ✓ verde discreto ao lado do Nº do item, em qualquer vista"]],
   ["2026-10-27", "Monitor 2.18: Pendências, Revisões e Conferência", "Monitor", ["Mostrar pendências (vermelho): arquivo faltando", "Mostrar revisões (amarelo): desatualizado, fora de padrão ou marcado para revisão", "Mostrar conferência (verde): ✓ se já foi marcado como revisado", "Marcar um desmarca os outros; nenhum marcado = lista normal"]],
   ["2026-10-27", "Vista principal do lado dos escareados", "Gerador", ["Chapa plana e usinada: a vista principal mostra a face onde o escareado/rebaixo abre (antes podia sair com ele virado para baixo)", "Ref. 02124117: agora sai pela vista inferior, mostrando a boca dos escareados"]],
   ["2026-10-27", "Processo: ACABAMENTO MANUAL / FINAL contam", "Gerador", ["A conferência de processo preenchido lê o nome real da propriedade (ACAB. MANUAL, ACABAMENTO MANUAL, ACABAMENTO FINAL...)", "Ref. 02124107 era barrada com a tabela preenchida; agora gera"]],

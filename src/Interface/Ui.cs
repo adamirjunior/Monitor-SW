@@ -15,8 +15,8 @@ using Microsoft.Win32;
 [assembly: AssemblyTitle("Monitor")]
 [assembly: AssemblyDescription("BOM dos projetos SolidWorks com status de PDF/DXF")]
 [assembly: AssemblyProduct("Monitor")]
-[assembly: AssemblyVersion("2.18.0.0")]
-[assembly: AssemblyFileVersion("2.18.0.0")]
+[assembly: AssemblyVersion("2.18.1.0")]
+[assembly: AssemblyFileVersion("2.18.1.0")]
 
 namespace MonitorSW
 {
@@ -676,6 +676,7 @@ namespace MonitorSW
         public bool HasKids, Open;
         public int Aviso;   // submontagem com algo DENTRO: 1 = falta detalhamento (laranja), 2 = outra pendência (vermelho)
         public string AvisoTxt = "";
+        public bool Rev;   // marcado como revisado: ✓ verde entre o Nº do item e o código
     }
 
     public class MainForm : Form
@@ -841,8 +842,8 @@ namespace MonitorSW
                 var h = new ToolStripControlHost(cb); h.ToolTipText = dica; ts.Items.Add(h);
             };
             chk(chkMiss, "Mostrar pendências", Theme.PendText, F_FALTANTES, "Só os itens com arquivo faltando (sem desenho, PDF ou DXF), em vermelho.");
-            chk(chkRev, "Mostrar revisões", Theme.WarnText, F_REVISOES, "Só os itens para revisar (PDF/DXF desatualizado, fora de padrão, marcado para revisão), em amarelo. Liga a conferência das datas.");
-            chk(chkConf, "Mostrar conferência", Theme.ConfText, F_CONFERENCIA, "Itens detalhados com ✓ se já foram marcados como revisado. Só libera quando não falta detalhamento.");
+            chk(chkRev, "Mostrar desatualizados", Theme.WarnText, F_REVISOES, "Só os itens desatualizados (PDF/DXF mais antigo, fora de padrão, marcado para revisão), em amarelo. Liga a conferência das datas.");
+            chk(chkConf, "Mostrar à conferir", Theme.ConfText, F_CONFERENCIA, "Só os itens detalhados que ainda NÃO foram marcados como revisado. Os revisados têm um ✓ verde ao lado do Nº do item. Só libera quando não falta detalhamento.");
             var conf = Btn("✔  Conferência", (s, a) => ConferirProjeto());
             conf.ForeColor = Theme.ConfText;
             conf.ToolTipText = "Confere a montagem aberta: datas de 3D/desenho/PDF/DXF, carimbo do PDF e descrição/escala do DXF";
@@ -858,8 +859,8 @@ namespace MonitorSW
                 "LISTA DE PEÇAS (Comercial)",
                 "Todas as pendências",
                 "Pendências - arquivos faltantes (sem desenho / PDF / DXF)",
-                "Revisões (desatualizados, fora de padrão, marcados para revisão)",
-                "Conferência (✓ revisado ou não)",
+                "Desatualizados (PDF/DXF antigo, fora de padrão, marcados para revisão)",
+                "À conferir (ainda não marcados como revisado)",
                 "Pendências LASER",
                 "Pendências USINAGEM",
                 "Pendências SUBMONTAGENS",
@@ -1982,7 +1983,7 @@ namespace MonitorSW
         {
             lgPend.Visible = on;
             Text = on ? "Monitor - conferindo se PDF/DXF estão atualizados" : "Monitor";
-            lblStatus.Text = on ? "Revisões: peças com PDF/DXF mais antigo que o modelo aparecem em amarelo." : "Mostrando só se tem ou não tem detalhamento.";
+            lblStatus.Text = on ? "Desatualizados: peças com PDF/DXF mais antigo que o modelo aparecem em amarelo." : "Mostrando só se tem ou não tem detalhamento.";
             System.Threading.ThreadPool.QueueUserWorkItem(_ => engine.SetCheckUpdates(on));
         }
 
@@ -2399,6 +2400,20 @@ namespace MonitorSW
         // linhas-guia da arvore (como no SolidWorks): mostram a qual submontagem cada item pertence
         void PaintTreeGuides(object sender, DataGridViewCellPaintingEventArgs e)
         {
+            if (e.RowIndex >= 0 && e.ColumnIndex == C_NUM)
+            {
+                var tn = grid.Rows[e.RowIndex].Tag as NodeTag;
+                if (tn == null || !tn.Rev) return;
+                e.Paint(e.CellBounds, DataGridViewPaintParts.All);
+                using (var f = new Font("Segoe UI", 8.5f, FontStyle.Bold))
+                using (var br = new SolidBrush(Color.FromArgb(200, Theme.OkText)))
+                {
+                    var sz = e.Graphics.MeasureString("✓", f);
+                    e.Graphics.DrawString("✓", f, br, e.CellBounds.Right - sz.Width - 2, e.CellBounds.Top + (e.CellBounds.Height - sz.Height) / 2);
+                }
+                e.Handled = true;
+                return;
+            }
             if (e.RowIndex < 0 || e.ColumnIndex != C_ITEM || !TreeMode) return;
             var t = grid.Rows[e.RowIndex].Tag as NodeTag;
             if (t == null) return;
@@ -2990,7 +3005,7 @@ namespace MonitorSW
             var me = new RowData(); me.It = it; me.Level = level; me.Qty = qty; me.Tag = t; me.Num = num;
             int pos = outRows.Count;
             outRows.Add(me);
-            bool selfMatch = !filtered || (q.Length > 0 ? Match(it, q) : mode == 14 ? it.FaltaDet : mode == 15 ? EhRevisao(it) : mode == 16 ? EhConferivel(it) : mode == 7 ? (!it.Ignored && it.Mark.StartsWith("PEND", StringComparison.OrdinalIgnoreCase)) : (!it.Ignored && it.Sev == 2));
+            bool selfMatch = !filtered || (q.Length > 0 ? Match(it, q) : mode == 14 ? it.FaltaDet : mode == 15 ? EhRevisao(it) : mode == 16 ? (EhConferivel(it) && !Revisado(it)) : mode == 7 ? (!it.Ignored && it.Mark.StartsWith("PEND", StringComparison.OrdinalIgnoreCase)) : (!it.Ignored && it.Sev == 2));
             // todas as submontagens começam fechadas (como no SolidWorks); o conjunto guarda as que o usuário abriu
             bool inSet = collapsedIds.Contains(id);
             bool open = filtered || inSet;
@@ -3090,15 +3105,10 @@ namespace MonitorSW
             if (it.IsBlocked) r.Cells[C_BLQ].Style.ForeColor = Theme.WarnText;
             if (it.NeedDxf) r.Cells[C_NEED].Style.ForeColor = Theme.LaserTxt;
             r.Cells[C_TOG].Style.ForeColor = Theme.Accent;
-            // filtro Conferência: só o ✓ (verde) se já foi marcado como revisado, senão "não revisado"
-            if (Mode == 16 && !it.IsAsm && EhConferivel(it))
-            {
-                bool ok = Revisado(it);
-                r.Cells[C_SIT].Value = ok ? "✓ " + it.Mark : "não revisado";
-                r.Cells[C_SIT].Style.ForeColor = ok ? Theme.ConfText : Theme.Muted;
-                var bgc = ok ? ConfBg : r.DefaultCellStyle.BackColor;
-                foreach (var ci in new int[] { C_ITEM, C_NEED, C_SIT, C_DES, C_PDF, C_DXF }) r.Cells[ci].Style.BackColor = bgc;
-            }
+            // ✓ verde e discreto no fim da célula Nº DO ITEM quando já foi marcado como revisado (em qualquer vista);
+            // quem/quando fica no histórico do item e aparece no mouse
+            d.Tag.Rev = Revisado(it);
+            if (d.Tag.Rev) r.Cells[C_NUM].ToolTipText = it.Mark;
             return r;
         }
 
