@@ -231,7 +231,7 @@ function AcadEnquadrar($acad, $doc) {
 }
 function AbrirAutoCAD($arq) {
     if ($Modo -ne "gerar" -or -not (Test-Path $arq)) { return }
-    $arq = (Resolve-Path $arq).Path
+    $arq = (Resolve-Path -LiteralPath $arq).ProviderPath
     $acad = AcadAberto
     if ($acad) {
         try { AcadAbrirArquivo $acad $arq; Log "   DXF aberto no AutoCAD que já estava aberto (enquadrado)" "DarkGray"; return }

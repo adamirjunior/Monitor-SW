@@ -123,6 +123,9 @@ function AcharTemplate {
     $cands = @("$env:ProgramData\SolidWorks\SOLIDWORKS 2016\templates\DETALHAMENTO.drwdot",
                "$env:ProgramData\SOLIDWORKS\SOLIDWORKS 2016\templates\DETALHAMENTO.drwdot")
     foreach ($c in $cands) { if (Test-Path $c) { return $c } }
+    # cópia no servidor, ao lado do gerador (PC sem o template instalado, ex.: PC de casa pela VPN)
+    $srv = Join-Path $Pasta "DETALHAMENTO.drwdot"
+    if (Test-Path -LiteralPath $srv) { return $srv }
     $dir = "$env:ProgramData\SolidWorks\SOLIDWORKS 2016\templates"
     if (Test-Path $dir) { $f = Get-ChildItem $dir -Filter "*.drwdot" | Where-Object { $_.Name -match "DETALHAMENTO" } | Select-Object -First 1; if ($f) { return $f.FullName } }
     return ""

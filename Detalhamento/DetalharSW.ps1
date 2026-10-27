@@ -72,7 +72,7 @@ foreach ($a in $Arquivos) {
     } elseif ($a -match '\.txt$' -and (Test-Path $a)) {
         # arquivo .txt com um caminho por linha
         foreach ($l in (Get-Content -Path $a -Encoding UTF8)) { $t = $l.Trim(); if ($t -and -not $t.StartsWith("#") -and (Test-Path -LiteralPath $t)) { $lista += $t } elseif ($t -and -not $t.StartsWith("#")) { Log "   Não encontrado: $t" "Yellow" } }
-    } elseif (Test-Path $a) { $lista += (Resolve-Path $a).Path }
+    } elseif (Test-Path -LiteralPath $a) { $lista += (Resolve-Path -LiteralPath $a).ProviderPath }   # ProviderPath: caminho de rede (\\servidor\...) sem o prefixo "Microsoft.PowerShell.Core\FileSystem::" que o SolidWorks não abre
 }
 Log "==================== $Modo : $($lista.Count) arquivo(s) ====================" "Cyan"
 if ($PastaSaida -ne "") { Log "Saída de TESTE: $PastaSaida (o servidor não é alterado)" "Cyan" }
