@@ -15,8 +15,8 @@ using Microsoft.Win32;
 [assembly: AssemblyTitle("Monitor")]
 [assembly: AssemblyDescription("BOM dos projetos SolidWorks com status de PDF/DXF")]
 [assembly: AssemblyProduct("Monitor")]
-[assembly: AssemblyVersion("2.17.6.0")]
-[assembly: AssemblyFileVersion("2.17.6.0")]
+[assembly: AssemblyVersion("2.17.7.0")]
+[assembly: AssemblyFileVersion("2.17.7.0")]
 
 namespace MonitorSW
 {
@@ -765,9 +765,9 @@ namespace MonitorSW
         // 0 BOM completa, 10 comerciais, 2 revisões (Sev==2), 14 arquivos faltantes (FaltaDet), 15 conferência (desatualizados),
         // 11/12/13 pendências laser/usinagem/submontagens, 4 fabricadas, 6 exceções, 7 pendente, 8 revisado
         static readonly int[] FilterModes = { 0, 10, 2, 14, 15, 11, 12, 13, 6, 7, 8 };
-        const int F_REVISOES = 2, F_FALTANTES = 3, F_CONFERENCIA = 4;   // posições no Filtro
+        const int F_FALTANTES = 3, F_CONFERENCIA = 4, F_REVISOES = 9;   // 9 = Marcados para revisão   // posições no Filtro
         int Mode { get { int i = filter.SelectedIndex; return i >= 0 && i < FilterModes.Length ? FilterModes[i] : 0; } }
-        bool TreeMode { get { int m = Mode; return m <= 2 || m == 14 || m == 15; } }
+        bool TreeMode { get { int m = Mode; return m <= 2 || m == 7 || m == 14 || m == 15; } }
         // conferência: pendência que não é falta de arquivo nem marcação de revisão (PDF/DXF desatualizado, divergência)
         static bool EhConferencia(Item it) { return !it.Ignored && it.Sev == 2 && !it.FaltaDet && !it.Mark.StartsWith("PEND", StringComparison.OrdinalIgnoreCase); }
 
@@ -848,7 +848,7 @@ namespace MonitorSW
                 else if (filter.SelectedIndex == F_REVISOES) filter.SelectedIndex = 0;
             };
             var revHost = new ToolStripControlHost(chkRev);
-            revHost.ToolTipText = "Marcado: mostra só os itens marcados para revisão (em vermelho).";
+            revHost.ToolTipText = "Marcado: mostra só os itens marcados para revisão (vermelho), sem os arquivos faltantes.";
             ts.Items.Add(revHost);
             var conf = Btn("✔  Conferência", (s, a) => ConferirProjeto());
             conf.ForeColor = Theme.ConfText;
@@ -2410,7 +2410,7 @@ namespace MonitorSW
             if (level <= 0 && t.Aviso == 0) return;
             // com aviso o texto do código é desenhado por PintarAviso (encurta o nome se precisar para o ⚠ sempre aparecer)
             e.Paint(e.CellBounds, t.Aviso > 0 ? DataGridViewPaintParts.All & ~DataGridViewPaintParts.ContentForeground : DataGridViewPaintParts.All);
-            if (t.Aviso > 0) PintarAviso(e, t.Aviso, Mode == 14 ? "" : t.AvisoTxt);
+            if (t.Aviso > 0) PintarAviso(e, t.Aviso, (Mode == 14 || Mode == 7) ? "" : t.AvisoTxt);
             if (level <= 0) { e.Handled = true; return; }
             using (var pen = new Pen(Theme.Border))
             using (var acc = new Pen(Color.FromArgb(70, Theme.Accent)))
@@ -2899,7 +2899,7 @@ namespace MonitorSW
                 itemCount = p.Items.Count;
                 if (TreeMode)
                 {
-                    bool filtered = mode == 2 || mode == 14 || mode == 15 || q.Length > 0;
+                    bool filtered = mode == 2 || mode == 7 || mode == 14 || mode == 15 || q.Length > 0;
                     Item root;
                     if (p.Items.TryGetValue(p.MainPath, out root))
                     {
@@ -2994,7 +2994,7 @@ namespace MonitorSW
             var me = new RowData(); me.It = it; me.Level = level; me.Qty = qty; me.Tag = t; me.Num = num;
             int pos = outRows.Count;
             outRows.Add(me);
-            bool selfMatch = !filtered || (q.Length > 0 ? Match(it, q) : mode == 14 ? it.FaltaDet : mode == 15 ? EhConferencia(it) : (!it.Ignored && it.Sev == 2));
+            bool selfMatch = !filtered || (q.Length > 0 ? Match(it, q) : mode == 14 ? it.FaltaDet : mode == 15 ? EhConferencia(it) : mode == 7 ? (!it.Ignored && it.Mark.StartsWith("PEND", StringComparison.OrdinalIgnoreCase)) : (!it.Ignored && it.Sev == 2));
             // todas as submontagens começam fechadas (como no SolidWorks); o conjunto guarda as que o usuário abriu
             bool inSet = collapsedIds.Contains(id);
             bool open = filtered || inSet;

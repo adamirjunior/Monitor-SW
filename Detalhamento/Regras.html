@@ -95,7 +95,7 @@ td.rg { min-width: 300px }
     <p>Acompanhamento das regras do gerador automático: o que já funciona, o que espera teste no SolidWorks, o que falta, e a linha do tempo das alterações.</p>
   </div>
   <dl>
-    <dt>Monitor SW</dt><dd>2.17.6.0</dd>
+    <dt>Monitor SW</dt><dd>2.17.7.0</dd>
     <dt>Gerador</dt><dd id="ultima">—</dd>
     <dt>Regras</dt><dd>REGRAS_DETALHAMENTO.txt</dd>
     <dt>Último teste</dt><dd>1.2.1 · 26/10</dd>
@@ -220,7 +220,7 @@ const REGRAS = [
   ["perfil", "Barras e cantoneiras com a lógica do metalon", "teste", "2026-10-26", "Cantoneira (perfil em L) precisa de teste."]
 ];
 const ALTERACOES = [
-  ["2026-10-27", "Monitor 2.17.6: dois filtros exclusivos na barra", "Monitor", ["Mostrar pendências (arquivos faltantes, laranja)", "Mostrar revisões (itens marcados para revisão, vermelho)", "Se clica um, o outro desativa; visualização normal mostra ambos", "Conferência (desatualizados, divergências) fica só no Filtro, em verde-azulado"]],
+  ["2026-10-27", "Monitor 2.17.7: Mostrar pendências e Mostrar revisões", "Monitor", ["Mostrar pendências: só arquivos faltantes (laranja)", "Mostrar revisões: só itens marcados para revisão (vermelho), sem os faltantes", "Marcar um desmarca o outro", "Conferência (desatualizados, divergências) fica só no Filtro, em verde-azulado"]],
   ["2026-10-27", "DXF com casas decimais", "Gerador", ["Toda cota do DXF sai com 2 casas: 12,70 ±0,1 e 390,00 ±0,1 (antes 12 ±0,1)"]],
   ["2026-10-27", "Monitor 2.17.5: nomes dos botões", "Monitor", ["Barra: Modelo 3D, Detalhamento, PDF, DXF", "Aviso da submontagem de nome comprido: testado"]],
   ["2026-10-27", "Monitor 2.17.4: aviso em submontagem de nome comprido", "Monitor", ["O ⚠ ficava fora da célula quando o nome era longo (ex.: kit automação 01117032)", "Agora o nome é encurtado com … e o aviso sempre aparece"]],
