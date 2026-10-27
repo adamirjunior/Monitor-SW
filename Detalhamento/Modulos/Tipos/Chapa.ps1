@@ -615,3 +615,64 @@ function CotaRaioDobra($dm, $v) {
     X $dm "ClearSelection2" $true | Out-Null
     return $n
 }
+
+# ---------------------------------------------------------------- lado dos escareados / rebaixos
+# Em que lado do eixo fino k (0=X, 1=Y, 2=Z) abrem os escareados e rebaixos: conta as faces CÔNICAS (escareado) e,
+# nos furos com dois ou mais cilindros no mesmo eixo, o cilindro MAIOR que não atravessa a chapa (rebaixo).
+# Devolve +1 (lado max), -1 (lado min) ou 0 (nenhum / empate). Ex.: 02124117 tinha o escareado virado para baixo.
+function LadoAberturaFuros($peca, [int]$k) {
+    $cb = XD (X $peca "GetPartBox" $true)
+    $mid = ($cb[$k] + $cb[$k + 3]) / 2; $esp = [math]::Abs($cb[$k + 3] - $cb[$k])
+    $nMin = 0; $nMax = 0; $cil = @{}
+    $bodies = $null; try { $bodies = X $peca "GetBodies2" 0 $true } catch { }
+    foreach ($b in @($bodies)) {
+        if (-not $b) { continue }
+        $f = $null; try { $f = X $b "GetFirstFace" } catch { }
+        $guarda = 0
+        while ($f -and $guarda -lt 20000) {
+            $guarda++
+            try {
+                $sf = X $f "GetSurface"
+                if (X $sf "IsCone") {
+                    $cp = XD (XG $sf "ConeParams")
+                    if ([math]::Abs($cp[3 + $k]) -gt 0.99) {
+                        # a BOCA do escareado = maior círculo do cone (o cone pode atravessar quase toda a chapa fina)
+                        $rMax = -1.0; $t = $null
+                        foreach ($ed in @(X $f "GetEdges")) {
+                            try { $cv = X $ed "GetCurve"; if (X $cv "IsCircle") { $ci = XD (XG $cv "CircleParams"); if ($ci[6] -gt $rMax) { $rMax = $ci[6]; $t = $ci[$k] } } } catch { }
+                        }
+                        if ($null -eq $t) { $bx = XD (X $f "GetBox"); $t = ($bx[$k] + $bx[$k + 3]) / 2 }
+                        if ($t -gt $mid) { $nMax++ } else { $nMin++ }
+                    }
+                } elseif (X $sf "IsCylinder") {
+                    $cp = XD (XG $sf "CylinderParams")
+                    if ([math]::Abs($cp[3 + $k]) -gt 0.99 -and $cp[6] -lt 0.05) {
+                        $bx = XD (X $f "GetBox")
+                        $c = @(); for ($i = 0; $i -lt 3; $i++) { if ($i -ne $k) { $c += [math]::Round($cp[$i] * 2000) } }
+                        $ch = $c -join ";"
+                        if (-not $cil.ContainsKey($ch)) { $cil[$ch] = @() }
+                        $cil[$ch] += ,@($cp[6], $bx[$k], $bx[$k + 3])
+                    }
+                }
+            } catch { }
+            try { $f = X $f "GetNextFace" } catch { $f = $null }
+        }
+    }
+    foreach ($lst in $cil.Values) {
+        if (@($lst).Count -lt 2) { continue }
+        $g = @($lst | Sort-Object { -$_[0] })[0]
+        if (($g[2] - $g[1]) -ge 0.9 * $esp) { continue }   # o maior atravessa: não é rebaixo
+        if ((($g[1] + $g[2]) / 2) -gt $mid) { $nMax++ } else { $nMin++ }
+    }
+    if ($nMax + $nMin -gt 0) { Log ("   Escareados/rebaixos: {0} abrindo de um lado, {1} do outro" -f [math]::Max($nMax, $nMin), [math]::Min($nMax, $nMin)) "DarkGray" }
+    if ($nMax -gt $nMin) { return 1 } elseif ($nMin -gt $nMax) { return -1 } else { return 0 }
+}
+# vista que olha a face do lado dos escareados (k = eixo fino; lado padrão quando não há: Y/Z = max, X = min)
+function VistaDoLadoFuros($peca, [int]$k) {
+    $lado = 0; try { $lado = LadoAberturaFuros $peca $k } catch { Log "   (não consegui ver o lado dos escareados: $($_.Exception.Message))" "DarkYellow" }
+    switch ($k) {
+        0 { if ($lado -gt 0) { return ,@(@("*Direita", "*Right"), "direita") } else { return ,@(@("*Esquerda", "*Left"), "lateral") } }
+        1 { if ($lado -lt 0) { return ,@(@("*Inferior", "*Bottom"), "inferior") } else { return ,@(@("*Superior", "*Top"), "superior") } }
+        default { if ($lado -lt 0) { return ,@(@("*Posterior", "*Back"), "posterior") } else { return ,@(@("*Frontal", "*Front"), "frontal") } }
+    }
+}

@@ -41,16 +41,14 @@ function DetalharPeca($caminho, $peca) {
     $script:planaAtual = $plana
     $usinPrisma = $cls.UsinPrisma
     $script:usinPrisma = $usinPrisma
+    # eixo fino (0=X, 1=Y, 2=Z): a vista principal olha a face do lado em que abrem os escareados/rebaixos
+    $kFino = if ($mn -eq $Z) { 2 } elseif ($mn -eq $Y) { 1 } else { 0 }
     if ($usinPrisma) {
-        if ($mn -eq $Z) { $nomesFrente = @("*Frontal", "*Front"); $pl = "frontal" }
-        elseif ($mn -eq $Y) { $nomesFrente = @("*Superior", "*Top"); $pl = "superior" }
-        else { $nomesFrente = @("*Esquerda", "*Left"); $pl = "lateral" }
+        $vl = VistaDoLadoFuros $peca $kFino; $nomesFrente = $vl[0]; $pl = $vl[1]
         Log "   Peça usinada: vista principal = $pl (face maior) + vista de baixo + isométrica" "DarkGray"
     }
     if ($plana) {
-        if ($mn -eq $Z) { $nomesFrente = @("*Frontal", "*Front") ; $pl = "frontal" }
-        elseif ($mn -eq $Y) { $nomesFrente = @("*Superior", "*Top"); $pl = "superior" }
-        else { $nomesFrente = @("*Esquerda", "*Left"); $pl = "lateral" }
+        $vl = VistaDoLadoFuros $peca $kFino; $nomesFrente = $vl[0]; $pl = $vl[1]
         Log ("   Chapa plana (espessura {0:N1} mm): vista principal = {1} (face maior)" -f ($mn * 1000), $pl) "DarkGray"
     }
     $dm = NovoDesenho
