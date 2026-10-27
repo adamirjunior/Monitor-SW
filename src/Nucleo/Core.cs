@@ -903,7 +903,9 @@ namespace MonitorSW
         public string Process = "", Need = "";
         public string Status = "", PdfSt = "", DxfSt = "", Reason = "";
         public int Sev; // 0 ok, 1 informativo, 2 pendente
-        public int TotQty, PendBelow;
+        public int TotQty, PendBelow, MissBelow;
+        // falta detalhamento (desenho/PDF/DXF que a regra pede e não existe) - o que precisa ser feito antes da conferência
+        public bool FaltaDet { get { return !Ignored && !IsException && (Missing || (NeedPdf && Pdf == DateTime.MinValue) || (NeedDxf && Dxf == DateTime.MinValue)); } }
         public List<string> Parents = new List<string>();
         public bool OldFormat;
 
@@ -1613,6 +1615,7 @@ namespace MonitorSW
                 var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
                 CountBelow(it.Key, p, seen);
                 it.PendBelow = seen.Count(k => { Item x; return items.TryGetValue(k, out x) && x.Sev == 2 && !x.Ignored; });
+                it.MissBelow = seen.Count(k => { Item x; return items.TryGetValue(k, out x) && x.FaltaDet; });
             }
         }
 

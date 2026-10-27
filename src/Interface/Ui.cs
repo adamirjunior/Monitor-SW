@@ -15,8 +15,8 @@ using Microsoft.Win32;
 [assembly: AssemblyTitle("Monitor")]
 [assembly: AssemblyDescription("BOM dos projetos SolidWorks com status de PDF/DXF")]
 [assembly: AssemblyProduct("Monitor")]
-[assembly: AssemblyVersion("2.15.0.0")]
-[assembly: AssemblyFileVersion("2.15.0.0")]
+[assembly: AssemblyVersion("2.16.0.0")]
+[assembly: AssemblyFileVersion("2.16.0.0")]
 
 namespace MonitorSW
 {
@@ -37,6 +37,9 @@ namespace MonitorSW
         public static readonly Color AsmRow   = Escuro ? Color.FromArgb(24, 29, 38)    : Color.FromArgb(236, 241, 248);
         public static readonly Color PendRow  = Escuro ? Color.FromArgb(56, 26, 30)    : Color.FromArgb(255, 226, 228);
         public static readonly Color MissRow  = Escuro ? Color.FromArgb(56, 40, 20)    : Color.FromArgb(255, 238, 212);
+        // conferência (PDF/DXF desatualizado, divergência do botão Conferência): cor própria, separada de "falta" (laranja) e "revisão" (vermelho)
+        public static readonly Color ConfRow  = Escuro ? Color.FromArgb(18, 46, 52)    : Color.FromArgb(214, 242, 244);
+        public static readonly Color ConfText = Escuro ? Color.FromArgb(96, 210, 222)  : Color.FromArgb(0, 118, 132);
         public static readonly Color PendText = Escuro ? Color.FromArgb(255, 128, 128) : Color.FromArgb(196, 36, 36);
         public static readonly Color WarnText = Escuro ? Color.FromArgb(255, 184, 108) : Color.FromArgb(184, 96, 0);
         public static readonly Color OkText   = Escuro ? Color.FromArgb(92, 211, 138)  : Color.FromArgb(20, 135, 66);
@@ -688,6 +691,7 @@ namespace MonitorSW
         static readonly Color PurpleBg = Theme.PurpleBg;
         static readonly Color RedBg = Theme.PendRow;
         static readonly Color OrangeBg = Theme.MissRow;
+        static readonly Color ConfBg = Theme.ConfRow;
         static readonly Color AsmBg = Theme.AsmRow;
 
         // colunas (montadas conforme ColunasLista do config.ini)
@@ -781,7 +785,7 @@ namespace MonitorSW
             ts.Items.Add(upd);
             // liga/desliga mostrar a conferência (desatualizados) na lista; o resultado da conferência fica guardado
             chkConf.Text = "Mostrar conferência";
-            chkConf.ForeColor = Theme.WarnText;
+            chkConf.ForeColor = Theme.ConfText;
             chkConf.BackColor = Color.Transparent;
             chkConf.Font = Theme.UiFont;
             chkConf.AutoSize = true;
@@ -791,7 +795,7 @@ namespace MonitorSW
             confHost.ToolTipText = "Marcado: mostra também o que está desatualizado (PDF/DXF antigos, divergências da Conferência). Desmarcado: só se tem ou não tem detalhamento";
             ts.Items.Add(confHost);
             var conf = Btn("✔  Conferência", (s, a) => ConferirProjeto());
-            conf.ForeColor = Theme.WarnText;
+            conf.ForeColor = Theme.ConfText;
             conf.ToolTipText = "Confere a montagem aberta: datas de 3D/desenho/PDF/DXF, carimbo do PDF e descrição/escala do DXF";
             ts.Items.Add(conf);
             var mail = Btn("✉  E-mail", (s, a) => GerarEmail());
@@ -838,7 +842,7 @@ namespace MonitorSW
             }
             filter.SelectedIndexChanged += (s, a) => { for (int i = 0; i < viewItems.Count; i++) viewItems[i].Checked = i == filter.SelectedIndex; };
             DarkMenus(viewMenu);
-            if (viewItems.Count > 8) { viewItems[6].ForeColor = Purple; viewItems[7].ForeColor = Theme.WarnText; viewItems[8].ForeColor = Theme.OkText; }   // exceção roxo, pendente laranja, revisado verde
+            if (viewItems.Count > 8) { viewItems[6].ForeColor = Purple; viewItems[7].ForeColor = Theme.PendText; viewItems[8].ForeColor = Theme.OkText; }   // exceção roxo, marcado para revisão vermelho, revisado verde
             var filterBtn = new ToolStripButton("Filtro");
             filterBtn.Image = FunnelIcon(Theme.Text);
             filterBtn.DisplayStyle = ToolStripItemDisplayStyle.ImageAndText;
@@ -862,7 +866,13 @@ namespace MonitorSW
 
             var mCheck = new ToolStripMenuItem("Conferência");
             miCheck.CheckOnClick = true;
-            miCheck.CheckedChanged += (s, a) => { if (chkConf.Checked != miCheck.Checked) chkConf.Checked = miCheck.Checked; SetCheckMode(miCheck.Checked); };
+            miCheck.CheckedChanged += (s, a) =>
+            {
+                // conferência só depois que não falta nenhum detalhamento na montagem aberta
+                if (miCheck.Checked && !PodeConferir()) { miCheck.Checked = false; return; }
+                if (chkConf.Checked != miCheck.Checked) chkConf.Checked = miCheck.Checked;
+                SetCheckMode(miCheck.Checked);
+            };
             mCheck.DropDownItems.Add(miCheck);
             toolsMenu.Items.Add(mCheck);
 
@@ -1908,7 +1918,7 @@ namespace MonitorSW
         {
             lgPend.Visible = on;
             Text = on ? "Monitor - conferindo se PDF/DXF estão atualizados" : "Monitor";
-            lblStatus.Text = on ? "Conferência ligada: peças com PDF/DXF mais antigo que o modelo aparecem em vermelho." : "Mostrando só se tem ou não tem detalhamento.";
+            lblStatus.Text = on ? "Conferência ligada: peças com PDF/DXF mais antigo que o modelo aparecem em verde-azulado." : "Mostrando só se tem ou não tem detalhamento.";
             System.Threading.ThreadPool.QueueUserWorkItem(_ => engine.SetCheckUpdates(on));
         }
 
@@ -2162,8 +2172,23 @@ namespace MonitorSW
                 // conferido por alguém = a marcação PENDENTE (inclusive a automática de "gerado automaticamente") sai
                 if (err == null && it.Mark.StartsWith("PEND", StringComparison.OrdinalIgnoreCase)) { string e2 = Marks.Set(name, ""); if (e2 != null && !e2.StartsWith("AVISO")) err = e2; }
                 if (err == null) engine.SetCheckUpdates(true);
-                try { BeginInvoke(new Action(() => { if (err == null) { if (!miCheck.Checked) miCheck.Checked = true; lblStatus.Text = name + ": conferido."; } else MessageBox.Show("Não gravou: " + err, "Conferência"); })); } catch { }
+                try { BeginInvoke(new Action(() => { if (err == null) { lblStatus.Text = name + ": conferido."; } else MessageBox.Show("Não gravou: " + err, "Conferência"); })); } catch { }
             });
+        }
+
+        // a conferência é a última etapa: só libera quando nenhum item da montagem aberta está sem detalhamento
+        // (sem desenho / PDF / DXF que a regra pede). Senão avisa quais faltam e não liga.
+        bool PodeConferir()
+        {
+            if (current == null) return true;
+            List<Item> falta;
+            lock (engine.Sync) falta = current.Items.Values.Where(i => i.FaltaDet).OrderBy(i => i.Name).ToList();
+            if (falta.Count == 0) return true;
+            string lista = string.Join("\n", falta.Take(12).Select(i => "• " + i.Name + "  -  " + i.Status).ToArray()) + (falta.Count > 12 ? "\n… e mais " + (falta.Count - 12) : "");
+            MessageBox.Show("Providencie os detalhamentos que ainda faltam antes de conferir.\n\n" + falta.Count + " item(ns) de " + current.Name + " sem detalhamento:\n\n" + lista,
+                "Conferência", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            lblStatus.Text = "Conferência bloqueada: faltam " + falta.Count + " detalhamento(s) em " + current.Name + ".";
+            return false;
         }
 
         // botão Conferência: confere cada item da montagem aberta (sem abrir o SolidWorks) e liga o modo conferência
@@ -2172,6 +2197,7 @@ namespace MonitorSW
         {
             if (current == null) { MessageBox.Show("Abra (selecione) uma montagem na lista da esquerda.", "Conferência", MessageBoxButtons.OK, MessageBoxIcon.Information); return; }
             if (conferindo) { lblStatus.Text = "Conferência já em andamento…"; return; }
+            if (!PodeConferir()) return;
             conferindo = true;
             var proj = current;
             List<Item> itens;
@@ -2208,7 +2234,7 @@ namespace MonitorSW
                         string msg = itens.Count + " item(ns) conferido(s): " + (prob == 0 ? "nenhuma divergência nos PDF/DXF." : prob + " com divergência.");
                         if (err != null) msg += " (não gravou o resultado: " + err + ")";
                         lblStatus.Text = "Conferência de " + proj.Name + ": " + msg;
-                        Aviso(10000, "Conferência - " + proj.Name, msg + (prob > 0 ? " Veja os itens em vermelho / filtro de pendências." : ""), prob > 0 ? ToolTipIcon.Warning : ToolTipIcon.Info);
+                        Aviso(10000, "Conferência - " + proj.Name, msg + (prob > 0 ? " Veja os itens em verde-azulado / filtro de pendências." : ""), prob > 0 ? ToolTipIcon.Warning : ToolTipIcon.Info);
                     }));
                 }
                 catch { conferindo = false; }
@@ -2899,7 +2925,14 @@ namespace MonitorSW
             string desc = it.IsAsm ? AsmDesc(it, principal) : it.Desc;
             r.Cells[C_TOG].Value = tog;
             r.Cells[C_NUM].Value = d.Num;
-            r.Cells[C_ITEM].Value = it.Name + (TreeMode && it.IsAsm && it.PendBelow > 0 ? "   (" + it.PendBelow + " pend.)" : "");
+            // submontagem: avisa o que falta DENTRO dela (em qualquer nível), mesmo fechada
+            string abaixo = "";
+            if (TreeMode && it.IsAsm && !principal)
+            {
+                if (it.MissBelow > 0) abaixo = "   ⚠ falta detalhamento em " + it.MissBelow + (it.MissBelow == 1 ? " item" : " itens") + " dentro";
+                else if (it.PendBelow > 0) abaixo = "   (" + it.PendBelow + " pend. dentro)";
+            }
+            r.Cells[C_ITEM].Value = it.Name + abaixo;
             r.Cells[C_DESC].Value = desc;
             r.Cells[C_QTD].Value = d.Qty;
             foreach (var kv in propCols) r.Cells[kv.Key].Value = it.P(kv.Value);
@@ -2932,16 +2965,22 @@ namespace MonitorSW
             }
             if (it.Ignored) { r.Cells[C_NEED].Style.ForeColor = Theme.Muted; r.Cells[C_SIT].Style.ForeColor = Theme.Muted; }
             if (it.Sev == 1) r.Cells[C_SIT].Style.ForeColor = Theme.Muted;
+            // 3 cores: FALTA detalhamento (laranja) · marcado para REVISÃO (vermelho) · CONFERÊNCIA - PDF/DXF desatualizado
+            // ou divergência do botão Conferência (verde-azulado)
+            bool revisao = it.Mark.StartsWith("PEND", StringComparison.OrdinalIgnoreCase);
+            bool falta = it.FaltaDet;
             if (it.Sev == 2)
             {
-                var bg = it.Status.StartsWith("Sem") ? OrangeBg : RedBg;
+                var bg = revisao ? RedBg : falta ? OrangeBg : ConfBg;
                 foreach (var ci in new int[] { C_NEED, C_SIT, C_DES, C_PDF, C_DXF }) r.Cells[ci].Style.BackColor = bg;
                 r.Cells[C_ITEM].Style.BackColor = bg;
+                r.Cells[C_SIT].Style.ForeColor = revisao ? Theme.PendText : falta ? Theme.WarnText : Theme.ConfText;
             }
-            if (it.Sev == 2) r.Cells[C_SIT].Style.ForeColor = it.Status.StartsWith("Sem") ? Theme.WarnText : Theme.PendText;
+            else if (abaixo.Length > 0 && it.MissBelow > 0) { r.Cells[C_ITEM].Style.BackColor = OrangeBg; r.Cells[C_ITEM].Style.ForeColor = Theme.WarnText; }
+            else if (abaixo.Length > 0) r.Cells[C_ITEM].Style.ForeColor = Theme.PendText;
             if (it.Sev == 0 && !it.Ignored && it.NeedPdf) r.Cells[C_SIT].Style.ForeColor = Theme.OkText;
-            if (it.PdfSt.StartsWith("Desatualizado") || it.PdfSt == "Falta") r.Cells[C_PDF].Style.ForeColor = Theme.PendText;
-            if (it.DxfSt.StartsWith("Desatualizado") || it.DxfSt == "Falta") r.Cells[C_DXF].Style.ForeColor = Theme.PendText;
+            if (it.PdfSt == "Falta") r.Cells[C_PDF].Style.ForeColor = Theme.WarnText; else if (it.PdfSt.StartsWith("Desatualizado")) r.Cells[C_PDF].Style.ForeColor = Theme.ConfText;
+            if (it.DxfSt == "Falta") r.Cells[C_DXF].Style.ForeColor = Theme.WarnText; else if (it.DxfSt.StartsWith("Desatualizado")) r.Cells[C_DXF].Style.ForeColor = Theme.ConfText;
             if (it.PdfSt.StartsWith("Tem")) r.Cells[C_PDF].Style.ForeColor = Theme.OkText;
             r.Cells[C_DES].Style.ForeColor = des.StartsWith("✓") ? Theme.OkText : des.StartsWith("✗") ? Theme.PendText : Theme.Muted;
             if (it.DxfSt.StartsWith("Tem")) r.Cells[C_DXF].Style.ForeColor = Theme.OkText;
@@ -2950,7 +2989,7 @@ namespace MonitorSW
                 // item de exceção (representação etc.) fica roxo
                 foreach (DataGridViewCell c in r.Cells) { c.Style.BackColor = PurpleBg; c.Style.ForeColor = Purple; }
             }
-            else if (it.Mark.StartsWith("PEND", StringComparison.OrdinalIgnoreCase)) r.Cells[C_SIT].Style.ForeColor = Theme.WarnText;
+            else if (it.Mark.StartsWith("PEND", StringComparison.OrdinalIgnoreCase)) r.Cells[C_SIT].Style.ForeColor = Theme.PendText;
             else if (it.Mark.StartsWith("REVIS", StringComparison.OrdinalIgnoreCase)) r.Cells[C_SIT].Style.ForeColor = Theme.OkText;
             if (it.IsBlocked) r.Cells[C_BLQ].Style.ForeColor = Theme.WarnText;
             if (it.NeedDxf) r.Cells[C_NEED].Style.ForeColor = Theme.LaserTxt;
@@ -3014,7 +3053,7 @@ namespace MonitorSW
                 foreach (var i in its) if (i.Mark.StartsWith("PEND", StringComparison.OrdinalIgnoreCase)) tirar[i.Name] = "";
                 if (err == null && tirar.Count > 0) err = Marks.SetMany(tirar);
                 if (err == null) engine.SetCheckUpdates(true);
-                try { BeginInvoke(new Action(() => { if (err == null) { if (!miCheck.Checked) miCheck.Checked = true; lblStatus.Text = its.Count + " itens conferidos."; Aviso(3000, "Monitor", its.Count + " itens marcados como conferidos.", ToolTipIcon.Info); } else MessageBox.Show("Não gravou: " + err, "Conferência"); })); } catch { }
+                try { BeginInvoke(new Action(() => { if (err == null) { lblStatus.Text = its.Count + " itens conferidos."; Aviso(3000, "Monitor", its.Count + " itens marcados como conferidos.", ToolTipIcon.Info); } else MessageBox.Show("Não gravou: " + err, "Conferência"); })); } catch { }
             });
         }
 
