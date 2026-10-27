@@ -15,8 +15,8 @@ using Microsoft.Win32;
 [assembly: AssemblyTitle("Monitor")]
 [assembly: AssemblyDescription("BOM dos projetos SolidWorks com status de PDF/DXF")]
 [assembly: AssemblyProduct("Monitor")]
-[assembly: AssemblyVersion("2.17.3.0")]
-[assembly: AssemblyFileVersion("2.17.3.0")]
+[assembly: AssemblyVersion("2.17.4.0")]
+[assembly: AssemblyFileVersion("2.17.4.0")]
 
 namespace MonitorSW
 {
@@ -2393,7 +2393,8 @@ namespace MonitorSW
             if (t == null) return;
             int level = t.Id.Count(ch => ch == '>') - 1;
             if (level <= 0 && t.Aviso == 0) return;
-            e.Paint(e.CellBounds, DataGridViewPaintParts.All);
+            // com aviso o texto do código é desenhado por PintarAviso (encurta o nome se precisar para o ⚠ sempre aparecer)
+            e.Paint(e.CellBounds, t.Aviso > 0 ? DataGridViewPaintParts.All & ~DataGridViewPaintParts.ContentForeground : DataGridViewPaintParts.All);
             if (t.Aviso > 0) PintarAviso(e, t.Aviso, Mode == 14 ? "" : t.AvisoTxt);
             if (level <= 0) { e.Handled = true; return; }
             using (var pen = new Pen(Theme.Border))
@@ -2417,16 +2418,27 @@ namespace MonitorSW
         // no filtro Mostrar pendências só o triângulo (os itens já aparecem embaixo)
         void PintarAviso(DataGridViewCellPaintingEventArgs e, int aviso, string texto)
         {
+            // nome do arquivo pode ser enorme (ex.: "01117032 - (KIT DE AUTOMAÇÃO PARA MESA ...) V2" ocupava a célula toda e o
+            // aviso ficava de fora): reserva o espaço do aviso e encurta o NOME com "…" se não couber
             string nome = Convert.ToString(e.FormattedValue ?? "");
             var font = e.CellStyle.Font ?? grid.Font;
-            const TextFormatFlags fl = TextFormatFlags.NoPadding | TextFormatFlags.SingleLine;
-            int w = TextRenderer.MeasureText(e.Graphics, nome, font, new Size(int.MaxValue, int.MaxValue), fl).Width;
-            int x = e.CellBounds.Left + e.CellStyle.Padding.Left + 4 + w + 6;
-            if (x > e.CellBounds.Right - 14) return;
+            const TextFormatFlags fl = TextFormatFlags.NoPadding | TextFormatFlags.SingleLine | TextFormatFlags.VerticalCenter;
+            bool sel = (e.State & DataGridViewElementStates.Selected) != 0;
+            Color corNome = sel ? e.CellStyle.SelectionForeColor : e.CellStyle.ForeColor;
+            Color corAviso = aviso == 1 ? Theme.WarnText : Theme.PendText;
+            int x0 = e.CellBounds.Left + e.CellStyle.Padding.Left + 4;
+            int livre = e.CellBounds.Right - 4 - x0;
+            var big = new Size(int.MaxValue, int.MaxValue);
+            int wNome = TextRenderer.MeasureText(e.Graphics, nome, font, big, fl).Width;
             string s = string.IsNullOrEmpty(texto) ? "⚠" : "⚠ " + texto;
             var fn = string.IsNullOrEmpty(texto) ? font : Theme.UiFont;
-            var r = new Rectangle(x, e.CellBounds.Top, Math.Max(18, e.CellBounds.Right - x - 2), e.CellBounds.Height);
-            TextRenderer.DrawText(e.Graphics, s, fn, r, aviso == 1 ? Theme.WarnText : Theme.PendText, fl | TextFormatFlags.VerticalCenter | TextFormatFlags.EndEllipsis);
+            int wAv = TextRenderer.MeasureText(e.Graphics, s, fn, big, fl).Width;
+            // pouco espaço: fica só o triângulo (o texto completo aparece ao passar o mouse)
+            if (wNome + 8 + wAv > livre && s != "⚠") { s = "⚠"; fn = font; wAv = TextRenderer.MeasureText(e.Graphics, s, fn, big, fl).Width; }
+            int wN = Math.Max(0, Math.Min(wNome, livre - 8 - wAv));
+            TextRenderer.DrawText(e.Graphics, nome, font, new Rectangle(x0, e.CellBounds.Top, wN, e.CellBounds.Height), corNome, fl | TextFormatFlags.EndEllipsis);
+            int x = x0 + wN + 6;
+            TextRenderer.DrawText(e.Graphics, s, fn, new Rectangle(x, e.CellBounds.Top, Math.Max(0, e.CellBounds.Right - x - 2), e.CellBounds.Height), corAviso, fl | TextFormatFlags.EndEllipsis);
         }
 
         // tela responsiva: se sobrar espaço, alarga Nº DA PEÇA e DESCRIÇÃO para ocupar a largura do monitor

@@ -1614,7 +1614,8 @@ namespace MonitorSW
                 if (!it.IsAsm) continue;
                 var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
                 CountBelow(it.Key, p, seen);
-                it.PendBelow = seen.Count(k => { Item x; return items.TryGetValue(k, out x) && x.Sev == 2 && !x.Ignored; });
+                // comercial só fica com pendência quando marcado para revisão: conta também
+                it.PendBelow = seen.Count(k => { Item x; return items.TryGetValue(k, out x) && x.Sev == 2; });
                 it.MissBelow = seen.Count(k => { Item x; return items.TryGetValue(k, out x) && x.FaltaDet; });
             }
         }
