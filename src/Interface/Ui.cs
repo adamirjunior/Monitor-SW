@@ -15,8 +15,8 @@ using Microsoft.Win32;
 [assembly: AssemblyTitle("Monitor")]
 [assembly: AssemblyDescription("BOM dos projetos SolidWorks com status de PDF/DXF")]
 [assembly: AssemblyProduct("Monitor")]
-[assembly: AssemblyVersion("2.18.2.0")]
-[assembly: AssemblyFileVersion("2.18.2.0")]
+[assembly: AssemblyVersion("2.19.0.0")]
+[assembly: AssemblyFileVersion("2.19.0.0")]
 
 namespace MonitorSW
 {
@@ -700,7 +700,6 @@ namespace MonitorSW
         readonly CheckBox chkServer = new CheckBox();
         readonly CheckBox chkMiss = new CheckBox();    // Mostrar pendências (arquivos faltantes)
         readonly CheckBox chkRev = new CheckBox();     // Mostrar revisões
-        readonly CheckBox chkConf = new CheckBox();    // Mostrar conferência
         readonly System.Windows.Forms.Timer srvTimer = new System.Windows.Forms.Timer();
         readonly DataGridView srvGrid = new DataGridView();
         readonly ContextMenuStrip projMenu = new ContextMenuStrip();
@@ -727,7 +726,7 @@ namespace MonitorSW
         static readonly Color AsmBg = Theme.AsmRow;
 
         // colunas (montadas conforme ColunasLista do config.ini)
-        int C_TOG, C_NUM, C_ITEM, C_DESC, C_QTD = -1, C_NEED, C_SIT, C_DES, C_PDF, C_DXF, C_APR, C_BLQ, C_WHO, C_MOD, C_DRW, C_PDFD, C_DXFD, C_DIR;
+        int C_TOG, C_NUM, C_REV, C_ITEM, C_DESC, C_QTD = -1, C_NEED, C_SIT, C_DES, C_PDF, C_DXF, C_APR, C_BLQ, C_WHO, C_MOD, C_DRW, C_PDFD, C_DXFD, C_DIR;
         readonly Dictionary<int, string> propCols = new Dictionary<int, string>();
         readonly List<string> procCols = new List<string>();
         int C_ACAB = -1;
@@ -767,8 +766,8 @@ namespace MonitorSW
         // 0 BOM completa, 10 comerciais, 2 todas as pendências, 14 PENDÊNCIAS (arquivo faltando, vermelho),
         // 15 REVISÕES (desatualizado, fora de padrão, marcado para revisão - amarelo), 16 CONFERÊNCIA (✓ revisado ou não - verde),
         // 11/12/13 pendências laser/usinagem/submontagens, 6 exceções, 7 pendente, 8 revisado
-        static readonly int[] FilterModes = { 0, 10, 2, 14, 15, 16, 11, 12, 13, 6, 7, 8 };
-        const int F_FALTANTES = 3, F_REVISOES = 4, F_CONFERENCIA = 5;   // posições no Filtro (= os 3 checkboxes da barra)
+        static readonly int[] FilterModes = { 0, 10, 2, 14, 15, 11, 12, 13, 6, 7, 8 };
+        const int F_FALTANTES = 3, F_REVISOES = 4;   // posições no Filtro (= os 3 checkboxes da barra)
         int Mode { get { int i = filter.SelectedIndex; return i >= 0 && i < FilterModes.Length ? FilterModes[i] : 0; } }
         bool TreeMode { get { int m = Mode; return m <= 2 || m == 7 || m == 14 || m == 15 || m == 16; } }
         // revisão: pendência que não é falta de arquivo (PDF/DXF desatualizado, divergência/fora de padrão, marcado para revisão)
@@ -843,7 +842,6 @@ namespace MonitorSW
             };
             chk(chkMiss, "Pendências", Theme.PendText, F_FALTANTES, "Só os itens com arquivo faltando (sem desenho, PDF ou DXF), em vermelho.");
             chk(chkRev, "Desatualizados", Theme.WarnText, F_REVISOES, "Só os itens desatualizados (PDF/DXF mais antigo, fora de padrão, marcado para revisão), em amarelo. Liga a conferência das datas.");
-            chk(chkConf, "À conferir", Theme.ConfText, F_CONFERENCIA, "Só os itens que ainda NÃO foram marcados como revisado. Os revisados têm um ✓ verde ao lado do Nº do item.");
             var conf = Btn("✔  Conferência", (s, a) => ConferirProjeto());
             conf.ForeColor = Theme.ConfText;
             conf.ToolTipText = "Confere a montagem aberta: datas de 3D/desenho/PDF/DXF, carimbo do PDF e descrição/escala do DXF";
@@ -858,9 +856,8 @@ namespace MonitorSW
                 "LISTA DE PEÇAS (BOM completa)",
                 "LISTA DE PEÇAS (Comercial)",
                 "Todas as pendências",
-                "Pendências - arquivos faltantes (sem desenho / PDF / DXF)",
+                "Pendências (sem desenho / PDF / DXF)",
                 "Desatualizados (PDF/DXF antigo, fora de padrão, marcados para revisão)",
-                "À conferir (ainda não marcados como revisado)",
                 "Pendências LASER",
                 "Pendências USINAGEM",
                 "Pendências SUBMONTAGENS",
@@ -876,7 +873,6 @@ namespace MonitorSW
                 int fi = filter.SelectedIndex;
                 if (chkMiss.Checked != (fi == F_FALTANTES)) chkMiss.Checked = fi == F_FALTANTES;
                 if (chkRev.Checked != (fi == F_REVISOES)) chkRev.Checked = fi == F_REVISOES;
-                if (chkConf.Checked != (fi == F_CONFERENCIA)) chkConf.Checked = fi == F_CONFERENCIA;
                 ApplySortMode(); FillGrid();
             };
 
@@ -900,12 +896,12 @@ namespace MonitorSW
                 var vi = Mi(filter.Items[i].ToString(), (s, a) => { filter.SelectedIndex = idx; });
                 vi.Checked = i == 0;
                 viewItems.Add(vi);
-                if (i == 2 || i == 6 || i == 9) viewMenu.Items.Add(new ToolStripSeparator());
+                if (i == 2 || i == 5 || i == 8) viewMenu.Items.Add(new ToolStripSeparator());
                 viewMenu.Items.Add(vi);
             }
             filter.SelectedIndexChanged += (s, a) => { for (int i = 0; i < viewItems.Count; i++) viewItems[i].Checked = i == filter.SelectedIndex; };
             DarkMenus(viewMenu);
-            if (viewItems.Count > 11) { viewItems[F_FALTANTES].ForeColor = Theme.PendText; viewItems[F_REVISOES].ForeColor = Theme.WarnText; viewItems[F_CONFERENCIA].ForeColor = Theme.ConfText; viewItems[9].ForeColor = Purple; viewItems[10].ForeColor = Theme.WarnText; viewItems[11].ForeColor = Theme.OkText; }   // pendências vermelho, revisões amarelo, conferência verde, exceção roxo
+            if (viewItems.Count > 10) { viewItems[F_FALTANTES].ForeColor = Theme.PendText; viewItems[F_REVISOES].ForeColor = Theme.WarnText; viewItems[8].ForeColor = Purple; viewItems[9].ForeColor = Theme.WarnText; viewItems[10].ForeColor = Theme.OkText; }   // pendências vermelho, revisões amarelo, conferência verde, exceção roxo
             var filterBtn = new ToolStripButton("Filtro");
             filterBtn.Image = FunnelIcon(Theme.Text);
             filterBtn.DisplayStyle = ToolStripItemDisplayStyle.ImageAndText;
@@ -1079,6 +1075,7 @@ namespace MonitorSW
             typeof(DataGridView).GetProperty("DoubleBuffered", BindingFlags.Instance | BindingFlags.NonPublic).SetValue(grid, true, null);
             C_TOG = AddCol("", 28, typeof(string));
             C_NUM = AddCol("Nº DO ITEM", 70, typeof(string));
+            C_REV = AddCol("REV.", 42, typeof(string));   // ✓ verde = marcado como revisado (em qualquer filtro)
             C_ITEM = AddCol("Nº DA PEÇA", 300, typeof(string));
             C_DESC = AddCol("DESCRIÇÃO", 230, typeof(string));
             foreach (var pc in engine.Cfg.ListCols)
@@ -1107,6 +1104,12 @@ namespace MonitorSW
             C_PDFD = AddCol("PDF GERADO", 100, typeof(DateTime));
             C_DXFD = AddCol("DXF GERADO", 100, typeof(DateTime));
             C_DIR = AddCol("PASTA", 230, typeof(string));
+            // datas e pasta ficam só no painel Detalhes (embaixo); as colunas continuam para ordenar/exportar, escondidas
+            foreach (var ci in new int[] { C_MOD, C_DRW, C_PDFD, C_DXFD, C_DIR }) grid.Columns[ci].Visible = false;
+            grid.Columns[C_REV].DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleCenter;
+            grid.Columns[C_REV].DefaultCellStyle.ForeColor = Theme.OkText;
+            grid.Columns[C_REV].DefaultCellStyle.Font = Theme.UiBold;
+            grid.Columns[C_REV].Frozen = true;
             grid.Columns[C_NUM].DefaultCellStyle.Font = Theme.UiBold;
             grid.Columns[C_NUM].DefaultCellStyle.ForeColor = Theme.Muted;
             grid.Columns[C_NUM].Frozen = true;
@@ -2398,20 +2401,6 @@ namespace MonitorSW
         // linhas-guia da arvore (como no SolidWorks): mostram a qual submontagem cada item pertence
         void PaintTreeGuides(object sender, DataGridViewCellPaintingEventArgs e)
         {
-            if (e.RowIndex >= 0 && e.ColumnIndex == C_NUM)
-            {
-                var tn = grid.Rows[e.RowIndex].Tag as NodeTag;
-                if (tn == null || !tn.Rev) return;
-                e.Paint(e.CellBounds, DataGridViewPaintParts.All);
-                using (var f = new Font("Segoe UI", 8.5f, FontStyle.Bold))
-                using (var br = new SolidBrush(Color.FromArgb(200, Theme.OkText)))
-                {
-                    var sz = e.Graphics.MeasureString("✓", f);
-                    e.Graphics.DrawString("✓", f, br, e.CellBounds.Right - sz.Width - 2, e.CellBounds.Top + (e.CellBounds.Height - sz.Height) / 2);
-                }
-                e.Handled = true;
-                return;
-            }
             if (e.RowIndex < 0 || e.ColumnIndex != C_ITEM || !TreeMode) return;
             var t = grid.Rows[e.RowIndex].Tag as NodeTag;
             if (t == null) return;
@@ -3105,8 +3094,7 @@ namespace MonitorSW
             r.Cells[C_TOG].Style.ForeColor = Theme.Accent;
             // ✓ verde e discreto no fim da célula Nº DO ITEM quando já foi marcado como revisado (em qualquer vista);
             // quem/quando fica no histórico do item e aparece no mouse
-            d.Tag.Rev = Revisado(it);
-            if (d.Tag.Rev) r.Cells[C_NUM].ToolTipText = it.Mark;
+            if (Revisado(it)) { r.Cells[C_REV].Value = "✓"; r.Cells[C_REV].ToolTipText = it.Mark; r.Cells[C_REV].Style.ForeColor = Theme.OkText; }
             return r;
         }
 
@@ -3229,6 +3217,14 @@ namespace MonitorSW
                         mk.StartsWith("EXCE") ? Purple : mk.StartsWith("PEND") ? Theme.WarnText : Theme.OkText, 110);
                 }
                 AddProcBox("DETALHAMENTO", it.Drw != DateTime.MinValue ? "Tem" : (it.NeedPdf ? "Falta" : "–"), it.Drw != DateTime.MinValue ? ok : (it.NeedPdf ? bad : mute), 120);
+                procPanel.SetFlowBreak(procPanel.Controls[procPanel.Controls.Count - 1], true);
+                // datas e pasta (saíram da lista; ficam só aqui)
+                Func<DateTime, string> dt = x => x == DateTime.MinValue ? "–" : x.ToString("dd/MM/yy HH:mm");
+                AddProcBox("MODELO SALVO", dt(it.Model), Theme.Text, 120);
+                AddProcBox("DESENHO SALVO", dt(it.Drw), Theme.Text, 120);
+                AddProcBox("PDF GERADO", dt(it.Pdf), Theme.Text, 120);
+                AddProcBox("DXF GERADO", dt(it.Dxf), Theme.Text, 120);
+                AddProcBox("PASTA", string.IsNullOrEmpty(it.Folder) ? "–" : it.Folder, Theme.Text, 420);
                 // processos de fabricação (TORNO, FRESA...) ficam na linha de baixo
                 procPanel.SetFlowBreak(procPanel.Controls[procPanel.Controls.Count - 1], true);
             }
