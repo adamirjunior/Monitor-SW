@@ -15,8 +15,8 @@ using Microsoft.Win32;
 [assembly: AssemblyTitle("Monitor")]
 [assembly: AssemblyDescription("BOM dos projetos SolidWorks com status de PDF/DXF")]
 [assembly: AssemblyProduct("Monitor")]
-[assembly: AssemblyVersion("2.17.7.0")]
-[assembly: AssemblyFileVersion("2.17.7.0")]
+[assembly: AssemblyVersion("2.18.0.0")]
+[assembly: AssemblyFileVersion("2.18.0.0")]
 
 namespace MonitorSW
 {
@@ -36,12 +36,12 @@ namespace MonitorSW
         public static readonly Color SelText  = Escuro ? Color.White                   : Color.FromArgb(16, 24, 40);
         public static readonly Color AsmRow   = Escuro ? Color.FromArgb(24, 29, 38)    : Color.FromArgb(236, 241, 248);
         public static readonly Color PendRow  = Escuro ? Color.FromArgb(56, 26, 30)    : Color.FromArgb(255, 226, 228);
-        public static readonly Color MissRow  = Escuro ? Color.FromArgb(56, 40, 20)    : Color.FromArgb(255, 238, 212);
+        public static readonly Color MissRow  = Escuro ? Color.FromArgb(54, 46, 14)    : Color.FromArgb(255, 245, 196);   // revisão (amarelo)
         // conferência (PDF/DXF desatualizado, divergência do botão Conferência): cor própria, separada de "falta" (laranja) e "revisão" (vermelho)
-        public static readonly Color ConfRow  = Escuro ? Color.FromArgb(18, 46, 52)    : Color.FromArgb(214, 242, 244);
-        public static readonly Color ConfText = Escuro ? Color.FromArgb(96, 210, 222)  : Color.FromArgb(0, 118, 132);
+        public static readonly Color ConfRow  = Escuro ? Color.FromArgb(20, 48, 30)    : Color.FromArgb(220, 244, 226);   // conferência (verde)
+        public static readonly Color ConfText = Escuro ? Color.FromArgb(92, 211, 138)  : Color.FromArgb(20, 135, 66);
         public static readonly Color PendText = Escuro ? Color.FromArgb(255, 128, 128) : Color.FromArgb(196, 36, 36);
-        public static readonly Color WarnText = Escuro ? Color.FromArgb(255, 184, 108) : Color.FromArgb(184, 96, 0);
+        public static readonly Color WarnText = Escuro ? Color.FromArgb(240, 204, 90)  : Color.FromArgb(150, 108, 0);   // amarelo (revisão)
         public static readonly Color OkText   = Escuro ? Color.FromArgb(92, 211, 138)  : Color.FromArgb(20, 135, 66);
         public static readonly Color LaserTxt = Escuro ? Color.FromArgb(240, 160, 90)  : Color.FromArgb(196, 88, 16);
         public static readonly Color Purple   = Escuro ? Color.FromArgb(185, 140, 255) : Color.FromArgb(118, 66, 200);
@@ -699,6 +699,7 @@ namespace MonitorSW
         readonly CheckBox chkServer = new CheckBox();
         readonly CheckBox chkMiss = new CheckBox();    // Mostrar pendências (arquivos faltantes)
         readonly CheckBox chkRev = new CheckBox();     // Mostrar revisões
+        readonly CheckBox chkConf = new CheckBox();    // Mostrar conferência
         readonly System.Windows.Forms.Timer srvTimer = new System.Windows.Forms.Timer();
         readonly DataGridView srvGrid = new DataGridView();
         readonly ContextMenuStrip projMenu = new ContextMenuStrip();
@@ -762,14 +763,18 @@ namespace MonitorSW
         }
 
         // opções do Filtro -> modo interno da lista
-        // 0 BOM completa, 10 comerciais, 2 revisões (Sev==2), 14 arquivos faltantes (FaltaDet), 15 conferência (desatualizados),
-        // 11/12/13 pendências laser/usinagem/submontagens, 4 fabricadas, 6 exceções, 7 pendente, 8 revisado
-        static readonly int[] FilterModes = { 0, 10, 2, 14, 15, 11, 12, 13, 6, 7, 8 };
-        const int F_FALTANTES = 3, F_CONFERENCIA = 4, F_REVISOES = 9;   // 9 = Marcados para revisão   // posições no Filtro
+        // 0 BOM completa, 10 comerciais, 2 todas as pendências, 14 PENDÊNCIAS (arquivo faltando, vermelho),
+        // 15 REVISÕES (desatualizado, fora de padrão, marcado para revisão - amarelo), 16 CONFERÊNCIA (✓ revisado ou não - verde),
+        // 11/12/13 pendências laser/usinagem/submontagens, 6 exceções, 7 pendente, 8 revisado
+        static readonly int[] FilterModes = { 0, 10, 2, 14, 15, 16, 11, 12, 13, 6, 7, 8 };
+        const int F_FALTANTES = 3, F_REVISOES = 4, F_CONFERENCIA = 5;   // posições no Filtro (= os 3 checkboxes da barra)
         int Mode { get { int i = filter.SelectedIndex; return i >= 0 && i < FilterModes.Length ? FilterModes[i] : 0; } }
-        bool TreeMode { get { int m = Mode; return m <= 2 || m == 7 || m == 14 || m == 15; } }
-        // conferência: pendência que não é falta de arquivo nem marcação de revisão (PDF/DXF desatualizado, divergência)
-        static bool EhConferencia(Item it) { return !it.Ignored && it.Sev == 2 && !it.FaltaDet && !it.Mark.StartsWith("PEND", StringComparison.OrdinalIgnoreCase); }
+        bool TreeMode { get { int m = Mode; return m <= 2 || m == 7 || m == 14 || m == 15 || m == 16; } }
+        // revisão: pendência que não é falta de arquivo (PDF/DXF desatualizado, divergência/fora de padrão, marcado para revisão)
+        static bool EhRevisao(Item it) { return !it.Ignored && it.Sev == 2 && !it.FaltaDet; }
+        // conferência: itens que têm detalhamento (mostra ✓ se já foi marcado como revisado)
+        static bool EhConferivel(Item it) { return !it.Ignored && !it.IsException && !it.FaltaDet && (it.NeedPdf || it.NeedDxf || it.Drw != DateTime.MinValue); }
+        static bool Revisado(Item it) { return it.Mark.StartsWith("REVIS", StringComparison.OrdinalIgnoreCase); }
 
         // ------------------------------------------------------------ montagem da tela
         void BuildUi()
@@ -821,35 +826,23 @@ namespace MonitorSW
             var upd = Btn("⟳  Atualizar lista", (s, a) => ForceRefreshList());
             upd.ToolTipText = "Confere de novo agora se cada item tem desenho, PDF e DXF (F5)";
             ts.Items.Add(upd);
-            // dois filtros exclusivos: arquivos faltantes (1ª etapa) e revisões (Sev==2, marcadas para revisão)
-            chkMiss.Text = "Mostrar pendências";
-            chkMiss.ForeColor = Theme.WarnText;
-            chkMiss.BackColor = Color.Transparent;
-            chkMiss.Font = Theme.UiFont;
-            chkMiss.AutoSize = true;
-            chkMiss.Margin = new Padding(8, 3, 0, 0);
-            chkMiss.CheckedChanged += (s, a) =>
+            // três filtros exclusivos (um desmarca os outros; nenhum marcado = lista normal):
+            // pendências = arquivo faltando (vermelho) · revisões = desatualizado / fora de padrão / marcado (amarelo) ·
+            // conferência = ✓ se já foi marcado como revisado (verde)
+            Action<CheckBox, string, Color, int, string> chk = (cb, txt, cor, idx, dica) =>
             {
-                if (chkMiss.Checked) { chkRev.Checked = false; if (filter.SelectedIndex != F_FALTANTES) filter.SelectedIndex = F_FALTANTES; }
-                else if (filter.SelectedIndex == F_FALTANTES) filter.SelectedIndex = 0;
+                cb.Text = txt; cb.ForeColor = cor; cb.BackColor = Color.Transparent; cb.Font = Theme.UiFont;
+                cb.AutoSize = true; cb.Margin = new Padding(8, 3, 0, 0);
+                cb.CheckedChanged += (s2, a2) =>
+                {
+                    if (cb.Checked) { if (filter.SelectedIndex != idx) filter.SelectedIndex = idx; }
+                    else if (filter.SelectedIndex == idx) filter.SelectedIndex = 0;
+                };
+                var h = new ToolStripControlHost(cb); h.ToolTipText = dica; ts.Items.Add(h);
             };
-            var missHost = new ToolStripControlHost(chkMiss);
-            missHost.ToolTipText = "Marcado: mostra só os itens com arquivo faltando (sem desenho, PDF ou DXF), em laranja.";
-            ts.Items.Add(missHost);
-            chkRev.Text = "Mostrar revisões";
-            chkRev.ForeColor = Theme.PendText;
-            chkRev.BackColor = Color.Transparent;
-            chkRev.Font = Theme.UiFont;
-            chkRev.AutoSize = true;
-            chkRev.Margin = new Padding(8, 3, 0, 0);
-            chkRev.CheckedChanged += (s, a) =>
-            {
-                if (chkRev.Checked) { chkMiss.Checked = false; if (filter.SelectedIndex != F_REVISOES) filter.SelectedIndex = F_REVISOES; }
-                else if (filter.SelectedIndex == F_REVISOES) filter.SelectedIndex = 0;
-            };
-            var revHost = new ToolStripControlHost(chkRev);
-            revHost.ToolTipText = "Marcado: mostra só os itens marcados para revisão (vermelho), sem os arquivos faltantes.";
-            ts.Items.Add(revHost);
+            chk(chkMiss, "Mostrar pendências", Theme.PendText, F_FALTANTES, "Só os itens com arquivo faltando (sem desenho, PDF ou DXF), em vermelho.");
+            chk(chkRev, "Mostrar revisões", Theme.WarnText, F_REVISOES, "Só os itens para revisar (PDF/DXF desatualizado, fora de padrão, marcado para revisão), em amarelo. Liga a conferência das datas.");
+            chk(chkConf, "Mostrar conferência", Theme.ConfText, F_CONFERENCIA, "Itens detalhados com ✓ se já foram marcados como revisado. Só libera quando não falta detalhamento.");
             var conf = Btn("✔  Conferência", (s, a) => ConferirProjeto());
             conf.ForeColor = Theme.ConfText;
             conf.ToolTipText = "Confere a montagem aberta: datas de 3D/desenho/PDF/DXF, carimbo do PDF e descrição/escala do DXF";
@@ -864,8 +857,9 @@ namespace MonitorSW
                 "LISTA DE PEÇAS (BOM completa)",
                 "LISTA DE PEÇAS (Comercial)",
                 "Todas as pendências",
-                "Arquivos faltantes (sem desenho / PDF / DXF)",
-                "Conferência (PDF/DXF desatualizados, divergências)",
+                "Pendências - arquivos faltantes (sem desenho / PDF / DXF)",
+                "Revisões (desatualizados, fora de padrão, marcados para revisão)",
+                "Conferência (✓ revisado ou não)",
                 "Pendências LASER",
                 "Pendências USINAGEM",
                 "Pendências SUBMONTAGENS",
@@ -875,11 +869,15 @@ namespace MonitorSW
             filter.SelectedIndex = 0;
             filter.SelectedIndexChanged += (s, a) =>
             {
-                // Conferência no Filtro liga o modo conferência (datas); sair dela desliga
-                bool emConf = filter.SelectedIndex == F_CONFERENCIA;
-                if (emConf != miCheck.Checked) { miCheck.Checked = emConf; if (emConf && !miCheck.Checked) { filter.SelectedIndex = 0; return; } }
-                if (chkMiss.Checked != (filter.SelectedIndex == F_FALTANTES)) chkMiss.Checked = filter.SelectedIndex == F_FALTANTES;
-                if (chkRev.Checked != (filter.SelectedIndex == F_REVISOES)) chkRev.Checked = filter.SelectedIndex == F_REVISOES;
+                // conferência só depois que não falta nenhum detalhamento na montagem aberta
+                if (filter.SelectedIndex == F_CONFERENCIA && !PodeConferir()) { filter.SelectedIndex = F_FALTANTES; return; }
+                // Revisões liga a conferência das datas (desatualizados); sair dela desliga
+                bool emRev = filter.SelectedIndex == F_REVISOES;
+                if (emRev != miCheck.Checked) miCheck.Checked = emRev;
+                int fi = filter.SelectedIndex;
+                if (chkMiss.Checked != (fi == F_FALTANTES)) chkMiss.Checked = fi == F_FALTANTES;
+                if (chkRev.Checked != (fi == F_REVISOES)) chkRev.Checked = fi == F_REVISOES;
+                if (chkConf.Checked != (fi == F_CONFERENCIA)) chkConf.Checked = fi == F_CONFERENCIA;
                 ApplySortMode(); FillGrid();
             };
 
@@ -903,12 +901,12 @@ namespace MonitorSW
                 var vi = Mi(filter.Items[i].ToString(), (s, a) => { filter.SelectedIndex = idx; });
                 vi.Checked = i == 0;
                 viewItems.Add(vi);
-                if (i == 2 || i == 5 || i == 8) viewMenu.Items.Add(new ToolStripSeparator());
+                if (i == 2 || i == 6 || i == 9) viewMenu.Items.Add(new ToolStripSeparator());
                 viewMenu.Items.Add(vi);
             }
             filter.SelectedIndexChanged += (s, a) => { for (int i = 0; i < viewItems.Count; i++) viewItems[i].Checked = i == filter.SelectedIndex; };
             DarkMenus(viewMenu);
-            if (viewItems.Count > 10) { viewItems[F_FALTANTES].ForeColor = Theme.WarnText; viewItems[F_CONFERENCIA].ForeColor = Theme.ConfText; viewItems[8].ForeColor = Purple; viewItems[9].ForeColor = Theme.PendText; viewItems[10].ForeColor = Theme.OkText; }   // faltantes laranja, conferência verde-azulado, exceção roxo, revisão vermelho, revisado verde
+            if (viewItems.Count > 11) { viewItems[F_FALTANTES].ForeColor = Theme.PendText; viewItems[F_REVISOES].ForeColor = Theme.WarnText; viewItems[F_CONFERENCIA].ForeColor = Theme.ConfText; viewItems[9].ForeColor = Purple; viewItems[10].ForeColor = Theme.WarnText; viewItems[11].ForeColor = Theme.OkText; }   // pendências vermelho, revisões amarelo, conferência verde, exceção roxo
             var filterBtn = new ToolStripButton("Filtro");
             filterBtn.Image = FunnelIcon(Theme.Text);
             filterBtn.DisplayStyle = ToolStripItemDisplayStyle.ImageAndText;
@@ -934,12 +932,10 @@ namespace MonitorSW
             miCheck.CheckOnClick = true;
             miCheck.CheckedChanged += (s, a) =>
             {
-                // conferência só depois que não falta nenhum detalhamento na montagem aberta
-                if (miCheck.Checked && !PodeConferir()) { miCheck.Checked = false; return; }
                 SetCheckMode(miCheck.Checked);
-                // menu Opções > Conferência anda junto com o Filtro
-                if (miCheck.Checked && filter.SelectedIndex != F_CONFERENCIA) filter.SelectedIndex = F_CONFERENCIA;
-                else if (!miCheck.Checked && filter.SelectedIndex == F_CONFERENCIA) filter.SelectedIndex = 0;
+                // menu Opções > Conferência anda junto com o filtro Revisões
+                if (miCheck.Checked && filter.SelectedIndex != F_REVISOES) filter.SelectedIndex = F_REVISOES;
+                else if (!miCheck.Checked && filter.SelectedIndex == F_REVISOES) filter.SelectedIndex = 0;
             };
             mCheck.DropDownItems.Add(miCheck);
             toolsMenu.Items.Add(mCheck);
@@ -1009,7 +1005,7 @@ namespace MonitorSW
             ss.SizingGrip = false;
             ss.Padding = new Padding(10, 3, 10, 3);
             // rodape minimalista: pendentes / ok do projeto aberto · mensagens · índice
-            lblPendN.ForeColor = Theme.WarnText;
+            lblPendN.ForeColor = Theme.PendText;
             lblPendN.ToolTipText = "Itens sem detalhamento (falta PDF/DXF).\nLaser = PDF + DXF · Usinagem = PDF · Solda = PDF";
             lblOkN.ForeColor = Theme.OkText;
             lblOkN.ToolTipText = "Itens com detalhamento";
@@ -1986,7 +1982,7 @@ namespace MonitorSW
         {
             lgPend.Visible = on;
             Text = on ? "Monitor - conferindo se PDF/DXF estão atualizados" : "Monitor";
-            lblStatus.Text = on ? "Conferência ligada: peças com PDF/DXF mais antigo que o modelo aparecem em verde-azulado." : "Mostrando só se tem ou não tem detalhamento.";
+            lblStatus.Text = on ? "Revisões: peças com PDF/DXF mais antigo que o modelo aparecem em amarelo." : "Mostrando só se tem ou não tem detalhamento.";
             System.Threading.ThreadPool.QueueUserWorkItem(_ => engine.SetCheckUpdates(on));
         }
 
@@ -2297,7 +2293,7 @@ namespace MonitorSW
                     BeginInvoke(new Action(() =>
                     {
                         conferindo = false;
-                        if (filter.SelectedIndex != F_CONFERENCIA) filter.SelectedIndex = F_CONFERENCIA;   // mostra a conferência (liga o modo de datas)
+                        if (filter.SelectedIndex != F_REVISOES) filter.SelectedIndex = F_REVISOES;   // mostra as revisões (liga o modo de datas)
                         else System.Threading.ThreadPool.QueueUserWorkItem(__ => engine.SetCheckUpdates(true));
                         string msg = itens.Count + " item(ns) conferido(s): " + (prob == 0 ? "nenhuma divergência nos PDF/DXF." : prob + " com divergência.");
                         if (err != null) msg += " (não gravou o resultado: " + err + ")";
@@ -2410,7 +2406,7 @@ namespace MonitorSW
             if (level <= 0 && t.Aviso == 0) return;
             // com aviso o texto do código é desenhado por PintarAviso (encurta o nome se precisar para o ⚠ sempre aparecer)
             e.Paint(e.CellBounds, t.Aviso > 0 ? DataGridViewPaintParts.All & ~DataGridViewPaintParts.ContentForeground : DataGridViewPaintParts.All);
-            if (t.Aviso > 0) PintarAviso(e, t.Aviso, (Mode == 14 || Mode == 7) ? "" : t.AvisoTxt);
+            if (t.Aviso > 0) PintarAviso(e, t.Aviso, (Mode == 14 || Mode == 7 || Mode == 15 || Mode == 16) ? "" : t.AvisoTxt);
             if (level <= 0) { e.Handled = true; return; }
             using (var pen = new Pen(Theme.Border))
             using (var acc = new Pen(Color.FromArgb(70, Theme.Accent)))
@@ -2440,7 +2436,7 @@ namespace MonitorSW
             const TextFormatFlags fl = TextFormatFlags.NoPadding | TextFormatFlags.SingleLine | TextFormatFlags.VerticalCenter;
             bool sel = (e.State & DataGridViewElementStates.Selected) != 0;
             Color corNome = sel ? e.CellStyle.SelectionForeColor : e.CellStyle.ForeColor;
-            Color corAviso = aviso == 1 ? Theme.WarnText : Theme.PendText;
+            Color corAviso = aviso == 1 ? Theme.PendText : Theme.WarnText;   // falta dentro = vermelho, revisão dentro = amarelo
             int x0 = e.CellBounds.Left + e.CellStyle.Padding.Left + 4;
             int livre = e.CellBounds.Right - 4 - x0;
             var big = new Size(int.MaxValue, int.MaxValue);
@@ -2777,7 +2773,7 @@ namespace MonitorSW
                 li.ToolTipText = p.MainPath;
                 if (p.Error != null) { li.ForeColor = Theme.PendText; li.ToolTipText = p.Error; }
                 else if (p.LastScan == DateTime.MinValue) li.ForeColor = Theme.Muted;
-                else { li.ForeColor = p.Pend > 0 ? Theme.WarnText : Theme.Text; li.ToolTipText = p.MainPath + "\n" + p.Pend + " sem detalhamento · " + p.Ok + " ok"; }
+                else { li.ForeColor = p.Pend > 0 ? Theme.PendText : Theme.Text; li.ToolTipText = p.MainPath + "\n" + p.Pend + " sem detalhamento · " + p.Ok + " ok"; }
                 projList.Items.Add(li);
                 if (p == sel) li.Selected = true;
             }
@@ -2899,7 +2895,7 @@ namespace MonitorSW
                 itemCount = p.Items.Count;
                 if (TreeMode)
                 {
-                    bool filtered = mode == 2 || mode == 7 || mode == 14 || mode == 15 || q.Length > 0;
+                    bool filtered = mode == 2 || mode == 7 || mode == 14 || mode == 15 || mode == 16 || q.Length > 0;
                     Item root;
                     if (p.Items.TryGetValue(p.MainPath, out root))
                     {
@@ -2994,7 +2990,7 @@ namespace MonitorSW
             var me = new RowData(); me.It = it; me.Level = level; me.Qty = qty; me.Tag = t; me.Num = num;
             int pos = outRows.Count;
             outRows.Add(me);
-            bool selfMatch = !filtered || (q.Length > 0 ? Match(it, q) : mode == 14 ? it.FaltaDet : mode == 15 ? EhConferencia(it) : mode == 7 ? (!it.Ignored && it.Mark.StartsWith("PEND", StringComparison.OrdinalIgnoreCase)) : (!it.Ignored && it.Sev == 2));
+            bool selfMatch = !filtered || (q.Length > 0 ? Match(it, q) : mode == 14 ? it.FaltaDet : mode == 15 ? EhRevisao(it) : mode == 16 ? EhConferivel(it) : mode == 7 ? (!it.Ignored && it.Mark.StartsWith("PEND", StringComparison.OrdinalIgnoreCase)) : (!it.Ignored && it.Sev == 2));
             // todas as submontagens começam fechadas (como no SolidWorks); o conjunto guarda as que o usuário abriu
             bool inSet = collapsedIds.Contains(id);
             bool open = filtered || inSet;
@@ -3068,20 +3064,19 @@ namespace MonitorSW
             }
             if (it.Ignored) { r.Cells[C_NEED].Style.ForeColor = Theme.Muted; r.Cells[C_SIT].Style.ForeColor = Theme.Muted; }
             if (it.Sev == 1) r.Cells[C_SIT].Style.ForeColor = Theme.Muted;
-            // 3 cores: FALTA detalhamento (laranja) · marcado para REVISÃO (vermelho) · CONFERÊNCIA - PDF/DXF desatualizado
-            // ou divergência do botão Conferência (verde-azulado)
-            bool revisao = it.Mark.StartsWith("PEND", StringComparison.OrdinalIgnoreCase);
+            // 3 cores: PENDÊNCIA = falta arquivo (vermelho) · REVISÃO = desatualizado, fora de padrão ou marcado para revisão (amarelo) ·
+            // CONFERÊNCIA = marcado como revisado (verde, só no filtro Conferência)
             bool falta = it.FaltaDet;
             if (it.Sev == 2)
             {
-                var bg = revisao ? RedBg : falta ? OrangeBg : ConfBg;
+                var bg = falta ? RedBg : OrangeBg;
                 foreach (var ci in new int[] { C_NEED, C_SIT, C_DES, C_PDF, C_DXF }) r.Cells[ci].Style.BackColor = bg;
                 r.Cells[C_ITEM].Style.BackColor = bg;
-                r.Cells[C_SIT].Style.ForeColor = revisao ? Theme.PendText : falta ? Theme.WarnText : Theme.ConfText;
+                r.Cells[C_SIT].Style.ForeColor = falta ? Theme.PendText : Theme.WarnText;
             }
             if (it.Sev == 0 && !it.Ignored && it.NeedPdf) r.Cells[C_SIT].Style.ForeColor = Theme.OkText;
-            if (it.PdfSt == "Falta") r.Cells[C_PDF].Style.ForeColor = Theme.WarnText; else if (it.PdfSt.StartsWith("Desatualizado")) r.Cells[C_PDF].Style.ForeColor = Theme.ConfText;
-            if (it.DxfSt == "Falta") r.Cells[C_DXF].Style.ForeColor = Theme.WarnText; else if (it.DxfSt.StartsWith("Desatualizado")) r.Cells[C_DXF].Style.ForeColor = Theme.ConfText;
+            if (it.PdfSt == "Falta") r.Cells[C_PDF].Style.ForeColor = Theme.PendText; else if (it.PdfSt.StartsWith("Desatualizado")) r.Cells[C_PDF].Style.ForeColor = Theme.WarnText;
+            if (it.DxfSt == "Falta") r.Cells[C_DXF].Style.ForeColor = Theme.PendText; else if (it.DxfSt.StartsWith("Desatualizado")) r.Cells[C_DXF].Style.ForeColor = Theme.WarnText;
             if (it.PdfSt.StartsWith("Tem")) r.Cells[C_PDF].Style.ForeColor = Theme.OkText;
             r.Cells[C_DES].Style.ForeColor = des.StartsWith("✓") ? Theme.OkText : des.StartsWith("✗") ? Theme.PendText : Theme.Muted;
             if (it.DxfSt.StartsWith("Tem")) r.Cells[C_DXF].Style.ForeColor = Theme.OkText;
@@ -3090,11 +3085,20 @@ namespace MonitorSW
                 // item de exceção (representação etc.) fica roxo
                 foreach (DataGridViewCell c in r.Cells) { c.Style.BackColor = PurpleBg; c.Style.ForeColor = Purple; }
             }
-            else if (it.Mark.StartsWith("PEND", StringComparison.OrdinalIgnoreCase)) r.Cells[C_SIT].Style.ForeColor = Theme.PendText;
+            else if (it.Mark.StartsWith("PEND", StringComparison.OrdinalIgnoreCase)) r.Cells[C_SIT].Style.ForeColor = Theme.WarnText;
             else if (it.Mark.StartsWith("REVIS", StringComparison.OrdinalIgnoreCase)) r.Cells[C_SIT].Style.ForeColor = Theme.OkText;
             if (it.IsBlocked) r.Cells[C_BLQ].Style.ForeColor = Theme.WarnText;
             if (it.NeedDxf) r.Cells[C_NEED].Style.ForeColor = Theme.LaserTxt;
             r.Cells[C_TOG].Style.ForeColor = Theme.Accent;
+            // filtro Conferência: só o ✓ (verde) se já foi marcado como revisado, senão "não revisado"
+            if (Mode == 16 && !it.IsAsm && EhConferivel(it))
+            {
+                bool ok = Revisado(it);
+                r.Cells[C_SIT].Value = ok ? "✓ " + it.Mark : "não revisado";
+                r.Cells[C_SIT].Style.ForeColor = ok ? Theme.ConfText : Theme.Muted;
+                var bgc = ok ? ConfBg : r.DefaultCellStyle.BackColor;
+                foreach (var ci in new int[] { C_ITEM, C_NEED, C_SIT, C_DES, C_PDF, C_DXF }) r.Cells[ci].Style.BackColor = bgc;
+            }
             return r;
         }
 
