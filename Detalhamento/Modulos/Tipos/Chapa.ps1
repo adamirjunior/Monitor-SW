@@ -461,7 +461,8 @@ function CotasLaserInterno($dm, $front, $left, $top, $flat) {
         # o comprimento total vai na vista de baixo (face da chapa). Ex.: 02124099 (119,50 e 252,50; 304,76 e 157 embaixo)
         $n += CotaTotal $dm $front $false $true
         $na = 0; try { $na = CotasAbasPerfil $dm $front } catch { Log "   (abas no perfil: $($_.Exception.Message))" "DarkYellow" }
-        if ($na -eq 0) { $na = CotaTotal $dm $front $true $false }
+        # sem aba para cotar: comprimento total aqui só se não houver a vista de baixo (senão repetiria, ex.: Peça3 133)
+        if ($na -eq 0 -and -not $top) { $na = CotaTotal $dm $front $true $false }
         $n += $na
         if ($top) { $n += CotaTotal $dm $top $true $true }
         if ($left) { $n += CotaTotal $dm $left $true $false }

@@ -133,8 +133,9 @@ function DetalharPeca($caminho, $peca) {
     AlinharPlanificada $dm $front $flat
     $of0 = Contorno $front
     $longa = ($of0.w -gt 2.5 * $of0.h)
-    # perfil como principal: arranjo normal (perfil em cima, face embaixo, isométrica em cima à direita, planificada embaixo à direita)
-    if ($script:perfilPrincipal) { $longa = $false }
+    # perfil como principal: arranjo normal (perfil em cima, face embaixo, isométrica em cima à direita, planificada embaixo
+    # à direita - 02124099, perfil 2,5x mais largo que alto); só empilha se for MUITO comprida (02204262, 676 x 27)
+    if ($script:perfilPrincipal -and $of0.w -le 4 * $of0.h) { $longa = $false }
     if ($longa) { Log "   Disposição para peça longa (vistas empilhadas)" "DarkGray" }
     # chapa dobrada longa: principal + vista de baixo + planificada já mostram tudo; a lateral só repetiria a largura
     # (e ficaria sem cota - nenhuma vista pode ficar sem cota)
