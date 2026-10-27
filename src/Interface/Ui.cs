@@ -15,8 +15,8 @@ using Microsoft.Win32;
 [assembly: AssemblyTitle("Monitor")]
 [assembly: AssemblyDescription("BOM dos projetos SolidWorks com status de PDF/DXF")]
 [assembly: AssemblyProduct("Monitor")]
-[assembly: AssemblyVersion("2.17.1.0")]
-[assembly: AssemblyFileVersion("2.17.1.0")]
+[assembly: AssemblyVersion("2.17.2.0")]
+[assembly: AssemblyFileVersion("2.17.2.0")]
 
 namespace MonitorSW
 {
@@ -648,6 +648,7 @@ namespace MonitorSW
         public string Id, Key;
         public bool HasKids, Open;
         public int Aviso;   // submontagem com algo DENTRO: 1 = falta detalhamento (laranja), 2 = outra pendência (vermelho)
+        public string AvisoTxt = "";
     }
 
     public class MainForm : Form
@@ -2361,7 +2362,7 @@ namespace MonitorSW
             int level = t.Id.Count(ch => ch == '>') - 1;
             if (level <= 0 && t.Aviso == 0) return;
             e.Paint(e.CellBounds, DataGridViewPaintParts.All);
-            if (t.Aviso > 0) PintarAviso(e, t.Aviso);
+            if (t.Aviso > 0) PintarAviso(e, t.Aviso, Mode == 14 ? "" : t.AvisoTxt);
             if (level <= 0) { e.Handled = true; return; }
             using (var pen = new Pen(Theme.Border))
             using (var acc = new Pen(Color.FromArgb(70, Theme.Accent)))
@@ -2380,7 +2381,9 @@ namespace MonitorSW
         }
 
         // triângulo de aviso logo depois do código da submontagem (laranja: falta detalhamento dentro; vermelho: outra pendência)
-        void PintarAviso(DataGridViewCellPaintingEventArgs e, int aviso)
+        // na lista normal vem também o texto (ex.: "falta detalhamento em 2 itens dentro"), na mesma cor, sem pintar a linha;
+        // no filtro Mostrar pendências só o triângulo (os itens já aparecem embaixo)
+        void PintarAviso(DataGridViewCellPaintingEventArgs e, int aviso, string texto)
         {
             string nome = Convert.ToString(e.FormattedValue ?? "");
             var font = e.CellStyle.Font ?? grid.Font;
@@ -2388,8 +2391,10 @@ namespace MonitorSW
             int w = TextRenderer.MeasureText(e.Graphics, nome, font, new Size(int.MaxValue, int.MaxValue), fl).Width;
             int x = e.CellBounds.Left + e.CellStyle.Padding.Left + 4 + w + 6;
             if (x > e.CellBounds.Right - 14) return;
-            var r = new Rectangle(x, e.CellBounds.Top, 18, e.CellBounds.Height);
-            TextRenderer.DrawText(e.Graphics, "⚠", font, r, aviso == 1 ? Theme.WarnText : Theme.PendText, fl | TextFormatFlags.VerticalCenter);
+            string s = string.IsNullOrEmpty(texto) ? "⚠" : "⚠ " + texto;
+            var fn = string.IsNullOrEmpty(texto) ? font : Theme.UiFont;
+            var r = new Rectangle(x, e.CellBounds.Top, Math.Max(18, e.CellBounds.Right - x - 2), e.CellBounds.Height);
+            TextRenderer.DrawText(e.Graphics, s, fn, r, aviso == 1 ? Theme.WarnText : Theme.PendText, fl | TextFormatFlags.VerticalCenter | TextFormatFlags.EndEllipsis);
         }
 
         // tela responsiva: se sobrar espaço, alarga Nº DA PEÇA e DESCRIÇÃO para ocupar a largura do monitor
@@ -2967,8 +2972,8 @@ namespace MonitorSW
             d.Tag.Aviso = 0;
             if (TreeMode && it.IsAsm && !principal)
             {
-                if (it.MissBelow > 0) { d.Tag.Aviso = 1; abaixo = "Falta detalhamento em " + it.MissBelow + (it.MissBelow == 1 ? " item" : " itens") + " dentro desta submontagem"; }
-                else if (it.PendBelow > 0) { d.Tag.Aviso = 2; abaixo = it.PendBelow + (it.PendBelow == 1 ? " pendência" : " pendências") + " dentro desta submontagem"; }
+                if (it.MissBelow > 0) { d.Tag.Aviso = 1; d.Tag.AvisoTxt = "falta detalhamento em " + it.MissBelow + (it.MissBelow == 1 ? " item" : " itens") + " dentro"; abaixo = "Falta detalhamento em " + it.MissBelow + (it.MissBelow == 1 ? " item" : " itens") + " dentro desta submontagem"; }
+                else if (it.PendBelow > 0) { d.Tag.Aviso = 2; d.Tag.AvisoTxt = it.PendBelow + (it.PendBelow == 1 ? " pendência" : " pendências") + " dentro"; abaixo = it.PendBelow + (it.PendBelow == 1 ? " pendência" : " pendências") + " dentro desta submontagem"; }
             }
             r.Cells[C_ITEM].Value = it.Name;
             if (abaixo.Length > 0) r.Cells[C_ITEM].ToolTipText = abaixo;
