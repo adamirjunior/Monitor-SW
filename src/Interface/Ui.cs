@@ -15,8 +15,8 @@ using Microsoft.Win32;
 [assembly: AssemblyTitle("Monitor")]
 [assembly: AssemblyDescription("BOM dos projetos SolidWorks com status de PDF/DXF")]
 [assembly: AssemblyProduct("Monitor")]
-[assembly: AssemblyVersion("2.17.5.0")]
-[assembly: AssemblyFileVersion("2.17.5.0")]
+[assembly: AssemblyVersion("2.17.6.0")]
+[assembly: AssemblyFileVersion("2.17.6.0")]
 
 namespace MonitorSW
 {
@@ -697,7 +697,8 @@ namespace MonitorSW
         readonly DarkTabs tabs = new DarkTabs();
         readonly Button detailBar = new Button();
         readonly CheckBox chkServer = new CheckBox();
-        readonly CheckBox chkConf = new CheckBox();
+        readonly CheckBox chkMiss = new CheckBox();    // Mostrar pendências (arquivos faltantes)
+        readonly CheckBox chkRev = new CheckBox();     // Mostrar revisões
         readonly System.Windows.Forms.Timer srvTimer = new System.Windows.Forms.Timer();
         readonly DataGridView srvGrid = new DataGridView();
         readonly ContextMenuStrip projMenu = new ContextMenuStrip();
@@ -761,10 +762,10 @@ namespace MonitorSW
         }
 
         // opções do Filtro -> modo interno da lista
-        // 0 BOM completa, 10 comerciais, 2 todas as pendências, 14 arquivos faltantes, 15 conferência (desatualizados),
+        // 0 BOM completa, 10 comerciais, 2 revisões (Sev==2), 14 arquivos faltantes (FaltaDet), 15 conferência (desatualizados),
         // 11/12/13 pendências laser/usinagem/submontagens, 4 fabricadas, 6 exceções, 7 pendente, 8 revisado
         static readonly int[] FilterModes = { 0, 10, 2, 14, 15, 11, 12, 13, 6, 7, 8 };
-        const int F_FALTANTES = 3, F_CONFERENCIA = 4;   // posições no Filtro
+        const int F_REVISOES = 2, F_FALTANTES = 3, F_CONFERENCIA = 4;   // posições no Filtro
         int Mode { get { int i = filter.SelectedIndex; return i >= 0 && i < FilterModes.Length ? FilterModes[i] : 0; } }
         bool TreeMode { get { int m = Mode; return m <= 2 || m == 14 || m == 15; } }
         // conferência: pendência que não é falta de arquivo nem marcação de revisão (PDF/DXF desatualizado, divergência)
@@ -820,22 +821,35 @@ namespace MonitorSW
             var upd = Btn("⟳  Atualizar lista", (s, a) => ForceRefreshList());
             upd.ToolTipText = "Confere de novo agora se cada item tem desenho, PDF e DXF (F5)";
             ts.Items.Add(upd);
-            // atalho do Filtro "Arquivos faltantes": o que falta detalhar (desenho/PDF/DXF) - a 1ª etapa.
-            // Desatualizados ficam na Conferência (Filtro > Conferência ou botão Conferência).
-            chkConf.Text = "Mostrar pendências";
-            chkConf.ForeColor = Theme.WarnText;
-            chkConf.BackColor = Color.Transparent;
-            chkConf.Font = Theme.UiFont;
-            chkConf.AutoSize = true;
-            chkConf.Margin = new Padding(8, 3, 0, 0);
-            chkConf.CheckedChanged += (s, a) =>
+            // dois filtros exclusivos: arquivos faltantes (1ª etapa) e revisões (Sev==2, marcadas para revisão)
+            chkMiss.Text = "Mostrar pendências";
+            chkMiss.ForeColor = Theme.WarnText;
+            chkMiss.BackColor = Color.Transparent;
+            chkMiss.Font = Theme.UiFont;
+            chkMiss.AutoSize = true;
+            chkMiss.Margin = new Padding(8, 3, 0, 0);
+            chkMiss.CheckedChanged += (s, a) =>
             {
-                if (chkConf.Checked) { if (filter.SelectedIndex != F_FALTANTES) filter.SelectedIndex = F_FALTANTES; }
+                if (chkMiss.Checked) { chkRev.Checked = false; if (filter.SelectedIndex != F_FALTANTES) filter.SelectedIndex = F_FALTANTES; }
                 else if (filter.SelectedIndex == F_FALTANTES) filter.SelectedIndex = 0;
             };
-            var confHost = new ToolStripControlHost(chkConf);
-            confHost.ToolTipText = "Marcado: mostra só os itens com arquivo faltando (sem desenho, PDF ou DXF), em laranja. Desatualizados ficam na Conferência.";
-            ts.Items.Add(confHost);
+            var missHost = new ToolStripControlHost(chkMiss);
+            missHost.ToolTipText = "Marcado: mostra só os itens com arquivo faltando (sem desenho, PDF ou DXF), em laranja.";
+            ts.Items.Add(missHost);
+            chkRev.Text = "Mostrar revisões";
+            chkRev.ForeColor = Theme.PendText;
+            chkRev.BackColor = Color.Transparent;
+            chkRev.Font = Theme.UiFont;
+            chkRev.AutoSize = true;
+            chkRev.Margin = new Padding(8, 3, 0, 0);
+            chkRev.CheckedChanged += (s, a) =>
+            {
+                if (chkRev.Checked) { chkMiss.Checked = false; if (filter.SelectedIndex != F_REVISOES) filter.SelectedIndex = F_REVISOES; }
+                else if (filter.SelectedIndex == F_REVISOES) filter.SelectedIndex = 0;
+            };
+            var revHost = new ToolStripControlHost(chkRev);
+            revHost.ToolTipText = "Marcado: mostra só os itens marcados para revisão (em vermelho).";
+            ts.Items.Add(revHost);
             var conf = Btn("✔  Conferência", (s, a) => ConferirProjeto());
             conf.ForeColor = Theme.ConfText;
             conf.ToolTipText = "Confere a montagem aberta: datas de 3D/desenho/PDF/DXF, carimbo do PDF e descrição/escala do DXF";
@@ -863,8 +877,9 @@ namespace MonitorSW
             {
                 // Conferência no Filtro liga o modo conferência (datas); sair dela desliga
                 bool emConf = filter.SelectedIndex == F_CONFERENCIA;
-                if (emConf != miCheck.Checked) { miCheck.Checked = emConf; if (emConf && !miCheck.Checked) { filter.SelectedIndex = F_FALTANTES; return; } }
-                if (chkConf.Checked != (filter.SelectedIndex == F_FALTANTES)) chkConf.Checked = filter.SelectedIndex == F_FALTANTES;
+                if (emConf != miCheck.Checked) { miCheck.Checked = emConf; if (emConf && !miCheck.Checked) { filter.SelectedIndex = 0; return; } }
+                if (chkMiss.Checked != (filter.SelectedIndex == F_FALTANTES)) chkMiss.Checked = filter.SelectedIndex == F_FALTANTES;
+                if (chkRev.Checked != (filter.SelectedIndex == F_REVISOES)) chkRev.Checked = filter.SelectedIndex == F_REVISOES;
                 ApplySortMode(); FillGrid();
             };
 
