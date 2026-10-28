@@ -95,7 +95,7 @@ td.rg { min-width: 300px }
     <p>Acompanhamento das regras do gerador automático: o que já funciona, o que espera teste no SolidWorks, o que falta, e a linha do tempo das alterações.</p>
   </div>
   <dl>
-    <dt>Monitor SW</dt><dd>2.20.2.0</dd>
+    <dt>Monitor SW</dt><dd>2.21.0.0</dd>
     <dt>Gerador</dt><dd id="ultima">—</dd>
     <dt>Regras</dt><dd>REGRAS_DETALHAMENTO.txt</dd>
     <dt>Último teste</dt><dd>1.2.1 · 26/10</dd>
@@ -231,6 +231,7 @@ const REGRAS = [
   ["perfil", "Barras e cantoneiras com a lógica do metalon", "teste", "2026-10-26", "Cantoneira (perfil em L) precisa de teste."]
 ];
 const ALTERACOES = [
+  ["2026-10-28", "Monitor 2.21: peça avulsa e resumo de pendências", "Monitor", ["Abrir projeto aceita peça avulsa, submontagem ou montagem", "Aba Processos: no lugar do log, só a pendência (o que falta) e o que está desatualizado (com o motivo)"]],
   ["2026-10-28", "Montagem: vista que mostra mais detalhes", "Gerador", ["Testa as 4 isométricas vistas de cima e usa a que mostra mais detalhes (mais arestas visíveis)", "Ref. 13011920: abertura da caixa para a frente, como o desenho feito à mão"]],
   ["2026-10-28", "Isométrica na mesma escala da principal", "Gerador", ["Peça até 1 m: isométrica na mesma escala das outras vistas (diminui a escala da folha em um passo se precisar)", "Se não couber, fica a maior possível no espaço livre", "Peça grande (> 1 m), metalon e barras: maior possível e harmônica", "Chapa dobrada: por enquanto só cresce no espaço livre"]],
   ["2026-10-28", "Monitor 2.20.2: alteração só de propriedade", "Monitor", ["Opções > Revisão: escolher se mudança só de propriedade (descrição, acabamento, processo) marca para revisão", "Desligado: só geometria da peça ou lista da montagem contam", "Vale para as alterações daqui para frente"]],

@@ -15,8 +15,8 @@ using Microsoft.Win32;
 [assembly: AssemblyTitle("Monitor")]
 [assembly: AssemblyDescription("BOM dos projetos SolidWorks com status de PDF/DXF")]
 [assembly: AssemblyProduct("Monitor")]
-[assembly: AssemblyVersion("2.20.2.0")]
-[assembly: AssemblyFileVersion("2.20.2.0")]
+[assembly: AssemblyVersion("2.21.0.0")]
+[assembly: AssemblyFileVersion("2.21.0.0")]
 
 namespace MonitorSW
 {
@@ -1145,8 +1145,9 @@ namespace MonitorSW
             whereBox.Multiline = true;
             whereBox.ReadOnly = true;
             whereBox.ScrollBars = ScrollBars.Both;
-            whereBox.WordWrap = false;
-            whereBox.Font = new Font("Consolas", 9.5f);
+            whereBox.WordWrap = true;
+            whereBox.ScrollBars = ScrollBars.Vertical;
+            whereBox.Font = new Font("Segoe UI", 10f);
             whereBox.BackColor = Theme.Surface;
             whereBox.ForeColor = Theme.Text;
             whereBox.BorderStyle = BorderStyle.None;
@@ -1167,7 +1168,7 @@ namespace MonitorSW
 
             var wherePad = new Panel(); wherePad.BackColor = Theme.Surface; wherePad.Padding = new Padding(12, 8, 8, 4); wherePad.Controls.Add(whereBox);
             procPanel.Dock = DockStyle.Top;
-            procPanel.Height = 122;
+            procPanel.Height = 176;   // processos + datas/pasta
             procPanel.AutoScroll = true;
             procPanel.BackColor = Theme.Surface;
             procPanel.WrapContents = true;
@@ -3194,7 +3195,7 @@ namespace MonitorSW
             FillProcPanel(it);
             if (it == null || histItem == null || !string.Equals(it.Key, histItem.Key, StringComparison.OrdinalIgnoreCase) || it.Model != histItem.Model || it.LastBy != histItem.LastBy) ShowHistory(it);
             if (it == null) { whereBox.Text = "Selecione um item na BOM para ver detalhes e onde ele é usado."; return; }
-            whereBox.Text = Describe(it.Key);
+            whereBox.Text = Resumo(it);
         }
 
         // caixinhas com os processos da peça (TORNO, TORNO CNC, FRESA...) no topo da aba Processos
@@ -3414,6 +3415,35 @@ namespace MonitorSW
                     }
                 }));
             });
+        }
+
+        // painel de baixo (aba Processos): só o que importa - pendência (o que falta) e o que está desatualizado, com o motivo
+        static string Resumo(Item it)
+        {
+            var l = new List<string>();
+            if (it.IsException) return "Exceção: não precisa detalhamento.";
+            if (it.Ignored && it.Sev != 2) return "Item comercial: não precisa detalhamento.";
+            var falta = new List<string>();
+            if (it.Missing) falta.Add("o arquivo do modelo não foi encontrado");
+            else
+            {
+                if (it.NeedPdf && it.Drw == DateTime.MinValue) falta.Add("desenho (.SLDDRW)");
+                if (it.NeedPdf && it.Pdf == DateTime.MinValue) falta.Add("PDF");
+                if (it.NeedDxf && it.Dxf == DateTime.MinValue) falta.Add("DXF");
+            }
+            if (falta.Count > 0) l.Add("PENDÊNCIA - falta: " + string.Join(", ", falta.ToArray()) + ".");
+            if (it.Reason.Length > 0)
+                foreach (var m in it.Reason.Split(new[] { "; " }, StringSplitOptions.RemoveEmptyEntries)) l.Add("DESATUALIZADO - " + m + ".");
+            // divergências da Conferência e marcações que não são data (ex.: PDF com descrição diferente da peça)
+            foreach (var pr in (it.Status ?? "").Split(new[] { " + " }, StringSplitOptions.RemoveEmptyEntries))
+            {
+                string q = pr.Trim();
+                if (q.Length == 0 || q.StartsWith("Sem ") || q.IndexOf("desatualizado", StringComparison.OrdinalIgnoreCase) >= 0 || q.StartsWith("Arquivo não")) continue;
+                if (q.StartsWith("Marcado para revisão")) { l.Add("MARCADO PARA REVISÃO" + (it.Mark.Length > 0 ? " (" + it.Mark + ")" : "") + "."); continue; }
+                if (it.Sev == 2) l.Add("REVISAR - " + q + ".");
+            }
+            if (l.Count == 0) return it.Mark.StartsWith("REVIS", StringComparison.OrdinalIgnoreCase) ? "Sem pendências. ✓ " + it.Mark : "Sem pendências.";
+            return string.Join("\r\n", l.ToArray());
         }
 
         string Describe(string key)
@@ -3722,8 +3752,8 @@ namespace MonitorSW
         {
             using (var d = new OpenFileDialog())
             {
-                d.Title = "Abrir projeto (montagem principal)";
-                d.Filter = "Montagens SolidWorks (*.SLDASM)|*.SLDASM|Peças e montagens|*.SLDASM;*.SLDPRT";
+                d.Title = "Abrir projeto: montagem, submontagem ou peça avulsa";
+                d.Filter = "Peças e montagens SolidWorks (*.SLDASM;*.SLDPRT)|*.SLDASM;*.SLDPRT|Montagens (*.SLDASM)|*.SLDASM|Peças (*.SLDPRT)|*.SLDPRT";
                 d.Multiselect = true;
                 d.RestoreDirectory = true;
                 try
@@ -3786,8 +3816,8 @@ namespace MonitorSW
                 {
                     using (var d = new OpenFileDialog())
                     {
-                        d.Title = "Escolha a montagem principal do projeto";
-                        d.Filter = "Montagens SolidWorks (*.sldasm)|*.sldasm";
+                        d.Title = "Escolha a montagem, submontagem ou peça";
+                        d.Filter = "Peças e montagens SolidWorks (*.SLDASM;*.SLDPRT)|*.SLDASM;*.SLDPRT|Montagens (*.SLDASM)|*.SLDASM|Peças (*.SLDPRT)|*.SLDPRT";
                         try { d.InitialDirectory = Path.Combine(engine.Cfg.Root, "01 (MONTAGEM)"); } catch { }
                         d.Multiselect = true;
                         if (d.ShowDialog(f) == DialogResult.OK) { result = d.FileNames.ToList(); f.DialogResult = DialogResult.OK; }

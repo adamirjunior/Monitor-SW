@@ -1222,7 +1222,8 @@ namespace MonitorSW
             // 1) arvore: le a montagem principal e as submontagens salvas depois dela
             var children = new Dictionary<string, List<TreeRef>>(p.Children, StringComparer.OrdinalIgnoreCase);
             var src = new Dictionary<string, DateTime>(p.ChildrenSrc, StringComparer.OrdinalIgnoreCase);
-            if (!src.ContainsKey(mainKey) || mainTime > src[mainKey])
+            bool pecaAvulsa = mainKey.EndsWith(".SLDPRT", StringComparison.OrdinalIgnoreCase);   // projeto = uma peça só
+            if (!pecaAvulsa && (!src.ContainsKey(mainKey) || mainTime > src[mainKey]))
             {
                 Say("Lendo árvore de " + p.Name + "...");
                 if (!ReadTreeInto(mainKey, mainKey, mainTime, children, src))
