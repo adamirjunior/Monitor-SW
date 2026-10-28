@@ -886,6 +886,7 @@ namespace MonitorSW
         public string Key, Path, Name, Folder;
         public bool IsAsm, Ignored, Missing, IsWeld;
         public DateTime Model, Drw, Pdf, Dxf, Eff;
+        public DateTime Geo;   // última alteração de GEOMETRIA (peça) / LISTA de itens (montagem) - sem as de só propriedade
         public string EffSource;
         public string DrwPath, PdfPath, DxfPath;
         public string PdfVer = "", DxfVer = "";
@@ -917,7 +918,7 @@ namespace MonitorSW
 
     public class Snap
     {
-        public DateTime Model, Drw, Pdf, Dxf, LastByStamp;
+        public DateTime Model, Drw, Pdf, Dxf, LastByStamp, Geo;
         public string LastBy, Desc = "", Aprov = "", Blocked = "", MachSteps = "";
         public Dictionary<string, string> Props = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
         public bool PropsKnown, IsLaser, IsMach;
@@ -1289,14 +1290,21 @@ namespace MonitorSW
                     // montagem salva sem mudar nada (mesma lista de itens e mesmas propriedades): não conta como alteração
                     // peça salva sem mudar nada (mesma geometria e mesmas propriedades): idem
                     string ns = !it.PropsKnown ? "" : it.IsAsm ? SigOf(children, k, it) : PartSig(k, it);
-                    if (ns.Length > 0 && !string.IsNullOrEmpty(ps.Sig) && ns == ps.Sig)
+                    if (ns.Length > 0 && !string.IsNullOrEmpty(ps.Sig) && SigCheia(ns) == SigCheia(ps.Sig))
                     {
-                        it.Model = ps.Model; it.LastByStamp = it.Model; it.Sig = ns;
+                        it.Model = ps.Model; it.LastByStamp = it.Model; it.Sig = ns; it.Geo = GeoDe(ps);
                     }
-                    else { modelChanged.Add(k); it.Sig = ns; }
+                    else
+                    {
+                        modelChanged.Add(k); it.Sig = ns;
+                        // mudou só propriedade (descrição, acabamento, processo): a geometria / lista continua a mesma
+                        string c1 = SigNucleo(ns), c0 = SigNucleo(ps.Sig);
+                        it.Geo = (c1.Length > 0 && c0.Length > 0 && c1 == c0) ? GeoDe(ps) : it.Model;
+                    }
                 }
                 else if (it.IsAsm && !it.Ignored)
                 {
+                    it.Geo = temPs ? GeoDe(ps) : it.Model;
                     if (temPs && !string.IsNullOrEmpty(ps.Sig) && ps.Model == it.Model) it.Sig = ps.Sig;
                     else if (it.PropsKnown) it.Sig = SigOf(children, k, it);
                     if (temPs && ps.Model != DateTime.MinValue && it.Model > ps.Model) it.Model = ps.Model; // mantém a data da última alteração real
@@ -1305,6 +1313,7 @@ namespace MonitorSW
                 {
                     // peça: guarda a assinatura (geometria + propriedades) para reconhecer depois um "salvar sem mudar nada".
                     // Calcula aos poucos (lê o arquivo inteiro): no máximo algumas por varredura
+                    it.Geo = temPs ? GeoDe(ps) : it.Model;
                     if (temPs && !string.IsNullOrEmpty(ps.Sig)) it.Sig = ps.Sig;
                     else if (it.PropsKnown && sigBudget > 0) { sigBudget--; it.Sig = PartSig(k, it); }
                     if (temPs && ps.Model != DateTime.MinValue && it.Model > ps.Model) it.Model = ps.Model;
@@ -1339,6 +1348,17 @@ namespace MonitorSW
             return evs;
         }
 
+        // assinatura = "CHEIA" (tudo; compara com versões antigas) + "/" núcleo da montagem (só a lista de itens).
+        // peça: "geometria|propriedades" -> núcleo = geometria
+        static string SigCheia(string sg) { if (string.IsNullOrEmpty(sg)) return ""; int i = sg.IndexOf('/'); return i >= 0 ? sg.Substring(0, i) : sg; }
+        static string SigNucleo(string sg)
+        {
+            if (string.IsNullOrEmpty(sg)) return "";
+            int i = sg.IndexOf('/'); if (i >= 0) return sg.Substring(i + 1);
+            int j = sg.IndexOf('|'); return j > 0 ? sg.Substring(0, j) : "";
+        }
+        static DateTime GeoDe(Snap ps) { return ps.Geo != DateTime.MinValue ? ps.Geo : ps.Model; }
+
         // "assinatura" de uma peça: geometria (corpo Parasolid) + propriedades. Sem geometria legível = "" (conta como alteração)
         static string PartSig(string key, Item it)
         {
@@ -1368,7 +1388,13 @@ namespace MonitorSW
                 foreach (var kv in it.Props.OrderBy(x => x.Key, StringComparer.OrdinalIgnoreCase)) sb.Append(kv.Key.ToUpperInvariant()).Append('=').Append((kv.Value ?? "").Trim()).Append(';');
             uint h = 2166136261;
             foreach (char ch in sb.ToString()) { h ^= ch; h *= 16777619; }
-            return h.ToString("x8") + sb.Length.ToString("x");
+            string cheia = h.ToString("x8") + sb.Length.ToString("x");
+            if (children.Count == 0) return cheia;   // (props da peça dentro de PartSig)
+            // núcleo da montagem: só a lista (itens + quantidades)
+            string so = sb.ToString(); int hp = so.IndexOf('#'); if (hp >= 0) so = so.Substring(0, hp);
+            uint h2 = 2166136261;
+            foreach (char ch in so) { h2 ^= ch; h2 *= 16777619; }
+            return cheia + "/" + h2.ToString("x8") + so.Length.ToString("x");
         }
 
         static void CopyProps(Item o, Item it)
@@ -1394,7 +1420,7 @@ namespace MonitorSW
                 s.Model = it.Model; s.Drw = it.Drw; s.Pdf = it.Pdf; s.Dxf = it.Dxf; s.Sev = it.Sev;
                 s.LastBy = it.LastBy; s.LastByStamp = it.LastByStamp;
                 s.PropsKnown = it.PropsKnown; s.Desc = it.Desc; s.Aprov = it.Aprov; s.Blocked = it.Blocked;
-                s.MachSteps = it.MachSteps; s.IsLaser = it.IsLaser; s.IsMach = it.IsMach; s.Props = it.Props; s.Sig = it.Sig ?? "";
+                s.MachSteps = it.MachSteps; s.IsLaser = it.IsLaser; s.IsMach = it.IsMach; s.Props = it.Props; s.Sig = it.Sig ?? ""; s.Geo = it.Geo;
                 prev[it.Key] = s;
             }
             return prev;
@@ -1724,6 +1750,8 @@ namespace MonitorSW
             bool rMd = RegrasRevisao.Ativa("md"), rMp = RegrasRevisao.Ativa("mp"), rMx = RegrasRevisao.Ativa("mx");
             bool rDp = RegrasRevisao.Ativa("dp"), rDx = RegrasRevisao.Ativa("dx"), rCf = RegrasRevisao.Ativa("cf");
             DateTime modT = it.Model;
+            // alteração só de propriedade (descrição/acabamento/processo) conta? (Opções > Revisão)
+            if (!RegrasRevisao.Ativa("pp") && it.Geo != DateTime.MinValue && it.Geo < modT) modT = it.Geo;
             if (it.EffSource != null && it.IsWeld && it.Eff > modT) modT = it.Eff;   // solda: componente alterado conta como 3D
             var motivos = new List<string>();
             // desenho mais antigo que o 3D
@@ -1844,7 +1872,7 @@ namespace MonitorSW
                     foreach (var it in p.Items.Values)
                         sb.AppendLine(string.Join("\t", new string[] { it.Key, T(it.Model).ToString(), T(it.Drw).ToString(), T(it.Pdf).ToString(), T(it.Dxf).ToString(),
                             it.Sev.ToString(), E(it.LastBy), T(it.LastByStamp).ToString(),
-                            it.PropsKnown ? "1" : "0", E(it.Desc), E(it.Aprov), E(it.Blocked), E(it.MachSteps), it.IsLaser ? "1" : "0", it.IsMach ? "1" : "0", PackProps(it.Props), E(it.Sig ?? "") }));
+                            it.PropsKnown ? "1" : "0", E(it.Desc), E(it.Aprov), E(it.Blocked), E(it.MachSteps), it.IsLaser ? "1" : "0", it.IsMach ? "1" : "0", PackProps(it.Props), E(it.Sig ?? ""), T(it.Geo).ToString() }));
                 }
                 File.WriteAllText(p.StateFile, sb.ToString(), Encoding.UTF8);
             }
@@ -1871,6 +1899,7 @@ namespace MonitorSW
                         s.IsLaser = f[13] == "1"; s.IsMach = f[14] == "1";
                         if (f.Length >= 16) s.Props = UnpackProps(f[15]); else s.LastByStamp = DateTime.MinValue;
                         if (f.Length >= 17) s.Sig = f[16];
+                        if (f.Length >= 18) s.Geo = D(f[17]);
                     }
                     else s.LastByStamp = DateTime.MinValue; // estado da versao anterior: rele as propriedades
                     p.Prev[f[0]] = s;

@@ -20,6 +20,7 @@ namespace MonitorSW
             new[] { "dp", "Desenho salvo depois do PDF (PDF não exportado de novo)", "1" },
             new[] { "dx", "Desenho salvo depois do DXF", "0" },
             new[] { "cf", "Divergências da Conferência (carimbo do PDF, descrição/escala do DXF)", "1" },
+            new[] { "pp", "Alteração só de PROPRIEDADE também conta (descrição, acabamento - ex.: grafite para cinza -, processo)", "1" },
             new[] { "an", "Incluir alterações ANTIGAS (anteriores à data abaixo)", "0" },
         };
         // sem "an": só conta alteração (3D/desenho salvo) a partir desta data - o que já estava assim antes do Monitor não aparece
