@@ -200,20 +200,67 @@ function VistaPorEixo($dm, $caminho, [int]$k, [int]$lado, $x, $y) {
     if ($reserva) { Log "   (vista principal: nenhuma vista olhou pelo lado pedido; usando a do mesmo eixo)" "DarkYellow" }
     return $reserva
 }
-# isométrica PROJETADA da principal (como arrastar a vista frontal na diagonal): fica coerente com a frente escolhida.
-# Se o SolidWorks não fizer a projeção na diagonal, usa a isométrica nomeada do modelo.
-function IsoDaFrontal($dm, $caminho, $front, $x, $y) {
+# ISOMÉTRICA A PARTIR DA VISTA PRINCIPAL (pedido 28/10): a perspectiva tem que partir da frontal escolhida - a que mostra
+# os recursos -, como arrastar a frontal na diagonal; a isométrica do SolidWorks depende do plano em que a peça foi
+# modelada e muitas vezes mostra outra face (ex.: 02124059). Direção = direita + cima + frente DA VISTA PRINCIPAL
+# (como ela aparece na folha, já deitada), "para cima" = o cima da principal. Cria a vista nomeada "ISO DETALHE" na peça
+# e confere no desenho se a vista olha mesmo para lá (a matriz do SolidWorks pode vir em linhas ou colunas).
+function Normaliza([double[]]$v) { $l = [math]::Sqrt($v[0] * $v[0] + $v[1] * $v[1] + $v[2] * $v[2]); if ($l -lt 1e-12) { return $v }; return [double[]]@(($v[0] / $l), ($v[1] / $l), ($v[2] / $l)) }
+function Vetorial([double[]]$a, [double[]]$b) { return [double[]]@(($a[1] * $b[2] - $a[2] * $b[1]), ($a[2] * $b[0] - $a[0] * $b[2]), ($a[0] * $b[1] - $a[1] * $b[0])) }
+function IsoNomeadaDaFrontal($dm, $caminho, $front, $x, $y) {
+    $script:xfCache = @{}; $script:xfModo = @{}
+    $a = DadosXf $front
+    $ex = Normaliza @([double]$a[0], [double]$a[3], [double]$a[6]); $ey = Normaliza @([double]$a[1], [double]$a[4], [double]$a[7]); $ez = Normaliza @([double]$a[2], [double]$a[5], [double]$a[8])
+    $z = Normaliza @(($ex[0] + $ey[0] + $ez[0]), ($ex[1] + $ey[1] + $ez[1]), ($ex[2] + $ey[2] + $ez[2]))
+    $xv = Normaliza (Vetorial $ey $z); $yv = Vetorial $z $xv
+    $peca = $null; try { $peca = X $sw "GetOpenDocumentByName" $caminho } catch { }
+    if (-not $peca) { return $null }
+    $tituloDrw = Titulo $dm
     $iso = $null
     try {
-        $p = Contorno $front
+        try { X $sw "ActivateDoc" (Titulo $peca) | Out-Null } catch { }
+        $mv = XG $peca "ActiveView"
+        if (-not $mv) { Log "   (peça sem janela: isométrica sem vista nomeada)" "DarkGray"; return $null }
+        $A = XD (XG (XG $mv "Orientation3") "ArrayData")
+        $formas = @(
+            @($xv[0], $yv[0], $z[0], $xv[1], $yv[1], $z[1], $xv[2], $yv[2], $z[2]),
+            @($xv[0], $xv[1], $xv[2], $yv[0], $yv[1], $yv[2], $z[0], $z[1], $z[2]))
+        $mu = X $sw "GetMathUtility"
+        foreach ($f in $formas) {
+            $arr = [double[]]($f + @($A[9], $A[10], $A[11], $A[12], $A[13], $A[14], $A[15]))
+            try { X $sw "ActivateDoc" (Titulo $peca) | Out-Null } catch { }
+            XS $mv "Orientation3" (X $mu "CreateTransform" $arr)
+            try { X $peca "GraphicsRedraw2" | Out-Null } catch { }
+            $nome = "ISO DETALHE"
+            try { X $peca "DeleteNamedView" $nome | Out-Null } catch { }
+            X $peca "NameView" $nome | Out-Null
+            try { X $sw "ActivateDoc" $tituloDrw | Out-Null } catch { }
+            $v = VistaModelo $dm $caminho @($nome) $x $y
+            if (-not $v) { continue }
+            Rebuild $dm; $script:xfCache = @{}; $script:xfModo = @{}
+            $b = DadosXf $v
+            $vz = Normaliza @([double]$b[2], [double]$b[5], [double]$b[8]); $vy = Normaliza @([double]$b[1], [double]$b[4], [double]$b[7])
+            $ok = ($vz[0] * $z[0] + $vz[1] * $z[1] + $vz[2] * $z[2]) -gt 0.99 -and ($vy[0] * $yv[0] + $vy[1] * $yv[1] + $vy[2] * $yv[2]) -gt 0.99
+            if ($ok) { $iso = $v; break }
+            try { Selecionar $dm $v | Out-Null; X $dm "EditDelete" | Out-Null } catch { }
+        }
+    } finally { try { X $sw "ActivateDoc" $tituloDrw | Out-Null } catch { } }
+    return $iso
+}
+function IsoDaFrontal($dm, $caminho, $front, $x, $y) {
+    $iso = $null
+    try { $iso = IsoNomeadaDaFrontal $dm $caminho $front $x $y } catch { Log "   (isométrica da principal: $($_.Exception.Message))" "DarkYellow"; $iso = $null }
+    if ($iso) { Log "   Isométrica a partir da vista principal (frente + direita + cima da principal)" "DarkGray"; return $iso }
+    # plano B: projeção na diagonal da principal; plano C: isométrica do modelo
+    try {
         if (Selecionar $dm $front) { $iso = X $dm "CreateUnfoldedViewAt3" ([double]$x) ([double]$y) 0.0 $false }
         if ($iso) {
             Rebuild $dm
             $dv = DirecaoVista $iso
-            if ($dv[0] -ge 0) { Log "   (isométrica pela diagonal saiu ortogonal; usando a isométrica do modelo)" "DarkGray"; try { Selecionar $dm $iso | Out-Null; X $dm "EditDelete" | Out-Null } catch { }; $iso = $null }
-            else { Log "   Isométrica projetada da vista principal" "DarkGray" }
+            if ($dv[0] -ge 0) { try { Selecionar $dm $iso | Out-Null; X $dm "EditDelete" | Out-Null } catch { }; $iso = $null }
+            else { Log "   Isométrica projetada da vista principal (diagonal)" "DarkGray" }
         }
     } catch { $iso = $null }
-    if (-not $iso) { $iso = VistaModelo $dm $caminho @("*Isométrica", "*Isometric") $x $y }
+    if (-not $iso) { $iso = VistaModelo $dm $caminho @("*Isométrica", "*Isometric") $x $y; Log "   (isométrica: usando a do modelo)" "DarkYellow" }
     return $iso
 }

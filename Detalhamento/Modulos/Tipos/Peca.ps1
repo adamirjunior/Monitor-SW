@@ -92,14 +92,12 @@ function DetalharPeca($caminho, $peca) {
             }
         }
     }
-    $iso = IsoDaFrontal $dm $caminho $front 0.25 0.25
     if ($laser -and $chapa -and -not $plana) {
         try { $flat = X $dm "CreateFlatPatternViewFromModelView3" $caminho (NomeConfig $peca) 0.2 0.07 0.0 $false $false } catch { }
         if (-not $flat) { Log "   Aviso: não criei a vista planificada no desenho." "Yellow" }
     }
-    Log ("   Vistas: frontal ok" + $(if ($left) { ", lateral ok" } else { ", SEM lateral" }) + $(if ($top) { ", superior ok" } else { ", SEM superior" }) + $(if ($iso) { ", isométrica ok" } else { ", SEM isométrica" }) + $(if ($flat) { ", planificada ok" } else { "" }))
+    Log ("   Vistas: frontal ok" + $(if ($left) { ", lateral ok" } else { ", SEM lateral" }) + $(if ($top) { ", superior ok" } else { ", SEM superior" }) + $(if ($flat) { ", planificada ok" } else { "" }))
     foreach ($v in @($front, $left, $top, $flat)) { if ($v) { Modo $v $DispHidden $true } }
-    if ($iso) { Modo $iso $DispShaded $true }
     # vista principal = a que mostra o comprimento maior na horizontal (como nos detalhamentos da ProEstamp)
     $cand = @(@($front, "*Frontal", "frontal"), @($left, "*Esquerda", "lateral"), @($top, "*Superior", "superior")) | Where-Object { $_[0] }
     $melhor = $cand | Sort-Object { -(Contorno $_[0]).w } | Select-Object -First 1
@@ -148,6 +146,10 @@ function DetalharPeca($caminho, $peca) {
             }
         } catch { Log "   (vista de perfil: $($_.Exception.Message))" "DarkYellow" }
     }
+    # isométrica por ÚLTIMO, a partir da vista principal já definida (e deitada)
+    Rebuild $dm
+    $iso = IsoDaFrontal $dm $caminho $front 0.25 0.25
+    if ($iso) { Modo $iso $DispShaded $true } else { Log "   SEM isométrica" "Yellow" }
     Deitar $dm $flat
     AlinharPlanificada $dm $front $flat
     $of0 = Contorno $front
@@ -203,7 +205,8 @@ function DetalharPeca($caminho, $peca) {
     if (-not $ok) { Log "   Aviso: as vistas não couberam perfeitamente; confira a disposição." "Yellow" }
     else {
         # chapa dobrada: isométrica do maior tamanho que couber no espaço livre (pedido do usuário em 27/10)
-        if ($iso -and $laser -and $chapa -and -not $plana) { try { AumentarIso $dm $iso @($front, $left, $top, $flat) ($arrOk -like "longa*") $escOk $flat $top } catch { Log "   (isométrica maior: $($_.Exception.Message))" "DarkYellow" } }
+        # e em toda peça (28/10): a isométrica é a vista "preenchida" que mostra a peça; cresce até o espaço livre
+        if ($iso) { try { AumentarIso $dm $iso @($front, $left, $top, $flat) ($arrOk -like "longa*") $escOk $flat $(if ($flat) { $top } else { $null }) } catch { Log "   (isométrica maior: $($_.Exception.Message))" "DarkYellow" } }
         Centralizar $dm @($front, $left, $top, $flat, $iso) $AreaB
     }
     EspalharNotasDobra $dm $flat
@@ -212,7 +215,7 @@ function DetalharPeca($caminho, $peca) {
     $usinagem = $cls.Usinagem
     Log "   Processo: $(if ($laser) { 'laser' } else { 'fabricada' })$(if ($usinagem) { ' + usinagem' } else { '' }) (classe $($cls.Classe))"
     if ($InserirCotas -and $laser -and -not $usinPrisma) {
-        # 1.1 / 1.2 (e 1.2.1): cotas totais; furos sem rosca/rebaixo e sem usinagem NÃO são cotados
+        # 1.1 / 1.2 (e 1.2.1): cotas totais + chamada de todos os furos (posição dos furos só com usinagem)
         try { CotasLaser $dm $front $left $top $flat } catch { Log "   Aviso: cotas de laser falharam ($($_.Exception.Message))" "Yellow" }
         # vista dos furos: a principal; com o perfil da dobra como principal, a vista com mais furos (face da chapa)
         $vFuros = $front
@@ -221,10 +224,9 @@ function DetalharPeca($caminho, $peca) {
             foreach ($vv in @($front, $top, $left)) { if ($vv) { $nf = 0; try { $script:xfCache = @{}; $script:xfModo = @{}; $nf = (FurosDaVista $vv).Count } catch { }; if ($nf -gt $mf) { $mf = $nf; $vFuros = $vv } } }
             $script:xfCache = @{}; $script:xfModo = @{}
         }
-        # furos roscados ou com rebaixo: chamada de furo (detalhe do furo)
-        if ($cls.Furos.Roscados + $cls.Furos.Rebaixos -gt 0) {
-            try { ChamadasFuro $dm $vFuros | Out-Null } catch { Log "   Aviso: chamadas de furo falharam ($($_.Exception.Message))" "Yellow" }
-        }
+        # chamada de TODOS os furos (passante, rebaixo, escareado, roscado) - só no desenho; o DXF continua sem
+        # (pedido 28/10: antes só roscado/rebaixo; ex.: 02124059 "4 x Ø3 PASSANTE")
+        try { ChamadasFuro $dm $vFuros | Out-Null } catch { Log "   Aviso: chamadas de furo falharam ($($_.Exception.Message))" "Yellow" }
         # 1.2.1: dobrada com usinagem -> posição dos furos também
         if ($usinagem) {
             try { CotasPosicaoFuros $dm $vFuros | Out-Null } catch { Log "   Aviso: cotas dos furos falharam ($($_.Exception.Message))" "Yellow" }
