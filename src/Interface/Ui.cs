@@ -15,8 +15,8 @@ using Microsoft.Win32;
 [assembly: AssemblyTitle("Monitor")]
 [assembly: AssemblyDescription("BOM dos projetos SolidWorks com status de PDF/DXF")]
 [assembly: AssemblyProduct("Monitor")]
-[assembly: AssemblyVersion("2.22.0.0")]
-[assembly: AssemblyFileVersion("2.22.0.0")]
+[assembly: AssemblyVersion("2.23.0.0")]
+[assembly: AssemblyFileVersion("2.23.0.0")]
 
 namespace MonitorSW
 {
@@ -2056,12 +2056,12 @@ namespace MonitorSW
             bool hasDrw = ResolvePreviewFile(model, 1) != null, hasPdf = ResolvePreviewFile(model, 2) != null, hasDxf = ResolvePreviewFile(model, 3) != null;
             bool laser = it != null ? it.IsLaser || it.NeedDxf : engine.Cfg.LaserWords.Any(w => sdesc.IndexOf(w, StringComparison.OrdinalIgnoreCase) >= 0);
 
-            bool wDrw, wPdf, wDxf, recriar;
+            bool wDrw, wPdf, wDxf, recriar; int opcao = 1;
             using (var f = new Form())
             {
                 f.Text = "Gerar detalhamento - " + name;
                 f.FormBorderStyle = FormBorderStyle.FixedDialog; f.StartPosition = FormStartPosition.CenterParent;
-                f.MinimizeBox = false; f.MaximizeBox = false; f.ClientSize = new Size(460, 300); Theme.Style(f);
+                f.MinimizeBox = false; f.MaximizeBox = false; f.ClientSize = new Size(460, 336); Theme.Style(f);
                 var t = new Label(); t.Text = "O que você quer gerar para " + name + "?"; t.SetBounds(14, 12, 432, 22); t.ForeColor = Theme.Text; t.Font = new Font(Theme.UiFont, FontStyle.Bold);
                 var d = new Label(); d.SetBounds(14, 36, 432, 34); d.ForeColor = Theme.Muted;
                 d.Text = (it != null && it.Desc.Length > 0 ? it.Desc + "\n" : sdesc.Length > 0 ? sdesc + "\n" : "") + (it != null && it.Need.Length > 0 ? "Exige: " + it.Need : (isAsm ? "Montagem" : "Peça"));
@@ -2110,16 +2110,24 @@ namespace MonitorSW
                 };
                 if ((cPdf.Checked && hasPdf) || (cDrw.Checked && hasDrw)) cRec.Checked = true;
                 atualizaRec();
-                var n = new Label(); n.SetBounds(14, 204, 432, 44); n.ForeColor = Theme.Muted;
+                // opção de disposição: a vista principal é sempre a mesma (pelos recursos); 2 e 3 giram / trocam o lado das vistas
+                var o1 = new RadioButton(); o1.Text = "Gerar opção 1"; o1.SetBounds(22, 202, 130, 24); o1.Checked = true;
+                var o2 = new RadioButton(); o2.Text = "Gerar opção 2"; o2.SetBounds(160, 202, 130, 24);
+                var o3 = new RadioButton(); o3.Text = "Gerar opção 3"; o3.SetBounds(298, 202, 130, 24);
+                foreach (var rb in new[] { o1, o2, o3 }) { rb.ForeColor = Theme.Text; rb.FlatStyle = FlatStyle.Flat; rb.Cursor = Cursors.Hand; }
+                var dica = new ToolTip();
+                dica.SetToolTip(o1, "Padrão"); dica.SetToolTip(o2, "Vista principal girada 90° (as outras mudam de lado) e isométrica pela esquerda"); dica.SetToolTip(o3, "Vista principal girada 180° (as outras mudam de lado)");
+                var n = new Label(); n.SetBounds(14, 236, 432, 44); n.ForeColor = Theme.Muted;
                 n.Text = "Grava na pasta da peça no servidor. Usa o SolidWorks deste computador (abre se estiver fechado).\nPDF sem desenho: marque também o detalhamento. Revise as cotas antes de liberar.";
-                var ok = new Button(); ok.Text = "Gerar"; ok.DialogResult = DialogResult.OK; ok.SetBounds(270, 256, 84, 30);
-                var ca = new Button(); ca.Text = "Cancelar"; ca.DialogResult = DialogResult.Cancel; ca.SetBounds(362, 256, 84, 30);
+                var ok = new Button(); ok.Text = "Gerar"; ok.DialogResult = DialogResult.OK; ok.SetBounds(270, 292, 84, 30);
+                var ca = new Button(); ca.Text = "Cancelar"; ca.DialogResult = DialogResult.Cancel; ca.SetBounds(362, 292, 84, 30);
                 foreach (var b in new[] { ok, ca }) { b.FlatStyle = FlatStyle.Flat; b.FlatAppearance.BorderColor = Theme.Border; b.BackColor = Theme.Surface2; b.ForeColor = Theme.Text; }
                 ok.BackColor = Theme.Accent; ok.ForeColor = Color.White; ok.FlatAppearance.BorderColor = Theme.Accent;
-                f.Controls.AddRange(new Control[] { t, d, cDrw, cPdf, cDxf, cRec, n, ok, ca });
+                f.Controls.AddRange(new Control[] { t, d, cDrw, cPdf, cDxf, cRec, o1, o2, o3, n, ok, ca });
                 f.AcceptButton = ok; f.CancelButton = ca;
                 if (f.ShowDialog(this) != DialogResult.OK) return;
                 wDrw = cDrw.Checked; wPdf = cPdf.Checked; wDxf = cDxf.Checked && cDxf.Enabled; recriar = cRec.Checked && cRec.Enabled;
+                opcao = o3.Checked ? 3 : o2.Checked ? 2 : 1;
             }
             if (!wDrw && !wPdf && !wDxf) return;
             // -Recriar do gerador = substituir o desenho; PDF e DXF marcados são sempre gerados de novo (substituem o arquivo)
@@ -2131,7 +2139,7 @@ namespace MonitorSW
             }
             var saidas = new List<string>();
             if (wDrw) saidas.Add("drw"); if (wPdf) saidas.Add("pdf"); if (wDxf) saidas.Add("dxf");
-            string args = "-NoProfile -ExecutionPolicy Bypass -STA -File \"" + script + "\" -Modo gerar -Saidas " + string.Join(",", saidas) + " -Destino servidor" + (recriar ? " -Recriar" : "") + (Users.Carimbo.Length > 0 ? " -Desenhista \"" + Users.Carimbo.Replace("\"", "") + "\"" : "") + " \"" + model + "\"";
+            string args = "-NoProfile -ExecutionPolicy Bypass -STA -File \"" + script + "\" -Modo gerar -Saidas " + string.Join(",", saidas) + " -Destino servidor" + (recriar ? " -Recriar" : "") + (opcao > 1 ? " -Opcao " + opcao : "") + (Users.Carimbo.Length > 0 ? " -Desenhista \"" + Users.Carimbo.Replace("\"", "") + "\"" : "") + " \"" + model + "\"";
             string what = string.Join(" + ", saidas.Select(x => x == "drw" ? "desenho" : x.ToUpperInvariant()));
             Process p;
             try

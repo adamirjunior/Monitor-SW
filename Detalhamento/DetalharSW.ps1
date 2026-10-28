@@ -9,6 +9,7 @@ param(
     [string]$Destino = "",               # servidor = ignora PastaSaida e grava na pasta da peça
     [switch]$Recriar,                    # recria o .SLDDRW mesmo se existir
     [string]$Desenhista = "",            # nome no carimbo (vem do login do Monitor)
+    [int]$Opcao = 1,                     # 1 = padrão; 2 e 3 = outra disposição (girar / trocar lado das vistas) - janela do Monitor
     [Parameter(ValueFromRemainingArguments = $true)][string[]]$Arquivos
 )
 
