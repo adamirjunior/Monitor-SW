@@ -234,7 +234,7 @@ function DetalharPeca($caminho, $peca) {
             if ($nob -gt 0) { Log "   Oblongo(s): $nob cota(s)" "DarkGray" }
         }
     } elseif ($InserirCotas -and $usinPrisma) {
-        try { CotasUsinagem $dm $front $top $left } catch { Log "   Aviso: cotas de usinagem falharam ($($_.Exception.Message))" "Yellow" }
+        try { CotasUsinagem $dm $front $top $left ([bool]$laser) } catch { Log "   Aviso: cotas de usinagem falharam ($($_.Exception.Message))" "Yellow" }
     } elseif ($InserirCotas) {
         try {
             X $dm "ClearSelection2" $true | Out-Null

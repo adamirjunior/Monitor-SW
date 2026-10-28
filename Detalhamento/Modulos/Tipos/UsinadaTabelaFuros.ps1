@@ -201,7 +201,7 @@ function DetalharUsinagemTabela($dm, $front, $caminho, $peca) {
             $script:xfCache = @{}; $script:xfModo = @{}
             $n = 0
             $n += CotaTotal $dm $front $true $true
-            try { $n += CotasRaios $dm $front } catch { }
+            if (-not $laser) { try { $n += CotasRaios $dm $front } catch { } }   # laser: contorno já sai pronto, não cota raio
             if ($dir) { $n += CotaTotal $dm $dir $true $false }
             $nl = 0
             foreach ($v in @($cima, $esq, $baixo, $dir)) {

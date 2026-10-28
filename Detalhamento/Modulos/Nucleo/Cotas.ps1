@@ -272,7 +272,7 @@ function ChamadasFuro($dm, $v) {
 }
 # ---------------------------------------------------------------- cotas de peça usinada (padrão ProEstamp, ex.: 02115187)
 # totais (comprimento em cima, altura à esquerda, espessura na vista de baixo), posição dos furos, raios e chamada de furo
-function CotasUsinagem($dm, $front, $top, $lat = $null) {
+function CotasUsinagem($dm, $front, $top, $lat = $null, [bool]$semRaios = $false) {
     $tgl = K "swUserPreferenceToggle_e" @("swInputDimValOnCreate") 10
     $antes = $null
     try { $antes = X $sw "GetUserPreferenceToggle" $tgl; X $sw "SetUserPreferenceToggle" $tgl $false | Out-Null } catch { }
@@ -288,7 +288,9 @@ function CotasUsinagem($dm, $front, $top, $lat = $null) {
         $p = 0; $r = 0; $f = 0
         if ($front) {
             try { $p = CotasPosicaoFuros $dm $front } catch { Log "   (posição dos furos: $($_.Exception.Message))" "DarkYellow" }
-            try { $r = CotasRaios $dm $front } catch { Log "   (raios: $($_.Exception.Message))" "DarkYellow" }
+            # laser + usinagem (1.1.1): o contorno (raios de canto, arcos) já sai pronto do laser - não cota raio
+            if ($semRaios) { Log "   Raios do contorno não cotados (peça de laser: o laser já corta o contorno)" "DarkGray" }
+            else { try { $r = CotasRaios $dm $front } catch { Log "   (raios: $($_.Exception.Message))" "DarkYellow" } }
             try { $f = ChamadasFuro $dm $front } catch { Log "   (chamada de furo: $($_.Exception.Message))" "DarkYellow" }
         }
         # furos que só aparecem de frente na vista de baixo ou na lateral (ex.: 02115197, Ø10 na face de 15,88)
