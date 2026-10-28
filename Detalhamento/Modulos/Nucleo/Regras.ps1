@@ -214,6 +214,9 @@ function EspessuraDo3D($peca) {
         $b = XD (X $peca "GetPartBox" $true)
         $d = @([math]::Abs($b[3] - $b[0]), [math]::Abs($b[4] - $b[1]), [math]::Abs($b[5] - $b[2])) | Sort-Object
         if ($d[0] -lt 0.1 * $d[2]) { return $d[0] }   # chapa plana sem recurso de chapa metálica
+        # chapa GROSSA (oxicorte/laser): a menor medida bem menor que a do meio (ex.: Placa Cassiano 19,1 x 150 x 150;
+        # 02115197 15,88 x 40 x 47,25) - antes ficava "não identificada" e a conferência/sobremetal era pulada
+        if ($d[0] -le 0.5 * $d[1]) { return $d[0] }
     } catch { }
     return $null
 }
