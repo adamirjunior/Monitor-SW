@@ -225,11 +225,9 @@ function IsoNomeadaDaFrontal($dm, $caminho, $front, $x, $y) {
     $script:xfCache = @{}; $script:xfModo = @{}
     $a = DadosXf $front
     $ex = Normaliza @([double]$a[0], [double]$a[3], [double]$a[6]); $ey = Normaliza @([double]$a[1], [double]$a[4], [double]$a[7]); $ez = Normaliza @([double]$a[2], [double]$a[5], [double]$a[8])
-    # recriando: perspectiva pela ESQUERDA da principal nas variantes 1 e 2 (de 4 em 4: 0 dir, 1 esq, 2 esq, 3 dir),
-    # combinando com a troca de lado da principal (ímpares) - cada recriação sai diferente
-    $vq = ([int]$script:variante) % 4
-    $sx = if ($vq -eq 1 -or $vq -eq 2) { -1.0 } else { 1.0 }
-    if ($sx -lt 0) { Log "   Recriando: isométrica pela esquerda da vista principal" "DarkGray" }
+    # opção 2 da janela do Monitor: perspectiva pela ESQUERDA da principal (opção 1 e 3: pela direita)
+    $sx = if (([int]$script:variante) -eq 1) { -1.0 } else { 1.0 }
+    if ($sx -lt 0) { Log "   Opção 2: isométrica pela esquerda da vista principal" "DarkGray" }
     $z = Normaliza @(($sx * $ex[0] + $ey[0] + $ez[0]), ($sx * $ex[1] + $ey[1] + $ez[1]), ($sx * $ex[2] + $ey[2] + $ez[2]))
     $peca = $null; try { $peca = X $sw "GetOpenDocumentByName" $caminho } catch { }
     if (-not $peca) { return $null }

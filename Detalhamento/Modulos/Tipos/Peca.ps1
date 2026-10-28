@@ -53,16 +53,8 @@ function DetalharPeca($caminho, $peca) {
             for ($i = 0; $i -lt 3; $i++) { if ($rec[$i] -gt $rec[$kFrente]) { $kFrente = $i } }
             Log ("   Recursos vistos de frente: X {0}, Y {1}, Z {2} -> principal olha em {3}" -f $rec[0], $rec[1], $rec[2], @("X", "Y", "Z")[$kFrente]) "DarkGray"
         }
-        # recriando (variante 2, 3...) na usinada: tenta o eixo com o 2º/3º mais recursos
-        $vr = [int]$script:variante
-        if ($vr -ge 2 -and $usinPrisma -and -not $plana -and -not $laser) {
-            $ord = @(0, 1, 2 | Sort-Object { -$rec[$_] }); $kFrente = $ord[[math]::Floor($vr / 2) % 3]
-            Log ("   Recriando: principal olha em {0}" -f @("X", "Y", "Z")[$kFrente]) "DarkGray"
-        }
         $ladoFrente = 0; try { $ladoFrente = LadoAberturaFuros $peca $kFrente } catch { }
         if ($ladoFrente -eq 0) { $ladoFrente = $(if ($kFrente -eq 0) { -1 } else { 1 }) }   # sem escareado: como antes (Esquerda / Superior / Frontal)
-        # recriando (variante ímpar): a face do outro lado
-        if ($vr % 2 -eq 1) { $ladoFrente = -$ladoFrente; Log "   Recriando: vista principal pelo outro lado" "DarkGray" }
         if ($usinPrisma) { Log "   Peça usinada: vista principal pela face com mais recursos + vista de baixo + isométrica" "DarkGray" }
         else { Log ("   Chapa plana (espessura {0:N1} mm): vista principal = face da chapa, lado dos escareados" -f ($mn * 1000)) "DarkGray" }
     }
@@ -74,6 +66,7 @@ function DetalharPeca($caminho, $peca) {
     # peça comprida em pé: gira a principal antes de projetar as outras (chapa plana: sempre deitada, lado maior na horizontal)
     # chapa dobrada (1.2): comprimento também na horizontal (ex.: 02204262, comprida no eixo Y do modelo)
     if ($plana) { Deitar $dm $front 1.02 } elseif ($usinPrisma -or ($chapa -and $laser)) { Deitar $dm $front }
+    GirarOpcao $dm $front
     # usinada com muitos furos: padrão ProEstamp com TABELA DE FUROS (ex.: 02124106)
     $tabelaFuros = $false
     if ($usinPrisma) {
@@ -114,7 +107,7 @@ function DetalharPeca($caminho, $peca) {
         foreach ($v in @($front, $left, $top)) { if ($v) { try { Selecionar $dm $v | Out-Null; X $dm "EditDelete" | Out-Null } catch { } } }
         $front = VistaModelo $dm $caminho @($melhor[1]) 0.08 0.15
         if (-not $front) { throw "não consegui recriar a vista principal" }
-        Deitar $dm $front
+        Deitar $dm $front; GirarOpcao $dm $front
         $left = $null; $top = $null
         try { Selecionar $dm $front | Out-Null; $left = X $dm "CreateUnfoldedViewAt3" 0.20 0.15 0.0 $false } catch { }
         if (-not $redonda) { try { Selecionar $dm $front | Out-Null; $top = X $dm "CreateUnfoldedViewAt3" 0.08 0.07 0.0 $false } catch { } }
@@ -137,7 +130,7 @@ function DetalharPeca($caminho, $peca) {
                         foreach ($v in @($front, $left, $top)) { if ($v) { try { Selecionar $dm $v | Out-Null; X $dm "EditDelete" | Out-Null } catch { } } }
                         $front = VistaModelo $dm $caminho @($nmP) 0.08 0.15
                         if (-not $front) { throw "não consegui recriar a vista principal (perfil)" }
-                        Deitar $dm $front
+                        Deitar $dm $front; GirarOpcao $dm $front
                         $left = $null; $top = $null
                         try { Selecionar $dm $front | Out-Null; $left = X $dm "CreateUnfoldedViewAt3" 0.20 0.15 0.0 $false } catch { }
                         try { Selecionar $dm $front | Out-Null; $top = X $dm "CreateUnfoldedViewAt3" 0.08 0.07 0.0 $false } catch { }
@@ -369,4 +362,14 @@ function AumentarIso($dm, $iso, $outras, [bool]$embaixo, [double]$escFolha, $fla
     if ($bom -lt $escFolha -and $bom * 1.15 -gt $escFolha) { XS $iso "ScaleDecimal" $escFolha; Rebuild $dm; if (& $por) { $bom = $escFolha } }
     XS $iso "ScaleDecimal" $bom; Rebuild $dm; & $por | Out-Null
     if ($bom -gt $esc0 * 1.01) { Log ("   Isométrica aumentada {0:N0}% (espaço livre na folha)" -f (($bom / $esc0 - 1) * 100)) "DarkGray" }
+}
+
+# opção 2 / 3 da janela do Monitor: depois de escolhida a principal (pelos recursos), gira a vista principal
+# (opção 2: 90°, opção 3: 180°) - as vistas projetadas e a isométrica mudam de lado / posição junto
+function GirarOpcao($dm, $v) {
+    $vr = [int]$script:variante
+    if ($vr -le 0 -or -not $v) { return }
+    $ang = 0.0; try { $ang = [double](XG $v "Angle") } catch { }
+    $giro = if ($vr -eq 1) { [math]::PI / 2 } else { [math]::PI }
+    try { XS $v "Angle" ($ang + $giro); Rebuild $dm; Log ("   Opção {0}: vista principal girada {1}°" -f ($vr + 1), $(if ($vr -eq 1) { 90 } else { 180 })) "DarkGray" } catch { }
 }

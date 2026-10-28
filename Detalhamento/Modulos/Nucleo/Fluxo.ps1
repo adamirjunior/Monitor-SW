@@ -56,9 +56,9 @@ function Gerar($arq) {
     $existe = AcharDesenho $arq
     if ($qDrw -and ((-not $existe) -or $Sobrescrever)) {
         $script:FazPdf = $qPdf; $script:FazDxf = $qDxf
-        # RECRIAR = a vez anterior não ficou boa: cada recriação usa outra tratativa de vistas (variante 1, 2, 3...)
-        $script:variante = Tentativa $cod ([bool]($existe -and $Sobrescrever))
-        if ($script:variante -gt 0) { Log ("   Recriando (tentativa {0}): vistas com outra tratativa" -f ($script:variante + 1)) "Yellow" }
+        # opção escolhida na janela do Monitor (1 = padrão; 2 / 3 = outra disposição das vistas depois da principal)
+        $script:variante = [math]::Max(0, [math]::Min(2, [int]$Opcao - 1))
+        if ($script:variante -gt 0) { Log ("   Opção {0}: vistas giradas / em outra disposição (a vista principal continua a mesma)" -f ($script:variante + 1)) "Yellow" }
         if ($ext -eq ".SLDPRT") { $peca = AbrirDoc $arq $DocPART; if (-not $peca) { throw "não consegui abrir a peça" }; DetalharPeca $arq $peca }
         elseif ($ext -eq ".SLDASM") { $asm = AbrirDoc $arq $DocASM; if (-not $asm) { throw "não consegui abrir a montagem" }; DetalharMontagem $arq $asm }
         else { throw "tipo não suportado: $ext" }
