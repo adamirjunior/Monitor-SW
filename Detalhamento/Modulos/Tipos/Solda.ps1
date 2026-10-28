@@ -557,25 +557,28 @@ function ArestasVisiveis($v) {
 # testa as 4 isométricas vistas DE CIMA (±X +Y ±Z, "para cima" = Y do modelo) e fica com a que mostra mais arestas;
 # empate = a padrão. (De baixo contava mais arestas da base, mas o desenho de solda é visto de cima.)
 function MelhorIsoMontagem($dm, $ref, $asm, $x, $y) {
-    $melhor = $null; $nMelhor = -1; $dMelhor = $null
-    foreach ($sx in 1, -1) { foreach ($sz in 1, -1) { foreach ($sy in @(1)) {
-        $d = [double[]]@($sx, $sy, $sz)
+    # mede as 4 direções (cria, conta e apaga), ordena pela quantidade de detalhes; recriando (variante) usa a 2ª, 3ª...
+    $cands = @()
+    foreach ($sx in 1, -1) { foreach ($sz in 1, -1) {
+        $d = [double[]]@($sx, 1, $sz)
         $v = $null; try { $v = VistaNaDirecao $dm $ref $asm $d @(0.0, 1.0, 0.0) "ISO MONTAGEM" $x $y } catch { $v = $null }
         if (-not $v) { continue }
         Modo $v $DispHidden $true | Out-Null; Rebuild $dm | Out-Null
         $n = ArestasVisiveis $v
-        Log ("   [dbg] isométrica ({0:+0;-0},{1:+0;-0},{2:+0;-0}): {3} arestas visíveis" -f $sx, $sy, $sz, $n) "DarkGray"
-        if ($n -gt $nMelhor * 1.03 -or -not $melhor) {
-            if ($melhor) { try { Selecionar $dm $melhor | Out-Null; X $dm "EditDelete" | Out-Null } catch { } }
-            $melhor = $v; $nMelhor = $n; $dMelhor = $d
-        } else { try { Selecionar $dm $v | Out-Null; X $dm "EditDelete" | Out-Null } catch { } }
-    } } }
+        Log ("   [dbg] isométrica ({0:+0;-0},+1,{1:+0;-0}): {2} arestas visíveis" -f $sx, $sz, $n) "DarkGray"
+        $cands += ,@($d, $n, $cands.Count)
+        try { Selecionar $dm $v | Out-Null; X $dm "EditDelete" | Out-Null } catch { }
+    } }
+    if ($cands.Count -eq 0) { return $null }
+    # ordem: mais arestas primeiro; empate (até 3%) fica com a ordem de teste (a padrão +X+Y+Z primeiro)
+    $ord = @($cands | Sort-Object @{ Expression = { -[math]::Round($_[1] / [math]::Max(1, $cands[0][1]) * 33) } }, @{ Expression = { $_[2] } })
+    $i = ([int]$script:variante) % $ord.Count
+    $esc = $ord[$i]
+    $melhor = VistaNaDirecao $dm $ref $asm $esc[0] @(0.0, 1.0, 0.0) "ISO MONTAGEM" $x $y
     if (-not $melhor) { return $null }
-    # grava de novo a vista nomeada com a direção escolhida (a última testada pode ser outra) - quem abrir a montagem acha
-    try { X $sw "ActivateDoc" (Titulo $asm) | Out-Null } catch { }
-    Log ("   Vista da montagem: isométrica ({0:+0;-0},{1:+0;-0},{2:+0;-0}) - a que mostra mais detalhes ({3} arestas)" -f $dMelhor[0], $dMelhor[1], $dMelhor[2], $nMelhor) "DarkGray"
+    Log ("   Vista da montagem: isométrica ({0:+0;-0},+1,{1:+0;-0}) - {2} arestas{3}" -f $esc[0][0], $esc[0][2], $esc[1], $(if ($i -gt 0) { " (recriando: opção $($i + 1) de $($ord.Count))" } else { " (a que mostra mais detalhes)" })) "DarkGray"
     AtivarDesenho $dm | Out-Null
-    # a vista ainda vai mudar de escala/posição: a transformação guardada na escolha ficaria velha (balões no centro erravam)
+    # a vista ainda vai mudar de escala/posição: a transformação guardada na escolha ficaria velha
     $script:xfCache = @{}; $script:xfModo = @{}
     return ,$melhor
 }

@@ -15,8 +15,8 @@ using Microsoft.Win32;
 [assembly: AssemblyTitle("Monitor")]
 [assembly: AssemblyDescription("BOM dos projetos SolidWorks com status de PDF/DXF")]
 [assembly: AssemblyProduct("Monitor")]
-[assembly: AssemblyVersion("2.21.1.0")]
-[assembly: AssemblyFileVersion("2.21.1.0")]
+[assembly: AssemblyVersion("2.22.0.0")]
+[assembly: AssemblyFileVersion("2.22.0.0")]
 
 namespace MonitorSW
 {
@@ -2004,7 +2004,7 @@ namespace MonitorSW
         // Devolve "Fulano (PC X) desde HH:mm: peça" se alguém está gerando, ou null.
         static string GeradorOcupado(string pasta)
         {
-            string f = Path.Combine(pasta, "gerando.lock");
+            string f = Path.Combine(pasta, "gerando_" + Environment.MachineName + ".lock");   // um por vez só no MESMO PC
             try
             {
                 if (!File.Exists(f)) return null;

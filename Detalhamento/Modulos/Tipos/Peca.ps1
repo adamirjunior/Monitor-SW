@@ -53,8 +53,16 @@ function DetalharPeca($caminho, $peca) {
             for ($i = 0; $i -lt 3; $i++) { if ($rec[$i] -gt $rec[$kFrente]) { $kFrente = $i } }
             Log ("   Recursos vistos de frente: X {0}, Y {1}, Z {2} -> principal olha em {3}" -f $rec[0], $rec[1], $rec[2], @("X", "Y", "Z")[$kFrente]) "DarkGray"
         }
+        # recriando (variante 2, 3...) na usinada: tenta o eixo com o 2º/3º mais recursos
+        $vr = [int]$script:variante
+        if ($vr -ge 2 -and $usinPrisma -and -not $plana -and -not $laser) {
+            $ord = @(0, 1, 2 | Sort-Object { -$rec[$_] }); $kFrente = $ord[[math]::Floor($vr / 2) % 3]
+            Log ("   Recriando: principal olha em {0}" -f @("X", "Y", "Z")[$kFrente]) "DarkGray"
+        }
         $ladoFrente = 0; try { $ladoFrente = LadoAberturaFuros $peca $kFrente } catch { }
         if ($ladoFrente -eq 0) { $ladoFrente = $(if ($kFrente -eq 0) { -1 } else { 1 }) }   # sem escareado: como antes (Esquerda / Superior / Frontal)
+        # recriando (variante ímpar): a face do outro lado
+        if ($vr % 2 -eq 1) { $ladoFrente = -$ladoFrente; Log "   Recriando: vista principal pelo outro lado" "DarkGray" }
         if ($usinPrisma) { Log "   Peça usinada: vista principal pela face com mais recursos + vista de baixo + isométrica" "DarkGray" }
         else { Log ("   Chapa plana (espessura {0:N1} mm): vista principal = face da chapa, lado dos escareados" -f ($mn * 1000)) "DarkGray" }
     }

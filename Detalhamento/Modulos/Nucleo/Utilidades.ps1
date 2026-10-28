@@ -147,8 +147,22 @@ function EscalaInicial($larguraFator, $alturaFator) {
 }
 function SalvarComo($dm, $destino, $opcoes) {
     # se o arquivo de destino estiver aberto no SolidWorks (rodada anterior), fecha antes
-    try { $aberto = X $sw "GetOpenDocumentByName" $destino; if ($aberto -and (Titulo $aberto) -ne (Titulo $dm)) { X $sw "CloseDoc" (Titulo $aberto) | Out-Null } } catch { }
-    if (Test-Path $destino) { Remove-Item $destino -Force }
+    # (desenho tem título "02124120 - Folha1": o CloseDoc pelo título não fechava -> "arquivo sendo usado" ao RECRIAR)
+    try {
+        $aberto = X $sw "GetOpenDocumentByName" $destino
+        if ($aberto -and (Titulo $aberto) -ne (Titulo $dm)) {
+            $fechou = $false
+            foreach ($nm in @($destino, (Titulo $aberto), ((Titulo $aberto) -replace ' - [^-]+$', ''), [IO.Path]::GetFileName($destino))) {
+                try { X $sw "CloseDoc" $nm | Out-Null } catch { }
+                $ainda = $null; try { $ainda = X $sw "GetOpenDocumentByName" $destino } catch { }
+                if (-not $ainda) { $fechou = $true; break }
+            }
+            if (-not $fechou) { try { X $sw "QuitDoc" (Titulo $aberto) | Out-Null } catch { } }
+        }
+    } catch { }
+    if (Test-Path $destino) {
+        for ($t = 0; $t -lt 5; $t++) { try { Remove-Item $destino -Force -ErrorAction Stop; break } catch { if ($t -eq 4) { throw }; Start-Sleep -Milliseconds 600 } }
+    }
     $r = X $dm "SaveAs3" $destino 0 $opcoes
     if (-not (Test-Path $destino)) { throw "SolidWorks não gravou $destino (código $r)" }
 }
@@ -211,7 +225,12 @@ function IsoNomeadaDaFrontal($dm, $caminho, $front, $x, $y) {
     $script:xfCache = @{}; $script:xfModo = @{}
     $a = DadosXf $front
     $ex = Normaliza @([double]$a[0], [double]$a[3], [double]$a[6]); $ey = Normaliza @([double]$a[1], [double]$a[4], [double]$a[7]); $ez = Normaliza @([double]$a[2], [double]$a[5], [double]$a[8])
-    $z = Normaliza @(($ex[0] + $ey[0] + $ez[0]), ($ex[1] + $ey[1] + $ez[1]), ($ex[2] + $ey[2] + $ez[2]))
+    # recriando: perspectiva pela ESQUERDA da principal nas variantes 1 e 2 (de 4 em 4: 0 dir, 1 esq, 2 esq, 3 dir),
+    # combinando com a troca de lado da principal (ímpares) - cada recriação sai diferente
+    $vq = ([int]$script:variante) % 4
+    $sx = if ($vq -eq 1 -or $vq -eq 2) { -1.0 } else { 1.0 }
+    if ($sx -lt 0) { Log "   Recriando: isométrica pela esquerda da vista principal" "DarkGray" }
+    $z = Normaliza @(($sx * $ex[0] + $ey[0] + $ez[0]), ($sx * $ex[1] + $ey[1] + $ez[1]), ($sx * $ex[2] + $ey[2] + $ez[2]))
     $peca = $null; try { $peca = X $sw "GetOpenDocumentByName" $caminho } catch { }
     if (-not $peca) { return $null }
     return VistaNaDirecao $dm $caminho $peca $z $ey "ISO DETALHE" $x $y

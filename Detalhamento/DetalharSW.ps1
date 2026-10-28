@@ -17,15 +17,16 @@ $Pasta = Split-Path -Parent $MyInvocation.MyCommand.Path
 $LogFile = Join-Path $Pasta "log.txt"
 $RelFile = Join-Path $Pasta ("relatorio_" + (Get-Date -Format "yyyy-MM-dd") + ".csv")
 
-# ---------------------------------------------------------------- um detalhamento por vez
-# gerando.lock na pasta do gerador (servidor): enquanto alguém gera, ninguém mais gera (em nenhum PC).
+# ---------------------------------------------------------------- um detalhamento por vez POR PC
+# gerando_<PC>.lock na pasta do gerador: PCs diferentes geram ao mesmo tempo (cada um no seu SolidWorks);
+# no MESMO PC um por vez (o SolidWorks é um só). Antes de 28/10 era um por vez em todos os PCs.
 # O arquivo fica ABERTO durante a geração; se o processo cair, o Windows solta o arquivo e o próximo apaga e segue.
 $script:trava = $null
 function SoltarTrava {
-    if ($script:trava) { try { $script:trava.Dispose() } catch { }; $script:trava = $null; try { Remove-Item -LiteralPath (Join-Path $Pasta "gerando.lock") -Force -ErrorAction Stop } catch { } }
+    if ($script:trava) { try { $script:trava.Dispose() } catch { }; $script:trava = $null; try { Remove-Item -LiteralPath (Join-Path $Pasta ("gerando_" + $env:COMPUTERNAME + ".lock")) -Force -ErrorAction Stop } catch { } }
 }
 if ($Modo -ne "diag") {
-    $arqTrava = Join-Path $Pasta "gerando.lock"
+    $arqTrava = Join-Path $Pasta ("gerando_" + $env:COMPUTERNAME + ".lock")
     $quem = if ($Desenhista) { $Desenhista } else { $env:USERNAME }
     for ($tent = 0; $tent -lt 2 -and -not $script:trava; $tent++) {
         if (Test-Path -LiteralPath $arqTrava) { try { Remove-Item -LiteralPath $arqTrava -Force -ErrorAction Stop } catch { } }   # sobra de geração que caiu: apaga

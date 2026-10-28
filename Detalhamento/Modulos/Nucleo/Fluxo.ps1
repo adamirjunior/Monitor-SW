@@ -56,6 +56,9 @@ function Gerar($arq) {
     $existe = AcharDesenho $arq
     if ($qDrw -and ((-not $existe) -or $Sobrescrever)) {
         $script:FazPdf = $qPdf; $script:FazDxf = $qDxf
+        # RECRIAR = a vez anterior não ficou boa: cada recriação usa outra tratativa de vistas (variante 1, 2, 3...)
+        $script:variante = Tentativa $cod ([bool]($existe -and $Sobrescrever))
+        if ($script:variante -gt 0) { Log ("   Recriando (tentativa {0}): vistas com outra tratativa" -f ($script:variante + 1)) "Yellow" }
         if ($ext -eq ".SLDPRT") { $peca = AbrirDoc $arq $DocPART; if (-not $peca) { throw "não consegui abrir a peça" }; DetalharPeca $arq $peca }
         elseif ($ext -eq ".SLDASM") { $asm = AbrirDoc $arq $DocASM; if (-not $asm) { throw "não consegui abrir a montagem" }; DetalharMontagem $arq $asm }
         else { throw "tipo não suportado: $ext" }
@@ -88,4 +91,17 @@ function Gerar($arq) {
         }
     }
     Relatorio $arq "" "gerar" "ok" ($feito -join " + ")
+}
+
+# contador de recriações por peça (tentativas.tsv na pasta do gerador): 1ª vez pelo gerador = 0; recriar = anterior + 1
+function Tentativa([string]$cod, [bool]$recriando) {
+    $arqT = Join-Path $Pasta "tentativas.tsv"
+    $m = @{}
+    try { if (Test-Path -LiteralPath $arqT) { foreach ($l in (Get-Content -LiteralPath $arqT -Encoding UTF8)) { $c = $l.Split("`t"); if ($c.Count -ge 2) { $m[$c[0]] = [int]$c[1] } } } } catch { }
+    $n = 0
+    # só conta como recriação se a vez anterior foi do gerador (desenho feito à mão existente = 1ª tentativa normal)
+    if ($recriando -and $m.ContainsKey($cod)) { $n = $m[$cod] + 1 }
+    $m[$cod] = $n
+    try { $linhas = @($m.Keys | Sort-Object | ForEach-Object { "{0}`t{1}`t{2}" -f $_, $m[$_], (Get-Date -Format "yyyy-MM-dd HH:mm") }); Set-Content -LiteralPath $arqT -Value $linhas -Encoding UTF8 } catch { }
+    return $n
 }
