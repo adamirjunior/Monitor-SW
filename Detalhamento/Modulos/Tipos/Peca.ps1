@@ -296,6 +296,7 @@ function DetalharPeca($caminho, $peca) {
     if ($script:FazPdf) { if (PdfProtegido $destDir $cod) { $pdfMsg = " (PDF mantido: existe APR)" } else { SalvarComo $dm $pdf ($SaveSilent + $SaveCopy); Log "   PDF: $pdf" "Green"; $pdfMsg = " + PDF" } }
     $dxfMsg = ""
     $fazDxf = if ($script:FazDxf -eq "auto") { $laser } else { [bool]$script:FazDxf }
+    if ($fazDxf -and $script:semDxf) { Log "   DXF não gerado: espessura da descrição diferente do 3D e não é sobremetal" "Yellow"; $fazDxf = $false; $dxfMsg = " (sem DXF: espessura)" }
     if ($fazDxf) { $dxf = Join-Path $destDir "$cod.DXF"; GerarDxf $caminho $peca $dxf $desc; Log "   DXF: $dxf" "Green"; AbrirAutoCAD $dxf; $dxfMsg = " + DXF" }
     if ($FecharDesenho) { Fechar $dm }
     Relatorio $caminho "peça" "detalhar" "ok" ("desenho" + $pdfMsg + $dxfMsg)

@@ -219,6 +219,7 @@ function EspessuraDo3D($peca) {
 }
 # laser: a espessura da descrição tem que ser a do 3D. Diferente (ou faltando) -> aviso e NÃO detalha
 function ConferirEspessuraLaser($peca, $caminho) {
+    $script:sobremetal = $null; $script:semDxf = $false
     if (-not $ConferirEspessura) { return }
     $desc = [string](Prop $peca $PropDesc)
     $e3d = EspessuraDo3D $peca
@@ -231,6 +232,26 @@ function ConferirEspessuraLaser($peca, $caminho) {
     if ($ld -and $ld.pol) { $tol = [math]::Max($ToleranciaEspessura, $ToleranciaEspessuraPol); $comoDesc = " ($($ld.texto) = $(& $f $eDesc))" }
     if ($null -eq $eDesc) {
         $msg = "A descrição não informa a espessura da chapa. Espessura do 3D: $(& $f $e3d). Escreva na descrição, por exemplo: ESP. $(& $f $e3d)"
+    } elseif ($eDesc -gt $e3d + $tol + 1e-9) {
+        # descrição MAIOR que o 3D: pode ser SOBREMETAL (chapa cortada mais grossa para usinar depois) - pergunta
+        $txtD = if ($ld.pol) { $ld.texto + " = " + (& $f $eDesc) } else { & $f $eDesc }
+        $perg = "Espessura diferente: descrição $txtD, 3D $(& $f $e3d).`n`nÉ SOBREMETAL (sobra de material para usinar)?`n`nSim: detalha pelo 3D e o DXF sai com a espessura da descrição ($(& $f $eDesc)) e o aviso de sobremetal.`nNão: detalha sem gerar o DXF."
+        $resp = "No"
+        if ($env:DETALHAR_SOBREMETAL -eq "sim") { $resp = "Yes" } elseif ($env:DETALHAR_SOBREMETAL -eq "nao") { $resp = "No" }   # testes sem janela
+        else { try {
+            Add-Type -AssemblyName System.Windows.Forms
+            $fm = New-Object System.Windows.Forms.Form; $fm.TopMost = $true
+            $resp = [string][System.Windows.Forms.MessageBox]::Show($fm, ((Codigo $caminho) + "`n`n" + $desc + "`n`n" + $perg), "Detalhamento - sobremetal?", "YesNo", "Question")
+            $fm.Dispose()
+        } catch { } }
+        if ($resp -eq "Yes") {
+            $script:sobremetal = [pscustomobject]@{ de = $e3d; para = $eDesc }
+            Log ("   SOBREMETAL confirmado: 3D {0} -> chapa {1} (DXF com a espessura da descrição)" -f (& $f $e3d), (& $f $eDesc)) "Yellow"
+        } else {
+            $script:semDxf = $true
+            Log ("   Espessura diferente (descrição {0}, 3D {1}) e NÃO é sobremetal: DXF não será gerado" -f $txtD, (& $f $e3d)) "Yellow"
+        }
+        return
     } elseif ([math]::Abs($eDesc - $e3d) -gt $tol + 1e-9) {
         $msg = "Espessura diferente: descrição $(if ($ld.pol) { $ld.texto + ' = ' + (& $f $eDesc) } else { & $f $eDesc }), 3D $(& $f $e3d). Corrija a descrição (ou o modelo) para a espessura do 3D antes de detalhar."
     } else { Log ("   Espessura conferida: descrição{0} = 3D = {1}" -f $comoDesc, (& $f $e3d)) "DarkGray"; return }

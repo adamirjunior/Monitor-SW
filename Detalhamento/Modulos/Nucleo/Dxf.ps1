@@ -412,7 +412,15 @@ function GerarDxf($caminhoPeca, $peca, $destinoDxf, $desc) {
                 if ($espL -le 0) { $bb = XD (X $peca "GetPartBox" $true); $espL = [math]::Min([math]::Abs($bb[3] - $bb[0]), [math]::Min([math]::Abs($bb[4] - $bb[1]), [math]::Abs($bb[5] - $bb[2]))) }
                 $espAntes = $script:espessura; $script:espessura = $espL
                 $yH = $null; try { $yH = [double](CaixaReal $v).y2 + $DistCota } catch { }
-                $ne = 0; try { $ne = CotaEspessura $d @($lat) $null $yH } catch { }
+                $ne = 0; try { $script:cotaEspDxf = $null; $ne = CotaEspessura $d @($lat) $null $yH } catch { }
+                # sobremetal: a cota da espessura no DXF mostra a espessura da chapa (descrição), não a do 3D
+                if ($ne -gt 0 -and $script:sobremetal -and $script:cotaEspDxf) {
+                    try {
+                        $txtE = ("{0:0.00}" -f ($script:sobremetal.para * 1000)).Replace(".", ",")
+                        X $script:cotaEspDxf "SetText" (K "swDimensionTextParts_e" @("swDimensionTextAll") 1) $txtE | Out-Null
+                        Log "   (DXF: espessura com sobremetal: $txtE mm)" "DarkGray"
+                    } catch { Log "   (DXF: não consegui trocar o texto da espessura: $($_.Exception.Message))" "DarkYellow" }
+                }
                 $script:espessura = $espAntes
                 if ($ne -gt 0) { $nc += $ne; if (-not $mesmaAltura) { $nc += CotaTotal $d $lat $false $true } }
                 else { $nc += CotaTotal $d $lat $true (-not $mesmaAltura) }
@@ -457,6 +465,7 @@ function GerarDxf($caminhoPeca, $peca, $destinoDxf, $desc) {
             if ($espD -le 0) { $bb = XD (X $peca "GetPartBox" $true); $espD = [math]::Min([math]::Abs($bb[3] - $bb[0]), [math]::Min([math]::Abs($bb[4] - $bb[1]), [math]::Abs($bb[5] - $bb[2]))) }
             $avD = @()
             if (TemUsinagemCnc $peca) { $avD += "Avaliar sobremetal - Recurso Offset" }
+            if ($script:sobremetal) { $avD = @(("Sobremetal aplicado ({0} mm para {1} mm)" -f (("{0:0.##}" -f ($script:sobremetal.de * 1000)).Replace(".", ",")), (("{0:0.##}" -f ($script:sobremetal.para * 1000)).Replace(".", ",")))) + $avD }
             $limTxt = ("{0:0.##}" -f ($EspessuraLimiteCnc * 1000)).Replace(".", ",")
             $grossa = $espD -gt $EspessuraLimiteCnc + 0.000001
             if (($fuD.Roscados + $fuD.Rebaixos) -gt 0 -and $grossa) { $avD += "Avaliar furação no CNC - Espessura > ${limTxt}mm" }

@@ -79,9 +79,13 @@ function Gerar($arq) {
         $peca = AbrirDoc $arq $DocPART
         if (-not $peca) { throw "não consegui abrir a peça" }
         $desc = Prop $peca $PropDesc
+        $script:sobremetal = $null; $script:semDxf = $false
         if (EhLaser $desc) { ConferirEspessuraLaser $peca $arq }   # só DXF: também confere a espessura
-        $dxf = Join-Path $destDir "$cod.DXF"
-        GerarDxf $arq $peca $dxf $desc; Log "   DXF: $dxf" "Green"; AbrirAutoCAD $dxf; $feito += "DXF"
+        if ($script:semDxf) { Log "   DXF não gerado: espessura da descrição diferente do 3D e não é sobremetal" "Yellow"; $feito += "sem DXF (espessura)" }
+        else {
+            $dxf = Join-Path $destDir "$cod.DXF"
+            GerarDxf $arq $peca $dxf $desc; Log "   DXF: $dxf" "Green"; AbrirAutoCAD $dxf; $feito += "DXF"
+        }
     }
     Relatorio $arq "" "gerar" "ok" ($feito -join " + ")
 }

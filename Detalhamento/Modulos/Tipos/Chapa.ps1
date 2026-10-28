@@ -101,7 +101,7 @@ function CotaEspessura($dm, $vistas, $xVert = $null, $yHoriz = $null) {
                 $dd = X $dm "AddVerticalDimension2" $xc $yPonta 0.0
             }
             X $dm "ClearSelection2" $true | Out-Null
-            if ($dd) { $script:vistaPerfil = $v; Log ("   Cota da espessura ({0:N2} mm) na vista {1}" -f ($T * 1000), (X $v "GetName2")) "DarkGray"; return 1 }
+            if ($dd) { $script:cotaEspDxf = $dd; $script:vistaPerfil = $v; Log ("   Cota da espessura ({0:N2} mm) na vista {1}" -f ($T * 1000), (X $v "GetName2")) "DarkGray"; return 1 }
         } catch { }
     }
     Log "   (não achei onde cotar a espessura da chapa)" "DarkYellow"
