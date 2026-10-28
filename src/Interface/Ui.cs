@@ -15,8 +15,8 @@ using Microsoft.Win32;
 [assembly: AssemblyTitle("Monitor")]
 [assembly: AssemblyDescription("BOM dos projetos SolidWorks com status de PDF/DXF")]
 [assembly: AssemblyProduct("Monitor")]
-[assembly: AssemblyVersion("2.21.0.0")]
-[assembly: AssemblyFileVersion("2.21.0.0")]
+[assembly: AssemblyVersion("2.21.1.0")]
+[assembly: AssemblyFileVersion("2.21.1.0")]
 
 namespace MonitorSW
 {
@@ -688,6 +688,7 @@ namespace MonitorSW
         readonly ListView projList = new ListView();
         readonly DataGridView grid = new DataGridView();
         readonly TextBox whereBox = new TextBox();
+        readonly RichTextBox resumoBox = new RichTextBox();   // pendência / desatualizado, colorido, acima dos quadros
         readonly ListView histList = new ListView();
         readonly ToolStripComboBox filter = new ToolStripComboBox();
         readonly ToolStripTextBox search = new ToolStripTextBox();
@@ -1174,6 +1175,10 @@ namespace MonitorSW
             procPanel.WrapContents = true;
             procPanel.Padding = new Padding(0, 0, 0, 6);
             wherePad.Controls.Add(procPanel);
+            resumoBox.Dock = DockStyle.Top; resumoBox.ReadOnly = true; resumoBox.BorderStyle = BorderStyle.None;
+            resumoBox.BackColor = Theme.Surface; resumoBox.Font = new Font("Segoe UI Semibold", 10f); resumoBox.ScrollBars = RichTextBoxScrollBars.None;
+            resumoBox.Height = 26; resumoBox.TabStop = false; resumoBox.Visible = false;
+            wherePad.Controls.Add(resumoBox);   // adicionado depois = fica em cima dos quadros
             tabs.AddPage("Processos", wherePad);
             tabs.AddPage("Histórico de alterações", histList);
             tabs.Dock = DockStyle.Fill;
@@ -1574,6 +1579,7 @@ namespace MonitorSW
             {
                 FillProcPanel(null);
                 string[] st; lock (srvStatus) srvStatus.TryGetValue(code, out st);
+                resumoBox.Visible = false;
                 whereBox.Text = code + (f != null && !string.IsNullOrEmpty(f.Desc) ? "  -  " + f.Desc : "") +
                     (st != null ? "\r\nDesenho: " + st[0] + "    PDF: " + st[1] + "    DXF: " + st[2] : "\r\nConferindo desenho/PDF/DXF na pasta…") +
                     (f != null ? "\r\n" + engine.Cfg.Map(f.Path) : "") +
@@ -3194,8 +3200,9 @@ namespace MonitorSW
             var it = SelItem();
             FillProcPanel(it);
             if (it == null || histItem == null || !string.Equals(it.Key, histItem.Key, StringComparison.OrdinalIgnoreCase) || it.Model != histItem.Model || it.LastBy != histItem.LastBy) ShowHistory(it);
-            if (it == null) { whereBox.Text = "Selecione um item na BOM para ver detalhes e onde ele é usado."; return; }
-            whereBox.Text = Resumo(it);
+            if (it == null) { resumoBox.Visible = false; whereBox.Text = "Selecione um item na BOM para ver detalhes e onde ele é usado."; return; }
+            MostrarResumo(it);
+            whereBox.Text = "";
         }
 
         // caixinhas com os processos da peça (TORNO, TORNO CNC, FRESA...) no topo da aba Processos
@@ -3415,6 +3422,23 @@ namespace MonitorSW
                     }
                 }));
             });
+        }
+
+        // linhas do resumo coloridas: pendência = vermelho, desatualizado / revisar = amarelo, sem pendências = verde
+        void MostrarResumo(Item it)
+        {
+            var linhas = Resumo(it).Split(new[] { "\r\n" }, StringSplitOptions.None);
+            resumoBox.SuspendLayout();
+            resumoBox.Clear();
+            foreach (var ln in linhas)
+            {
+                Color c = ln.StartsWith("PENDÊNCIA") ? Theme.PendText : (ln.StartsWith("DESATUALIZADO") || ln.StartsWith("REVISAR") || ln.StartsWith("MARCADO")) ? Theme.WarnText : ln.StartsWith("Sem pend") ? Theme.OkText : Theme.Muted;
+                resumoBox.SelectionStart = resumoBox.TextLength; resumoBox.SelectionColor = c;
+                resumoBox.AppendText((resumoBox.TextLength > 0 ? "\n" : "") + ln);
+            }
+            resumoBox.Height = Math.Max(26, linhas.Length * 22 + 8);
+            resumoBox.Visible = true;
+            resumoBox.ResumeLayout();
         }
 
         // painel de baixo (aba Processos): só o que importa - pendência (o que falta) e o que está desatualizado, com o motivo
