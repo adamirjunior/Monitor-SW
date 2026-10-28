@@ -212,15 +212,21 @@ function IsoNomeadaDaFrontal($dm, $caminho, $front, $x, $y) {
     $a = DadosXf $front
     $ex = Normaliza @([double]$a[0], [double]$a[3], [double]$a[6]); $ey = Normaliza @([double]$a[1], [double]$a[4], [double]$a[7]); $ez = Normaliza @([double]$a[2], [double]$a[5], [double]$a[8])
     $z = Normaliza @(($ex[0] + $ey[0] + $ez[0]), ($ex[1] + $ey[1] + $ez[1]), ($ex[2] + $ey[2] + $ez[2]))
-    $xv = Normaliza (Vetorial $ey $z); $yv = Vetorial $z $xv
     $peca = $null; try { $peca = X $sw "GetOpenDocumentByName" $caminho } catch { }
     if (-not $peca) { return $null }
+    return VistaNaDirecao $dm $caminho $peca $z $ey "ISO DETALHE" $x $y
+}
+# vista do modelo olhando na direção $z (do modelo para quem olha) com $up para cima: grava a vista nomeada $nome no
+# documento $doc e cria a vista no desenho por $ref (caminho ou título); confere a orientação real (linhas x colunas)
+function VistaNaDirecao($dm, $ref, $doc, [double[]]$z, [double[]]$up, [string]$nome, $x, $y) {
+    $z = Normaliza $z
+    $xv = Normaliza (Vetorial $up $z); $yv = Vetorial $z $xv
     $tituloDrw = Titulo $dm
-    $iso = $null
+    $res = $null
     try {
-        try { X $sw "ActivateDoc" (Titulo $peca) | Out-Null } catch { }
-        $mv = XG $peca "ActiveView"
-        if (-not $mv) { Log "   (peça sem janela: isométrica sem vista nomeada)" "DarkGray"; return $null }
+        try { X $sw "ActivateDoc" (Titulo $doc) | Out-Null } catch { }
+        $mv = XG $doc "ActiveView"
+        if (-not $mv) { Log "   (documento sem janela: sem vista nomeada)" "DarkGray"; return $null }
         $A = XD (XG (XG $mv "Orientation3") "ArrayData")
         $formas = @(
             @($xv[0], $yv[0], $z[0], $xv[1], $yv[1], $z[1], $xv[2], $yv[2], $z[2]),
@@ -228,24 +234,23 @@ function IsoNomeadaDaFrontal($dm, $caminho, $front, $x, $y) {
         $mu = X $sw "GetMathUtility"
         foreach ($f in $formas) {
             $arr = [double[]]($f + @($A[9], $A[10], $A[11], $A[12], $A[13], $A[14], $A[15]))
-            try { X $sw "ActivateDoc" (Titulo $peca) | Out-Null } catch { }
+            try { X $sw "ActivateDoc" (Titulo $doc) | Out-Null } catch { }
             XS $mv "Orientation3" (X $mu "CreateTransform" $arr)
-            try { X $peca "GraphicsRedraw2" | Out-Null } catch { }
-            $nome = "ISO DETALHE"
-            try { X $peca "DeleteNamedView" $nome | Out-Null } catch { }
-            X $peca "NameView" $nome | Out-Null
+            try { X $doc "GraphicsRedraw2" | Out-Null } catch { }
+            try { X $doc "DeleteNamedView" $nome | Out-Null } catch { }
+            X $doc "NameView" $nome | Out-Null
             try { X $sw "ActivateDoc" $tituloDrw | Out-Null } catch { }
-            $v = VistaModelo $dm $caminho @($nome) $x $y
+            $v = VistaModelo $dm $ref @($nome) $x $y
             if (-not $v) { continue }
             Rebuild $dm; $script:xfCache = @{}; $script:xfModo = @{}
             $b = DadosXf $v
             $vz = Normaliza @([double]$b[2], [double]$b[5], [double]$b[8]); $vy = Normaliza @([double]$b[1], [double]$b[4], [double]$b[7])
             $ok = ($vz[0] * $z[0] + $vz[1] * $z[1] + $vz[2] * $z[2]) -gt 0.99 -and ($vy[0] * $yv[0] + $vy[1] * $yv[1] + $vy[2] * $yv[2]) -gt 0.99
-            if ($ok) { $iso = $v; break }
+            if ($ok) { $res = $v; break }
             try { Selecionar $dm $v | Out-Null; X $dm "EditDelete" | Out-Null } catch { }
         }
     } finally { try { X $sw "ActivateDoc" $tituloDrw | Out-Null } catch { } }
-    return $iso
+    return $res
 }
 function IsoDaFrontal($dm, $caminho, $front, $x, $y) {
     $iso = $null

@@ -375,7 +375,10 @@ function DetalharMontagem($caminho, $asm) {
     $dm = NovoDesenho
     # montagem: criar a vista pelo título do documento aberto (pelo caminho o SolidWorks 2016 dá erro interno)
     $refAsm = Titulo $asm
-    $v1 = VistaModelo $dm $refAsm @("*Isométrica", "*Isometric") 0.08 0.14
+    # vista principal da montagem: das 8 isométricas possíveis, a que MOSTRA MAIS DETALHES (mais arestas visíveis com
+    # as linhas ocultas removidas - ex.: 13011920, abertura da caixa para a frente mostra rasgos e buchas por dentro)
+    $v1 = $null; try { $v1 = @(MelhorIsoMontagem $dm $refAsm $asm 0.08 0.14 | Where-Object { $_ -ne $null })[-1] } catch { Log "   (escolha da isométrica: $($_.Exception.Message))" "DarkYellow"; $v1 = $null }
+    if (-not $v1) { $v1 = VistaModelo $dm $refAsm @("*Isométrica", "*Isometric") 0.08 0.14 }
     if (-not $v1) { $refAsm = $caminho; $v1 = VistaModelo $dm $caminho @("*Isométrica", "*Isometric") 0.08 0.14 }
     # padrão ProEstamp (ex.: 13011773): uma isométrica grande, balões com o Nº DA PEÇA e a lista de materiais embaixo à direita
     $v2 = $null
@@ -540,4 +543,39 @@ function SetasNoCentro($dm, $v, $notas) {
     }
     Log "   Setas no centro da peça: $ok de $nTot balão(ões)" "DarkGray"
     return ,$novas
+}
+
+# conta as arestas VISÍVEIS de uma vista de montagem (linhas ocultas removidas): mais arestas = mais detalhes à mostra
+function ArestasVisiveis($v) {
+    $n = 0
+    $comps = $null; try { $comps = X $v "GetVisibleComponents" } catch { }
+    $t = K "swViewEntityType_e" @("swViewEntityType_Edge") 1
+    foreach ($c in @($comps)) { if (-not $c) { continue }; try { $r = X $v "GetVisibleEntities2" $c $t; if ($r) { $n += @($r).Count } } catch { } }
+    if ($n -eq 0) { try { $n = @(Entidades $v "swViewEntityType_Edge" 1).Count } catch { } }
+    return $n
+}
+# testa as 4 isométricas vistas DE CIMA (±X +Y ±Z, "para cima" = Y do modelo) e fica com a que mostra mais arestas;
+# empate = a padrão. (De baixo contava mais arestas da base, mas o desenho de solda é visto de cima.)
+function MelhorIsoMontagem($dm, $ref, $asm, $x, $y) {
+    $melhor = $null; $nMelhor = -1; $dMelhor = $null
+    foreach ($sx in 1, -1) { foreach ($sz in 1, -1) { foreach ($sy in @(1)) {
+        $d = [double[]]@($sx, $sy, $sz)
+        $v = $null; try { $v = VistaNaDirecao $dm $ref $asm $d @(0.0, 1.0, 0.0) "ISO MONTAGEM" $x $y } catch { $v = $null }
+        if (-not $v) { continue }
+        Modo $v $DispHidden $true | Out-Null; Rebuild $dm | Out-Null
+        $n = ArestasVisiveis $v
+        Log ("   [dbg] isométrica ({0:+0;-0},{1:+0;-0},{2:+0;-0}): {3} arestas visíveis" -f $sx, $sy, $sz, $n) "DarkGray"
+        if ($n -gt $nMelhor * 1.03 -or -not $melhor) {
+            if ($melhor) { try { Selecionar $dm $melhor | Out-Null; X $dm "EditDelete" | Out-Null } catch { } }
+            $melhor = $v; $nMelhor = $n; $dMelhor = $d
+        } else { try { Selecionar $dm $v | Out-Null; X $dm "EditDelete" | Out-Null } catch { } }
+    } } }
+    if (-not $melhor) { return $null }
+    # grava de novo a vista nomeada com a direção escolhida (a última testada pode ser outra) - quem abrir a montagem acha
+    try { X $sw "ActivateDoc" (Titulo $asm) | Out-Null } catch { }
+    Log ("   Vista da montagem: isométrica ({0:+0;-0},{1:+0;-0},{2:+0;-0}) - a que mostra mais detalhes ({3} arestas)" -f $dMelhor[0], $dMelhor[1], $dMelhor[2], $nMelhor) "DarkGray"
+    AtivarDesenho $dm | Out-Null
+    # a vista ainda vai mudar de escala/posição: a transformação guardada na escolha ficaria velha (balões no centro erravam)
+    $script:xfCache = @{}; $script:xfModo = @{}
+    return ,$melhor
 }
