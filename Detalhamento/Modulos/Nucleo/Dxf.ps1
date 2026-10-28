@@ -267,6 +267,52 @@ function AbrirAutoCAD($arq) {
     }
     if (-not $feito) { Log "   (não consegui enquadrar o DXF no AutoCAD: o arquivo já abre enquadrado pelo cabeçalho)" "DarkYellow" }
 }
+# eixo do modelo (0=X, 1=Y, 2=Z) que a vista olha de frente (o que vira um ponto na folha); -1 se nenhum
+function EixoDaVista($v) {
+    try {
+        $script:xfCache = @{}; $script:xfModo = @{}
+        $a = DadosXf $v
+        for ($k = 0; $k -lt 3; $k++) { if ([math]::Abs([double]$a[3 * $k]) + [math]::Abs([double]$a[3 * $k + 1]) -lt 0.05) { return $k } }
+    } catch { }
+    return -1
+}
+# DXF de peça sem recurso de chapa metálica: vista olhando NA DIREÇÃO DA ESPESSURA (corte plano do laser).
+# Eixo da espessura = a medida da caixa igual à espessura da descrição (ex.: ESP 5/8" = 15,88); senão a menor medida.
+# Cada vista criada é CONFERIDA pela orientação real (nome da vista não basta: a 02115197 saiu pela face do furo,
+# 15,88 x 47,25, em vez do perfil 40 x 47,25); se não olha pela espessura, apaga e tenta a próxima.
+function VistaCortePlano($d, $caminhoPeca, $peca, $desc) {
+    $b = XD (X $peca "GetPartBox" $true)
+    $dim = @([math]::Abs($b[3] - $b[0]), [math]::Abs($b[4] - $b[1]), [math]::Abs($b[5] - $b[2]))
+    $k = 0; for ($i = 1; $i -lt 3; $i++) { if ($dim[$i] -lt $dim[$k]) { $k = $i } }
+    $esp = $null; try { $esp = EspessuraDaDescricao $desc } catch { }
+    $origem = "menor medida"
+    if ($esp -and $esp -gt 0) {
+        $best = -1; $err = 1.0
+        for ($i = 0; $i -lt 3; $i++) { $e = [math]::Abs($dim[$i] - $esp); if ($e -lt $err) { $err = $e; $best = $i } }
+        if ($best -ge 0 -and $err -le [math]::Max(0.0005, 0.05 * $esp)) { $k = $best; $origem = "espessura da descrição" }
+    }
+    $nomes = @(@(@("*Esquerda", "*Left"), @("*Direita", "*Right")), @(@("*Superior", "*Top"), @("*Inferior", "*Bottom")), @(@("*Frontal", "*Front"), @("*Posterior", "*Back")))
+    $ordem = @($nomes[$k][0], $nomes[$k][1])
+    for ($i = 0; $i -lt 3; $i++) { if ($i -ne $k) { $ordem += ,$nomes[$i][0]; $ordem += ,$nomes[$i][1] } }
+    $script:eixoDxf = $k
+    Log ("   DXF: corte plano na direção {0} ({1}: {2:N2} mm)" -f @("X", "Y", "Z")[$k], $origem, ($dim[$k] * 1000)) "DarkGray"
+    $primeira = $null
+    foreach ($nm in $ordem) {
+        $v = VistaModelo $d $caminhoPeca $nm 0.3 0.3
+        if (-not $v) { continue }
+        Rebuild $d
+        $ev = EixoDaVista $v
+        if ($ev -eq $k) {
+            if ($primeira) { try { Selecionar $d $primeira | Out-Null; X $d "EditDelete" | Out-Null } catch { } }
+            Log "   DXF: vista $($nm[0]) olha pela espessura" "DarkGray"
+            return $v
+        }
+        Log ("   (DXF: vista {0} olha na direção {1}, não pela espessura; tentando outra)" -f $nm[0], $(if ($ev -ge 0) { @("X", "Y", "Z")[$ev] } else { "?" })) "DarkGray"
+        if (-not $primeira) { $primeira = $v } else { try { Selecionar $d $v | Out-Null; X $d "EditDelete" | Out-Null } catch { } }
+    }
+    if ($primeira) { Log "   Aviso: nenhuma vista olhou pela espessura; DXF com a primeira vista." "Yellow" }
+    return $primeira
+}
 function GerarDxf($caminhoPeca, $peca, $destinoDxf, $desc) {
     $d = NovoDesenho
     $script:dxfDesenhos += $d
@@ -283,14 +329,8 @@ function GerarDxf($caminhoPeca, $peca, $destinoDxf, $desc) {
         if (TemChapa $peca) {
             try { $v = X $d "CreateFlatPatternViewFromModelView3" $caminhoPeca (NomeConfig $peca) 0.3 0.3 0.0 $false $false } catch { Log "   (planificada no DXF falhou: $($_.Exception.Message))" "DarkYellow" }
         }
-        if (-not $v) {
-            # chapa sem recurso de chapa metálica: vista na direção da menor medida (espessura)
-            $b = XD (X $peca "GetPartBox" $true)
-            $dx = [math]::Abs($b[3] - $b[0]); $dy = [math]::Abs($b[4] - $b[1]); $dz = [math]::Abs($b[5] - $b[2])
-            $nomes = @("*Frontal", "*Front")
-            if ($dy -le $dx -and $dy -le $dz) { $nomes = @("*Superior", "*Top") } elseif ($dx -le $dy -and $dx -le $dz) { $nomes = @("*Esquerda", "*Left") }
-            $v = VistaModelo $d $caminhoPeca $nomes 0.3 0.3
-        }
+        $script:eixoDxf = -1
+        if (-not $v) { $v = VistaCortePlano $d $caminhoPeca $peca $desc }
         if (-not $v) { throw "não consegui criar a vista planificada" }
         # DXF de corte TEM que sair em 1:1 (vista criada pelo SolidWorks pode vir com escala automática)
         try { XS $v "UseSheetScale" $false } catch { try { XS $v "UseSheetScale" 0 } catch { } }
@@ -337,6 +377,7 @@ function GerarDxf($caminhoPeca, $peca, $destinoDxf, $desc) {
                     $dx = [math]::Abs($b[3] - $b[0]); $dy = [math]::Abs($b[4] - $b[1]); $dz = [math]::Abs($b[5] - $b[2])
                     $lado = @("*Superior", "*Top")
                     if ($dy -le $dx -and $dy -le $dz) { $lado = @("*Frontal", "*Front") } elseif ($dx -le $dy -and $dx -le $dz) { $lado = @("*Frontal", "*Front") }
+                    if ($script:eixoDxf -ge 0) { $lado = $(if ($script:eixoDxf -eq 2) { @("*Superior", "*Top") } else { @("*Frontal", "*Front") }) }   # de lado = mostra a espessura
                     $lat = VistaModelo $d $caminhoPeca $lado ($o.x2 + 0.05) (($o.y1 + $o.y2) / 2)
                     if ($lat) {
                         try { XS $lat "UseSheetScale" $false } catch { }

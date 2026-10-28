@@ -79,6 +79,7 @@ Formato: `- AAAA-MM-DD — o que mudou — motivo / pedido do usuário`. Itens *
 - Layout de balões em escadinha/fileiras: várias tentativas; ficou a versão aprovada (commit b4c2400) — "ficou bom aparentemente".
 
 ## DXF / AutoCAD
+- 2026-10-28 — DXF de peça sem chapa metálica: vista do corte plano escolhida pela ESPESSURA (medida da caixa igual à espessura da descrição, ex. ESP 5/8" = 15,88; senão a menor medida) e CONFERIDA pela orientação real da vista (eixo que vira ponto na folha); se a vista com aquele nome não olha pela espessura, apaga e tenta as outras. Motivo: 02115197 tem as vistas-padrão do modelo trocadas ("Esquerda" olha em Y) e o DXF saía pela face do furo (15,88 x 47,25) em vez do perfil 40 x 47,25. Vista de lado da espessura segue o mesmo eixo. Testado no PC: saiu pela "Frontal" = perfil certo. Pedido do usuário. **PENDENTE testar.**
 - 2026-10-27 — Cotas do DXF sempre com 2 casas (12,70 ±0,1 / 390,00 ±0,1): precisão 2 em todas as cotas e DIMZIN = 0 no cabeçalho e nos estilos de cota (o SolidWorks gravava DIMZIN = 12, que tira os zeros à direita: 12,70 virava 12,7 e 390,00 virava 390). Tolerância continua ±0,1. Conferido no arquivo (02124100, 02204262). Pedido do usuário. **PENDENTE testar.**
 - 2026-10-26 — DXF: se o DXF anterior estiver aberto no AutoCAD (arquivo travado: "sendo usado por outro processo"), fecha sem salvar antes de gravar o novo.
 - 2026-10-26 — DXF: cota da espessura (vista de lado) na mesma reta da cota horizontal de cima da peça (ex.: 1,5 alinhado com o 390), em vez de embaixo. Pedido do usuário. **PENDENTE testar.**
