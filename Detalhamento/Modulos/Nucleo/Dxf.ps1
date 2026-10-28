@@ -417,7 +417,8 @@ function GerarDxf($caminhoPeca, $peca, $destinoDxf, $desc) {
                 if ($ne -gt 0 -and $script:sobremetal -and $script:cotaEspDxf) {
                     try {
                         $txtE = ("{0:0.00}" -f ($script:sobremetal.para * 1000)).Replace(".", ",")
-                        X $script:cotaEspDxf "SetText" (K "swDimensionTextParts_e" @("swDimensionTextAll") 1) $txtE | Out-Null
+                        # texto trocado não mostra a tolerância do SolidWorks: vai junto no texto (mesma ±0,1 das outras cotas)
+                        X $script:cotaEspDxf "SetText" (K "swDimensionTextParts_e" @("swDimensionTextAll") 1) ($txtE + " ±0,1") | Out-Null
                         Log "   (DXF: espessura com sobremetal: $txtE mm)" "DarkGray"
                     } catch { Log "   (DXF: não consegui trocar o texto da espessura: $($_.Exception.Message))" "DarkYellow" }
                 }
