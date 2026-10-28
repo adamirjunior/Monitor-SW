@@ -173,7 +173,8 @@ function DetalharUsinagemTabela($dm, $front, $caminho, $peca) {
             $sheetEsc = [double]$Escalas[$i][0] / $Escalas[$i][1]
             try { XS $iso "UseSheetScale" $false } catch { try { XS $iso "UseSheetScale" 0 } catch { } }
             $isoOk = $false
-            foreach ($fi in 0.8, 0.65, 0.5, 0.4, 0.3) {
+            # REGRA 28/10: mesma escala da principal (1.0) quando couber
+            foreach ($fi in 1.0, 0.8, 0.65, 0.5, 0.4, 0.3) {
                 try { XS $iso "ScaleDecimal" ($sheetEsc * $fi) } catch { }
                 Rebuild $dm
                 $oi = Contorno $iso

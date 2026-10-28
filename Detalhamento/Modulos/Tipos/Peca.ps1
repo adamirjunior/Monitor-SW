@@ -199,14 +199,50 @@ function DetalharPeca($caminho, $peca) {
             if ($iso) { try { XS $iso "UseSheetScale" $false } catch { try { XS $iso "UseSheetScale" 0 } catch { } }; try { XS $iso "ScaleDecimal" (($num / $den) * $fi) } catch { } }
             Rebuild $dm
             $cabe = if ($arr -like "longa*") { LayoutPecaLonga $dm $front $left $top $iso $flat } else { LayoutPeca $dm $front $left $top $iso $flat }
-            if ($cabe) { $ok = $true; $arrOk = $arr; $escOk = $num / $den; Log "   Escala $num`:$den (arranjo $arr)"; break }
+            if ($cabe) { $ok = $true; $arrOk = $arr; $escOk = $num / $den; $iAchou = $i; Log "   Escala $num`:$den (arranjo $arr)"; break }
         }
+    }
+    # REGRA (28/10): isométrica na MESMA escala da principal (peça até 1 m). Tenta a disposição com a isométrica 1:1 em
+    # relação à folha na escala achada ou uma abaixo; se não couber, fica como estava (isométrica a maior que couber).
+    $isoIgual = ($mx -le 1.0) -and $iso
+    # chapa dobrada (com planificada): refazer a disposição em outra escala estragava a vista de perfil (02124099);
+    # nela a isométrica só cresce no espaço livre (AumentarIso tenta a mesma escala primeiro)
+    if ($ok -and $isoIgual -and -not $flat) {
+        # guarda a disposição achada (posição de cada vista + escalas) para voltar exatamente a ela se não couber
+        $guarda = @(); foreach ($v in @($front, $left, $top, $flat, $iso)) { if ($v) { $c = Contorno $v; $guarda += ,@($v, $c.x1, $c.y2) } }
+        $escIso0 = 1.0; try { $escIso0 = [double](XG $iso "ScaleDecimal") } catch { }
+        $achou = $false
+        foreach ($j in @($iAchou, ($iAchou + 1))) {
+            if ($j -ge $Escalas.Count) { break }
+            $num = $Escalas[$j][0]; $den = $Escalas[$j][1]
+            DefinirEscala $dm $num $den
+            foreach ($arr in $arranjos) {
+                try { XS $iso "ScaleDecimal" ($num / $den) } catch { }
+                Rebuild $dm
+                $cabe = if ($arr -like "longa*") { LayoutPecaLonga $dm $front $left $top $iso $flat } else { LayoutPeca $dm $front $left $top $iso $flat }
+                if ($cabe) { $achou = $true; $arrOk = $arr; $escOk = $num / $den; Log "   Escala $num`:$den (arranjo $arr) com a isométrica na mesma escala"; break }
+            }
+            if ($achou) { break }
+        }
+        if (-not $achou) {
+            # volta EXATAMENTE para a disposição achada antes (escala da folha, da isométrica e posição de cada vista)
+            $num = $Escalas[$iAchou][0]; $den = $Escalas[$iAchou][1]; DefinirEscala $dm $num $den
+            try { XS $iso "ScaleDecimal" $escIso0 } catch { }
+            Rebuild $dm
+            foreach ($g in $guarda) { try { MoverPara $g[0] $g[1] $g[2] } catch { } }
+            Rebuild $dm
+            $escOk = $num / $den
+            Log "   (isométrica na mesma escala não coube nem uma escala abaixo: fica a maior que couber)" "DarkGray"
+        }
+        # as tentativas mudaram a escala: transformações guardadas das vistas ficaram velhas (cotas sairiam erradas)
+        $script:xfCache = @{}; $script:xfModo = @{}
     }
     if (-not $ok) { Log "   Aviso: as vistas não couberam perfeitamente; confira a disposição." "Yellow" }
     else {
         # chapa dobrada: isométrica do maior tamanho que couber no espaço livre (pedido do usuário em 27/10)
         # e em toda peça (28/10): a isométrica é a vista "preenchida" que mostra a peça; cresce até o espaço livre
-        if ($iso) { try { AumentarIso $dm $iso @($front, $left, $top, $flat) ($arrOk -like "longa*") $escOk $flat $(if ($flat) { $top } else { $null }) } catch { Log "   (isométrica maior: $($_.Exception.Message))" "DarkYellow" } }
+        # exceção = peça grande (> 1 m): a isométrica fica o maior possível no espaço livre
+        if ($iso) { try { AumentarIso $dm $iso @($front, $left, $top, $flat) ($arrOk -like "longa*") $escOk $flat $(if ($flat) { $top } else { $null }) ($isoIgual -and -not $flat) } catch { Log "   (isométrica maior: $($_.Exception.Message))" "DarkYellow" } }
         Centralizar $dm @($front, $left, $top, $flat, $iso) $AreaB
     }
     EspalharNotasDobra $dm $flat
@@ -267,7 +303,7 @@ function DetalharPeca($caminho, $peca) {
 
 # isométrica cresce de 15 em 15% enquanto couber no canto dela (em cima à direita; embaixo à direita na peça longa),
 # longe das outras vistas o suficiente para as cotas delas (Gap); no máximo a escala da folha
-function AumentarIso($dm, $iso, $outras, [bool]$embaixo, [double]$escFolha, $flat = $null, $baixo = $null) {
+function AumentarIso($dm, $iso, $outras, [bool]$embaixo, [double]$escFolha, $flat = $null, $baixo = $null, [bool]$igual = $false) {
     $m = $script:MargemCotas
     $esc0 = [double](XG $iso "ScaleDecimal"); if ($esc0 -le 0) { return }
     # planificada desce até alinhar a base com a vista de baixo (como no 02124099 do usuário): sobra espaço para a isométrica
@@ -303,10 +339,25 @@ function AumentarIso($dm, $iso, $outras, [bool]$embaixo, [double]$escFolha, $fla
         return $true
     }
     $bom = $esc0; $f = 1.15
+    # mesma escala da principal: tenta direto; se não couber em nenhum canto livre, cresce o que der (como peça grande)
+    if ($igual -and $escFolha -gt $esc0) {
+        XS $iso "ScaleDecimal" $escFolha; Rebuild $dm
+        if (& $por) { Log ("   Isométrica na mesma escala da vista principal ({0:G4})" -f $escFolha) "DarkGray"; return }
+        if ($embaixo -eq $false) {
+            # outro canto: embaixo à direita
+            $oi = Contorno $iso; MoverPara $iso ($AreaR - $m - $oi.w) ($AreaB + $m + $oi.h + 0.002); Rebuild $dm
+            $ok2 = $true; $or = $null; try { $or = CaixaReal $iso } catch { $or = Contorno $iso }
+            if (-not (DentroDaArea $or $AreaB)) { $ok2 = $false } else { foreach ($o in $os) { if (Sobrepoe $or $o) { $ok2 = $false } } }
+            if ($ok2) { Log ("   Isométrica na mesma escala da vista principal ({0:G4}), embaixo à direita" -f $escFolha) "DarkGray"; return }
+        }
+        Log "   (isométrica na escala da principal não coube; fica a maior que couber)" "DarkGray"
+    }
     while ($esc0 * $f -le $escFolha * 1.001) {
         XS $iso "ScaleDecimal" ($esc0 * $f); Rebuild $dm
         if (& $por) { $bom = $esc0 * $f; $f *= 1.15 } else { Log "   [dbg] isométrica parou de crescer: $($script:isoMotivo)" "DarkGray"; break }
     }
+    # passo final exato até a escala da folha (os passos de 15% paravam antes)
+    if ($bom -lt $escFolha -and $bom * 1.15 -gt $escFolha) { XS $iso "ScaleDecimal" $escFolha; Rebuild $dm; if (& $por) { $bom = $escFolha } }
     XS $iso "ScaleDecimal" $bom; Rebuild $dm; & $por | Out-Null
     if ($bom -gt $esc0 * 1.01) { Log ("   Isométrica aumentada {0:N0}% (espaço livre na folha)" -f (($bom / $esc0 - 1) * 100)) "DarkGray" }
 }
