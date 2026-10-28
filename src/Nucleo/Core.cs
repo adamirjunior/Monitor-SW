@@ -1429,7 +1429,8 @@ namespace MonitorSW
                 bool dxfCh = it.Dxf > ps.Dxf + sec;
                 if (!modelCh && !drwCh && !pdfCh && !dxfCh)
                 {
-                    if (ps.Sev != 2 && it.Sev == 2 && ps.Sev >= 0 && (it.EffSource == null || !modelChanged.Contains(it.EffSource)))
+                    // sem arquivo novo: "desatualizado" só aparece por troca das regras de revisão (Opções > Revisão) - não vira evento
+                    if (ps.Sev != 2 && it.Sev == 2 && ps.Sev >= 0 && (it.EffSource == null || !modelChanged.Contains(it.EffSource)) && it.Status.IndexOf("desatualizado", StringComparison.OrdinalIgnoreCase) < 0)
                         evs.Add(NewEv(p, it, "Ficou pendente", "", it.Status + (it.Reason.Length > 0 ? " (" + it.Reason + ")" : "")));
                     continue;
                 }
@@ -1719,6 +1720,15 @@ namespace MonitorSW
             var lim = refT - tol;
             var pend = new List<string>();
             var info = new List<string>();
+            // regras de revisão (Opções > Revisão, por usuário): conferência das datas SEMPRE automática
+            bool rMd = RegrasRevisao.Ativa("md"), rMp = RegrasRevisao.Ativa("mp"), rMx = RegrasRevisao.Ativa("mx");
+            bool rDp = RegrasRevisao.Ativa("dp"), rDx = RegrasRevisao.Ativa("dx"), rCf = RegrasRevisao.Ativa("cf");
+            DateTime modT = it.Model;
+            if (it.EffSource != null && it.IsWeld && it.Eff > modT) modT = it.Eff;   // solda: componente alterado conta como 3D
+            var motivos = new List<string>();
+            // desenho mais antigo que o 3D
+            if (rMd && it.Drw != DateTime.MinValue && modT != DateTime.MinValue && it.Drw < modT - tol && it.NeedPdf)
+            { pend.Add("Desenho desatualizado"); motivos.Add("3D salvo em " + Util.Fmt(modT) + " depois do desenho (" + Util.Fmt(it.Drw) + ")"); }
 
             // PDF
             if (it.Pdf == DateTime.MinValue)
@@ -1726,10 +1736,11 @@ namespace MonitorSW
                 it.PdfSt = it.NeedPdf ? "Falta" : "-";
                 if (it.NeedPdf) pend.Add(it.Drw == DateTime.MinValue ? "Sem detalhamento" : "Sem PDF (tem desenho)");
             }
-            else if (chk && it.Pdf < lim)
+            else if ((rMp && modT != DateTime.MinValue && it.Pdf < modT - tol) || (rDp && it.Drw != DateTime.MinValue && it.Pdf < it.Drw - tol))
             {
                 it.PdfSt = "Desatualizado";
                 if (it.NeedPdf) pend.Add("PDF desatualizado"); else info.Add("PDF antigo");
+                motivos.Add(rMp && modT != DateTime.MinValue && it.Pdf < modT - tol ? "3D salvo em " + Util.Fmt(modT) + " depois do PDF (" + Util.Fmt(it.Pdf) + ")" : "desenho salvo em " + Util.Fmt(it.Drw) + " depois do PDF (" + Util.Fmt(it.Pdf) + ")");
             }
             else it.PdfSt = chk ? "OK" : "Tem";
             if (it.PdfVer.Length > 0 && it.Pdf != DateTime.MinValue) it.PdfSt += " (" + it.PdfVer + ")";
@@ -1743,27 +1754,29 @@ namespace MonitorSW
                 it.DxfSt = it.NeedDxf ? "Falta" : "-";
                 if (it.NeedDxf) pend.Add("Sem DXF (laser)");
             }
-            else if (chk && it.Dxf < lim)
+            else if ((rMx && modT != DateTime.MinValue && it.Dxf < modT - tol) || (rDx && it.Drw != DateTime.MinValue && it.Dxf < it.Drw - tol))
             {
                 it.DxfSt = "Desatualizado";
                 if (it.NeedDxf) pend.Add("DXF desatualizado"); else info.Add("DXF antigo");
+                motivos.Add(rMx && modT != DateTime.MinValue && it.Dxf < modT - tol ? "3D salvo em " + Util.Fmt(modT) + " depois do DXF (" + Util.Fmt(it.Dxf) + ")" : "desenho salvo em " + Util.Fmt(it.Drw) + " depois do DXF (" + Util.Fmt(it.Dxf) + ")");
             }
             else it.DxfSt = chk ? "OK" : "Tem";
             if (it.DxfVer.Length > 0 && it.Dxf != DateTime.MinValue) it.DxfSt += " (" + it.DxfVer + ")";
 
             // resultado do botão Conferência (PDF/DXF x peça), enquanto os arquivos não mudarem
-            if (chk && !it.Ignored)
+            if (!it.Ignored)
             {
                 var cm = Conf.Get(it);
                 if (cm != null && cm.StartsWith("✓"))
                 {
                     // alguém conferiu e confirmou que está em dia: tira os avisos de data (falta de arquivo continua valendo)
                     pend.RemoveAll(x => x.IndexOf("desatualizado", StringComparison.OrdinalIgnoreCase) >= 0 || x.StartsWith("PDF é APR"));
+                    motivos.Clear();
                     if (it.PdfSt.StartsWith("Desatualizado")) it.PdfSt = "OK";
                     if (it.DxfSt.StartsWith("Desatualizado")) it.DxfSt = "OK";
                     if (pend.Count == 0) { it.Sev = 0; it.Status = cm; ApplyMark(it); return; }
                 }
-                else if (!string.IsNullOrEmpty(cm))
+                else if (!string.IsNullOrEmpty(cm) && rCf)
                     foreach (var pr in cm.Split(new[] { " + " }, StringSplitOptions.RemoveEmptyEntries))
                         if (!pend.Any(x => x.Equals(pr, StringComparison.OrdinalIgnoreCase))) pend.Add(pr);
             }
@@ -1771,7 +1784,7 @@ namespace MonitorSW
             {
                 it.Sev = 2;
                 it.Status = string.Join(" + ", pend.ToArray());
-                if (pend.Any(x => x.Contains("desatualizado"))) it.Reason = why;
+                if (pend.Any(x => x.Contains("desatualizado"))) it.Reason = motivos.Count > 0 ? string.Join("; ", motivos.ToArray()) : why;
             }
             else if (!it.NeedPdf && !it.IsAsm && !it.PropsKnown) { it.Sev = 1; it.Status = "Lendo propriedades..."; }
             else if (info.Count > 0) { it.Sev = 1; it.Status = string.Join(" + ", info.ToArray()) + " (não obrigatório)"; }

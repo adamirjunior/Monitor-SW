@@ -15,8 +15,8 @@ using Microsoft.Win32;
 [assembly: AssemblyTitle("Monitor")]
 [assembly: AssemblyDescription("BOM dos projetos SolidWorks com status de PDF/DXF")]
 [assembly: AssemblyProduct("Monitor")]
-[assembly: AssemblyVersion("2.19.1.0")]
-[assembly: AssemblyFileVersion("2.19.1.0")]
+[assembly: AssemblyVersion("2.20.0.0")]
+[assembly: AssemblyFileVersion("2.20.0.0")]
 
 namespace MonitorSW
 {
@@ -965,6 +965,7 @@ namespace MonitorSW
                 }
             }));
             toolsMenu.Items.Add(mUser);
+            toolsMenu.Items.Add(Mi("Revisão (o que marcar como desatualizado)...", (s, a) => RegrasRevisao.Editar(this, () => { lblStatus.Text = "Regras de revisão gravadas; atualizando a lista…"; System.Threading.ThreadPool.QueueUserWorkItem(_ => engine.SetCheckUpdates(engine.CheckUpdates)); })));
             toolsMenu.Items.Add(Mi("Notificações...", (s, a) => { Notificacoes.Editar(this); var np = Notificacoes.Minha(); lblStatus.Text = np.Todos ? "Notificações: de todos os usuários." : "Notificações: de " + np.Logins.Count + " usuário(s) escolhido(s)."; }));
             toolsMenu.Items.Add(Mi("Testar aviso", (s, a) => Aviso(8000, "Teste de aviso", "Se você está vendo isto, os avisos do Monitor funcionam neste PC (" + Users.Me + ").", ToolTipIcon.Info)));
             var mCfg = new ToolStripMenuItem("Configurações");
@@ -3039,6 +3040,7 @@ namespace MonitorSW
             foreach (var kv in propCols) r.Cells[kv.Key].Value = it.P(kv.Value);
             r.Cells[C_NEED].Value = need;
             r.Cells[C_SIT].Value = it.Status + (it.OldFormat ? " (formato antigo)" : "");
+            if (it.Reason.Length > 0) r.Cells[C_SIT].ToolTipText = it.Reason;   // motivo da revisão (ex.: 3D salvo depois do PDF)
             string des = DesSt(it);
             r.Cells[C_DES].Value = des;
             r.Cells[C_PDF].Value = it.PdfSt;
