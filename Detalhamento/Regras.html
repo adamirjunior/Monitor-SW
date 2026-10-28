@@ -95,7 +95,7 @@ td.rg { min-width: 300px }
     <p>Acompanhamento das regras do gerador automático: o que já funciona, o que espera teste no SolidWorks, o que falta, e a linha do tempo das alterações.</p>
   </div>
   <dl>
-    <dt>Monitor SW</dt><dd>2.20.0.0</dd>
+    <dt>Monitor SW</dt><dd>2.20.1.0</dd>
     <dt>Gerador</dt><dd id="ultima">—</dd>
     <dt>Regras</dt><dd>REGRAS_DETALHAMENTO.txt</dd>
     <dt>Último teste</dt><dd>1.2.1 · 26/10</dd>
@@ -228,6 +228,7 @@ const REGRAS = [
   ["perfil", "Barras e cantoneiras com a lógica do metalon", "teste", "2026-10-26", "Cantoneira (perfil em L) precisa de teste."]
 ];
 const ALTERACOES = [
+  ["2026-10-28", "Monitor 2.20.1: alterações antigas fora da revisão", "Monitor", ["Opções > Revisão: \"Incluir alterações antigas\" (desligado) e a data de início (15/10/2026)", "Desligado: só entra como desatualizado o que foi salvo a partir dessa data"]],
   ["2026-10-28", "Monitor 2.20: revisão automática e configurável", "Monitor", ["Ao salvar o 3D com mudança, o item fica amarelo (desatualizado) sozinho, com o motivo no mouse", "Desenho mais antigo que o 3D também conta", "Opções > Revisão: escolher o que marca para revisão (3D x desenho/PDF/DXF, desenho x PDF/DXF, divergências da Conferência)"]],
   ["2026-10-28", "Isométrica da vista principal e chamada de todos os furos no laser", "Gerador", ["Isométrica feita a partir da vista principal escolhida (frente + direita + cima dela), não a do SolidWorks", "Isométrica cresce até o espaço livre em todas as peças", "Desenho de laser: chamada de todos os furos (ex.: 4 x Ø3 PASSANTE); DXF continua sem", "Ref. 02124059, 02124120, 02115197, Peça2"]],
   ["2026-10-28", "Monitor 2.19.1: marcar revisado não muda a lista", "Monitor", ["Marcar como conferido/revisado não liga mais a conferência de datas", "A lista continua na visualização em que estava"]],

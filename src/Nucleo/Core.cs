@@ -1727,7 +1727,7 @@ namespace MonitorSW
             if (it.EffSource != null && it.IsWeld && it.Eff > modT) modT = it.Eff;   // solda: componente alterado conta como 3D
             var motivos = new List<string>();
             // desenho mais antigo que o 3D
-            if (rMd && it.Drw != DateTime.MinValue && modT != DateTime.MinValue && it.Drw < modT - tol && it.NeedPdf)
+            if (rMd && it.Drw != DateTime.MinValue && modT != DateTime.MinValue && it.Drw < modT - tol && it.NeedPdf && RegrasRevisao.Conta(modT))
             { pend.Add("Desenho desatualizado"); motivos.Add("3D salvo em " + Util.Fmt(modT) + " depois do desenho (" + Util.Fmt(it.Drw) + ")"); }
 
             // PDF
@@ -1736,11 +1736,11 @@ namespace MonitorSW
                 it.PdfSt = it.NeedPdf ? "Falta" : "-";
                 if (it.NeedPdf) pend.Add(it.Drw == DateTime.MinValue ? "Sem detalhamento" : "Sem PDF (tem desenho)");
             }
-            else if ((rMp && modT != DateTime.MinValue && it.Pdf < modT - tol) || (rDp && it.Drw != DateTime.MinValue && it.Pdf < it.Drw - tol))
+            else if ((rMp && modT != DateTime.MinValue && it.Pdf < modT - tol && RegrasRevisao.Conta(modT)) || (rDp && it.Drw != DateTime.MinValue && it.Pdf < it.Drw - tol && RegrasRevisao.Conta(it.Drw)))
             {
                 it.PdfSt = "Desatualizado";
                 if (it.NeedPdf) pend.Add("PDF desatualizado"); else info.Add("PDF antigo");
-                motivos.Add(rMp && modT != DateTime.MinValue && it.Pdf < modT - tol ? "3D salvo em " + Util.Fmt(modT) + " depois do PDF (" + Util.Fmt(it.Pdf) + ")" : "desenho salvo em " + Util.Fmt(it.Drw) + " depois do PDF (" + Util.Fmt(it.Pdf) + ")");
+                motivos.Add(rMp && modT != DateTime.MinValue && it.Pdf < modT - tol && RegrasRevisao.Conta(modT) ? "3D salvo em " + Util.Fmt(modT) + " depois do PDF (" + Util.Fmt(it.Pdf) + ")" : "desenho salvo em " + Util.Fmt(it.Drw) + " depois do PDF (" + Util.Fmt(it.Pdf) + ")");
             }
             else it.PdfSt = chk ? "OK" : "Tem";
             if (it.PdfVer.Length > 0 && it.Pdf != DateTime.MinValue) it.PdfSt += " (" + it.PdfVer + ")";
@@ -1754,11 +1754,11 @@ namespace MonitorSW
                 it.DxfSt = it.NeedDxf ? "Falta" : "-";
                 if (it.NeedDxf) pend.Add("Sem DXF (laser)");
             }
-            else if ((rMx && modT != DateTime.MinValue && it.Dxf < modT - tol) || (rDx && it.Drw != DateTime.MinValue && it.Dxf < it.Drw - tol))
+            else if ((rMx && modT != DateTime.MinValue && it.Dxf < modT - tol && RegrasRevisao.Conta(modT)) || (rDx && it.Drw != DateTime.MinValue && it.Dxf < it.Drw - tol && RegrasRevisao.Conta(it.Drw)))
             {
                 it.DxfSt = "Desatualizado";
                 if (it.NeedDxf) pend.Add("DXF desatualizado"); else info.Add("DXF antigo");
-                motivos.Add(rMx && modT != DateTime.MinValue && it.Dxf < modT - tol ? "3D salvo em " + Util.Fmt(modT) + " depois do DXF (" + Util.Fmt(it.Dxf) + ")" : "desenho salvo em " + Util.Fmt(it.Drw) + " depois do DXF (" + Util.Fmt(it.Dxf) + ")");
+                motivos.Add(rMx && modT != DateTime.MinValue && it.Dxf < modT - tol && RegrasRevisao.Conta(modT) ? "3D salvo em " + Util.Fmt(modT) + " depois do DXF (" + Util.Fmt(it.Dxf) + ")" : "desenho salvo em " + Util.Fmt(it.Drw) + " depois do DXF (" + Util.Fmt(it.Dxf) + ")");
             }
             else it.DxfSt = chk ? "OK" : "Tem";
             if (it.DxfVer.Length > 0 && it.Dxf != DateTime.MinValue) it.DxfSt += " (" + it.DxfVer + ")";
