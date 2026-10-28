@@ -95,7 +95,7 @@ td.rg { min-width: 300px }
     <p>Acompanhamento das regras do gerador automático: o que já funciona, o que espera teste no SolidWorks, o que falta, e a linha do tempo das alterações.</p>
   </div>
   <dl>
-    <dt>Monitor SW</dt><dd>2.19.0.0</dd>
+    <dt>Monitor SW</dt><dd>2.19.1.0</dd>
     <dt>Gerador</dt><dd id="ultima">—</dd>
     <dt>Regras</dt><dd>REGRAS_DETALHAMENTO.txt</dd>
     <dt>Último teste</dt><dd>1.2.1 · 26/10</dd>
@@ -227,6 +227,7 @@ const REGRAS = [
   ["perfil", "Barras e cantoneiras com a lógica do metalon", "teste", "2026-10-26", "Cantoneira (perfil em L) precisa de teste."]
 ];
 const ALTERACOES = [
+  ["2026-10-28", "Monitor 2.19.1: marcar revisado não muda a lista", "Monitor", ["Marcar como conferido/revisado não liga mais a conferência de datas", "A lista continua na visualização em que estava"]],
   ["2026-10-28", "Laser com usinagem sem cota de raio do contorno", "Gerador", ["Raios externos e arcos do contorno não são cotados em peça de laser (o laser já corta pronto)", "Usinada pura continua cotando raios; dobrada cota só o raio da dobra", "Ref. 02124120 (sem o R3)"]],
   ["2026-10-28", "Vista principal e isométrica mais inteligentes", "Gerador", ["Vista principal conferida pela orientação real (vistas do modelo podem estar trocadas)", "Chapa: face da chapa, do lado dos escareados. Usinada: a face com mais furos/rasgos/escareados", "Furo que só aparece de lado ganha a vista lateral, cotado nela", "Isométrica sempre puxada da vista principal (como arrastar na diagonal)", "Chapa grossa sem chapa metálica (ex.: 5/8\") passa a ser plana", "Ref. 02124120, 02115197"]],
   ["2026-10-28", "DXF pela espessura da chapa", "Gerador", ["Vista do DXF olha na direção da espessura da descrição (ou da menor medida)", "Confere a orientação real da vista; se o modelo tem as vistas trocadas, tenta as outras", "Ref. 02115197 (ESP 5/8\"): saía pela face do furo, agora sai o perfil de corte"]],

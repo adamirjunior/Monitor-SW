@@ -15,8 +15,8 @@ using Microsoft.Win32;
 [assembly: AssemblyTitle("Monitor")]
 [assembly: AssemblyDescription("BOM dos projetos SolidWorks com status de PDF/DXF")]
 [assembly: AssemblyProduct("Monitor")]
-[assembly: AssemblyVersion("2.19.0.0")]
-[assembly: AssemblyFileVersion("2.19.0.0")]
+[assembly: AssemblyVersion("2.19.1.0")]
+[assembly: AssemblyFileVersion("2.19.1.0")]
 
 namespace MonitorSW
 {
@@ -2237,7 +2237,7 @@ namespace MonitorSW
                 string err = Conf.SaveMany(new List<KeyValuePair<Item, string>> { new KeyValuePair<Item, string>(it, "✓ Conferido por " + Users.Me + " em " + DateTime.Now.ToString("dd/MM/yy")) });
                 // conferido por alguém = a marcação PENDENTE (inclusive a automática de "gerado automaticamente") sai
                 if (err == null && it.Mark.StartsWith("PEND", StringComparison.OrdinalIgnoreCase)) { string e2 = Marks.Set(name, ""); if (e2 != null && !e2.StartsWith("AVISO")) err = e2; }
-                if (err == null) engine.SetCheckUpdates(true);
+                if (err == null) engine.SetCheckUpdates(engine.CheckUpdates);   // só atualiza; NÃO liga a conferência de datas (a lista fica como estava)
                 try { BeginInvoke(new Action(() => { if (err == null) { lblStatus.Text = name + ": conferido."; } else MessageBox.Show("Não gravou: " + err, "Conferência"); })); } catch { }
             });
         }
@@ -3153,7 +3153,7 @@ namespace MonitorSW
                 var tirar = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
                 foreach (var i in its) if (i.Mark.StartsWith("PEND", StringComparison.OrdinalIgnoreCase)) tirar[i.Name] = "";
                 if (err == null && tirar.Count > 0) err = Marks.SetMany(tirar);
-                if (err == null) engine.SetCheckUpdates(true);
+                if (err == null) engine.SetCheckUpdates(engine.CheckUpdates);   // só atualiza; NÃO liga a conferência de datas (a lista fica como estava)
                 try { BeginInvoke(new Action(() => { if (err == null) { lblStatus.Text = its.Count + " itens conferidos."; Aviso(3000, "Monitor", its.Count + " itens marcados como conferidos.", ToolTipIcon.Info); } else MessageBox.Show("Não gravou: " + err, "Conferência"); })); } catch { }
             });
         }
