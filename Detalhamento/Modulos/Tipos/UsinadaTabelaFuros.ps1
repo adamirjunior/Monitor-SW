@@ -116,7 +116,7 @@ function DetalharUsinagemTabela($dm, $front, $caminho, $peca) {
     foreach ($p in @(@(0.26, 0.15), @(-0.10, 0.15), @(0.08, 0.30), @(0.08, 0.02))) {
         try { Selecionar $dm $front | Out-Null; $v = X $dm "CreateUnfoldedViewAt3" ([double]$p[0]) ([double]$p[1]) 0.0 $false; if ($v) { $proj += ,$v } } catch { }
     }
-    $iso = VistaModelo $dm $caminho @("*Isométrica", "*Isometric") 0.25 0.18
+    $iso = IsoDaFrontal $dm $caminho $front 0.25 0.30
     Modo $front $DispHidden $true
     foreach ($v in $proj) { Modo $v $DispHidden $true }
     if ($iso) { Modo $iso $DispShaded $true }

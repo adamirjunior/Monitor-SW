@@ -676,3 +676,25 @@ function VistaDoLadoFuros($peca, [int]$k) {
         default { if ($lado -lt 0) { return ,@(@("*Posterior", "*Back"), "posterior") } else { return ,@(@("*Frontal", "*Front"), "frontal") } }
     }
 }
+
+# quantos recursos (furos, rasgos, escareados: faces cilíndricas/cônicas pequenas) cada eixo mostra de frente
+function RecursosPorEixo($peca) {
+    $n = @(0, 0, 0)
+    $bodies = $null; try { $bodies = X $peca "GetBodies2" 0 $true } catch { }
+    foreach ($b in @($bodies)) {
+        if (-not $b) { continue }
+        $f = $null; try { $f = X $b "GetFirstFace" } catch { }
+        $g = 0
+        while ($f -and $g -lt 20000) {
+            $g++
+            try {
+                $sf = X $f "GetSurface"; $cp = $null
+                if (X $sf "IsCylinder") { $cp = XD (XG $sf "CylinderParams"); if ($cp[6] -gt 0.05) { $cp = $null } }
+                elseif (X $sf "IsCone") { $cp = XD (XG $sf "ConeParams") }
+                if ($cp) { for ($k = 0; $k -lt 3; $k++) { if ([math]::Abs($cp[3 + $k]) -gt 0.99) { $n[$k]++ } } }
+            } catch { }
+            try { $f = X $f "GetNextFace" } catch { $f = $null }
+        }
+    }
+    return ,$n
+}

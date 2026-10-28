@@ -146,7 +146,7 @@ function CotaTotalSemVertices($dm, $v, [bool]$horiz, [bool]$vert) {
     # diâmetros: um de cada tamanho (externo e furo)
     $feitos = @{}; $k = 0
     # de cada diâmetro, cota o círculo mais perto do canto superior direito (onde fica o texto): linha de chamada curta
-    foreach ($ci in ($circ | Sort-Object { -$_[1] }, { -$_[2] })) {
+    foreach ($ci in @($circ | Sort-Object { -$_[1] }, { -$_[2] })) {
         if ($feitos.ContainsKey($ci[1])) { continue }
         X $dm "ClearSelection2" $true | Out-Null
         if (-not (SelecionarEntidade $dm $v $ci[0] $false)) { continue }
@@ -272,7 +272,7 @@ function ChamadasFuro($dm, $v) {
 }
 # ---------------------------------------------------------------- cotas de peça usinada (padrão ProEstamp, ex.: 02115187)
 # totais (comprimento em cima, altura à esquerda, espessura na vista de baixo), posição dos furos, raios e chamada de furo
-function CotasUsinagem($dm, $front, $top) {
+function CotasUsinagem($dm, $front, $top, $lat = $null) {
     $tgl = K "swUserPreferenceToggle_e" @("swInputDimValOnCreate") 10
     $antes = $null
     try { $antes = X $sw "GetUserPreferenceToggle" $tgl; X $sw "SetUserPreferenceToggle" $tgl $false | Out-Null } catch { }
@@ -290,6 +290,13 @@ function CotasUsinagem($dm, $front, $top) {
             try { $p = CotasPosicaoFuros $dm $front } catch { Log "   (posição dos furos: $($_.Exception.Message))" "DarkYellow" }
             try { $r = CotasRaios $dm $front } catch { Log "   (raios: $($_.Exception.Message))" "DarkYellow" }
             try { $f = ChamadasFuro $dm $front } catch { Log "   (chamada de furo: $($_.Exception.Message))" "DarkYellow" }
+        }
+        # furos que só aparecem de frente na vista de baixo ou na lateral (ex.: 02115197, Ø10 na face de 15,88)
+        foreach ($vo in @($top, $lat)) {
+            if (-not $vo) { continue }
+            try { $pm = @(); foreach ($vx in (Entidades $vo "swViewEntityType_Vertex" 2)) { try { $pm += ,([double[]](XD (X $vx "GetPoint"))) } catch { } }; if ($pm.Count -gt 0) { EscolherModoXf $vo $pm | Out-Null } } catch { }
+            try { $p += [int](CotasPosicaoFuros $dm $vo) } catch { Log "   (posição dos furos em outra vista: $($_.Exception.Message))" "DarkYellow" }
+            try { $f += ChamadasFuro $dm $vo } catch { Log "   (chamada de furo em outra vista: $($_.Exception.Message))" "DarkYellow" }
         }
         Log "   Cotas de usinagem: $n totais + $p de posição de furo + $r raio(s) + $f chamada(s) de furo"
         Rebuild $dm
@@ -350,7 +357,7 @@ function CotasPosicaoFuros($dm, $v) {
         if ($cb) { $min = $lim[$eixo][0]; $max = $lim[$eixo][1] }
         $meio = ($min + $max) / 2
         $pos = @()
-        foreach ($h in ($furos | Sort-Object { $_[2][$eixo] })) { if (-not ($pos | Where-Object { [math]::Abs($_[2][$eixo] - $h[2][$eixo]) -lt $tol })) { $pos += ,$h } }
+        foreach ($h in @($furos | Sort-Object { $_[2][$eixo] })) { if (-not ($pos | Where-Object { [math]::Abs($_[2][$eixo] - $h[2][$eixo]) -lt $tol })) { $pos += ,$h } }
         $sim = $true
         foreach ($h in $pos) { $esp = 2 * $meio - $h[2][$eixo]; if (-not ($pos | Where-Object { [math]::Abs($_[2][$eixo] - $esp) -lt 0.0003 })) { $sim = $false; break } }
         $nome = if ($eixo -eq 0) { "horizontal" } else { "vertical" }

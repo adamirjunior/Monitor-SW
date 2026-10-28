@@ -43,16 +43,25 @@ function DetalharPeca($caminho, $peca) {
     $script:usinPrisma = $usinPrisma
     # eixo fino (0=X, 1=Y, 2=Z): a vista principal olha a face do lado em que abrem os escareados/rebaixos
     $kFino = if ($mn -eq $Z) { 2 } elseif ($mn -eq $Y) { 1 } else { 0 }
-    if ($usinPrisma) {
-        $vl = VistaDoLadoFuros $peca $kFino; $nomesFrente = $vl[0]; $pl = $vl[1]
-        Log "   Peça usinada: vista principal = $pl (face maior) + vista de baixo + isométrica" "DarkGray"
-    }
-    if ($plana) {
-        $vl = VistaDoLadoFuros $peca $kFino; $nomesFrente = $vl[0]; $pl = $vl[1]
-        Log ("   Chapa plana (espessura {0:N1} mm): vista principal = {1} (face maior)" -f ($mn * 1000), $pl) "DarkGray"
+    $kFrente = -1; $ladoFrente = 0
+    if ($usinPrisma -or $plana) {
+        # chapa plana: sempre a face da chapa (eixo da espessura). Usinada: o eixo que mostra MAIS recursos de frente
+        # (furos, rasgos, escareados); empate = face maior. Lado: onde abrem os escareados/rebaixos.
+        $kFrente = $kFino
+        $rec = @(0, 0, 0); if ($usinPrisma) { try { $rec = RecursosPorEixo $peca } catch { } }
+        if ($usinPrisma -and -not $plana -and -not $laser) {
+            for ($i = 0; $i -lt 3; $i++) { if ($rec[$i] -gt $rec[$kFrente]) { $kFrente = $i } }
+            Log ("   Recursos vistos de frente: X {0}, Y {1}, Z {2} -> principal olha em {3}" -f $rec[0], $rec[1], $rec[2], @("X", "Y", "Z")[$kFrente]) "DarkGray"
+        }
+        $ladoFrente = 0; try { $ladoFrente = LadoAberturaFuros $peca $kFrente } catch { }
+        if ($ladoFrente -eq 0) { $ladoFrente = $(if ($kFrente -eq 0) { -1 } else { 1 }) }   # sem escareado: como antes (Esquerda / Superior / Frontal)
+        if ($usinPrisma) { Log "   Peça usinada: vista principal pela face com mais recursos + vista de baixo + isométrica" "DarkGray" }
+        else { Log ("   Chapa plana (espessura {0:N1} mm): vista principal = face da chapa, lado dos escareados" -f ($mn * 1000)) "DarkGray" }
     }
     $dm = NovoDesenho
-    $front = VistaModelo $dm $caminho $nomesFrente 0.08 0.15
+    $front = $null
+    if ($kFrente -ge 0) { $front = VistaPorEixo $dm $caminho $kFrente $ladoFrente 0.08 0.15 }
+    if (-not $front) { $front = VistaModelo $dm $caminho $nomesFrente 0.08 0.15 }
     if (-not $front) { throw "não consegui criar a vista frontal" }
     # peça comprida em pé: gira a principal antes de projetar as outras (chapa plana: sempre deitada, lado maior na horizontal)
     # chapa dobrada (1.2): comprimento também na horizontal (ex.: 02204262, comprida no eixo Y do modelo)
@@ -71,7 +80,19 @@ function DetalharPeca($caminho, $peca) {
     if ($plana) { Log "   Chapa plana: principal + lateral + vista de baixo mostrando a espessura" "DarkGray" }
     if ($redonda -and -not $plana) { Log "   Peça de revolução: sem vista superior (repetiria a frontal)" "DarkGray" }
     else { try { Selecionar $dm $front | Out-Null; $top = X $dm "CreateUnfoldedViewAt3" 0.08 0.07 0.0 $false } catch { Log "   (vista superior falhou: $($_.Exception.Message))" "DarkYellow" } }
-    $iso = VistaModelo $dm $caminho @("*Isométrica", "*Isometric") 0.25 0.17
+    # usinada: furo/rasgo numa face LATERAL (não aparece de frente nem na principal nem na de baixo) ganha a vista lateral
+    # (ex.: 02115197, Ø10 na face de 15,88 x 47,25)
+    if ($usinPrisma -and -not $left -and $top -and $kFrente -ge 0) {
+        $kT = (DirecaoVista $top)[0]
+        if ($kT -ge 0 -and $kT -ne $kFrente) {
+            $kL = 3 - $kFrente - $kT
+            if ($rec[$kL] -gt 0) {
+                try { Selecionar $dm $front | Out-Null; $left = X $dm "CreateUnfoldedViewAt3" 0.20 0.15 0.0 $false } catch { }
+                if ($left) { Log "   Vista lateral: há $($rec[$kL]) recurso(s) vistos só de lado" "DarkGray" }
+            }
+        }
+    }
+    $iso = IsoDaFrontal $dm $caminho $front 0.25 0.25
     if ($laser -and $chapa -and -not $plana) {
         try { $flat = X $dm "CreateFlatPatternViewFromModelView3" $caminho (NomeConfig $peca) 0.2 0.07 0.0 $false $false } catch { }
         if (-not $flat) { Log "   Aviso: não criei a vista planificada no desenho." "Yellow" }
@@ -213,7 +234,7 @@ function DetalharPeca($caminho, $peca) {
             if ($nob -gt 0) { Log "   Oblongo(s): $nob cota(s)" "DarkGray" }
         }
     } elseif ($InserirCotas -and $usinPrisma) {
-        try { CotasUsinagem $dm $front $top } catch { Log "   Aviso: cotas de usinagem falharam ($($_.Exception.Message))" "Yellow" }
+        try { CotasUsinagem $dm $front $top $left } catch { Log "   Aviso: cotas de usinagem falharam ($($_.Exception.Message))" "Yellow" }
     } elseif ($InserirCotas) {
         try {
             X $dm "ClearSelection2" $true | Out-Null

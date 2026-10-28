@@ -163,3 +163,57 @@ function AtivarDesenho($d) {
     Log "   (não consegui deixar o desenho ativo: $t)" "DarkYellow"
     return $false
 }
+
+# ---------------------------------------------------------------- vistas conferidas pela orientação REAL
+# (as vistas-padrão do modelo podem estar trocadas: na 02115197 "Esquerda" olhava em Y; na 02124120 "Posterior"
+#  mostrava a face sem os escareados). Devolve @(eixo 0/1/2 ou -1, sinal +1 = mostra a face do lado + do eixo).
+function DirecaoVista($v) {
+    try {
+        $script:xfCache = @{}; $script:xfModo = @{}
+        $a = DadosXf $v
+        for ($k = 0; $k -lt 3; $k++) {
+            if ([math]::Abs([double]$a[3 * $k]) + [math]::Abs([double]$a[3 * $k + 1]) -lt 0.05) { return ,@($k, $(if ([double]$a[3 * $k + 2] -ge 0) { 1 } else { -1 })) }
+        }
+    } catch { }
+    return ,@(-1, 0)
+}
+# cria a vista que olha de frente a face do lado $lado (+1/-1; 0 = tanto faz) do eixo $k; testa as vistas-padrão e
+# fica com a que realmente olha para lá (as erradas são apagadas)
+function VistaPorEixo($dm, $caminho, [int]$k, [int]$lado, $x, $y) {
+    $nomes = @(@(@("*Direita", "*Right"), @("*Esquerda", "*Left")), @(@("*Superior", "*Top"), @("*Inferior", "*Bottom")), @(@("*Frontal", "*Front"), @("*Posterior", "*Back")))
+    $ordem = @()
+    if ($lado -lt 0) { $ordem += ,$nomes[$k][1]; $ordem += ,$nomes[$k][0] } else { $ordem += ,$nomes[$k][0]; $ordem += ,$nomes[$k][1] }
+    for ($i = 0; $i -lt 3; $i++) { if ($i -ne $k) { $ordem += ,$nomes[$i][0]; $ordem += ,$nomes[$i][1] } }
+    $reserva = $null
+    foreach ($nm in $ordem) {
+        $v = VistaModelo $dm $caminho $nm $x $y
+        if (-not $v) { continue }
+        Rebuild $dm
+        $dv = DirecaoVista $v
+        if ($dv[0] -eq $k -and ($lado -eq 0 -or $dv[1] -eq $lado)) {
+            if ($reserva) { try { Selecionar $dm $reserva | Out-Null; X $dm "EditDelete" | Out-Null } catch { } }
+            Log ("   Vista principal: {0} (olha a face {1}{2})" -f $nm[0], $(if ($dv[1] -gt 0) { "+" } else { "-" }), @("X", "Y", "Z")[$k]) "DarkGray"
+            return $v
+        }
+        if (-not $reserva -and $dv[0] -eq $k) { $reserva = $v } else { try { Selecionar $dm $v | Out-Null; X $dm "EditDelete" | Out-Null } catch { } }
+    }
+    if ($reserva) { Log "   (vista principal: nenhuma vista olhou pelo lado pedido; usando a do mesmo eixo)" "DarkYellow" }
+    return $reserva
+}
+# isométrica PROJETADA da principal (como arrastar a vista frontal na diagonal): fica coerente com a frente escolhida.
+# Se o SolidWorks não fizer a projeção na diagonal, usa a isométrica nomeada do modelo.
+function IsoDaFrontal($dm, $caminho, $front, $x, $y) {
+    $iso = $null
+    try {
+        $p = Contorno $front
+        if (Selecionar $dm $front) { $iso = X $dm "CreateUnfoldedViewAt3" ([double]$x) ([double]$y) 0.0 $false }
+        if ($iso) {
+            Rebuild $dm
+            $dv = DirecaoVista $iso
+            if ($dv[0] -ge 0) { Log "   (isométrica pela diagonal saiu ortogonal; usando a isométrica do modelo)" "DarkGray"; try { Selecionar $dm $iso | Out-Null; X $dm "EditDelete" | Out-Null } catch { }; $iso = $null }
+            else { Log "   Isométrica projetada da vista principal" "DarkGray" }
+        }
+    } catch { $iso = $null }
+    if (-not $iso) { $iso = VistaModelo $dm $caminho @("*Isométrica", "*Isometric") $x $y }
+    return $iso
+}

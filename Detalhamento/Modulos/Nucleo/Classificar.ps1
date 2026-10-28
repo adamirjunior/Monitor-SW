@@ -64,6 +64,9 @@ function ClassificarPeca($caminho, $peca) {
         $k.Grupo = "laser"; $k.Laser = $true; $k.FazDxf = $true
         $plana = ($mn -lt 0.1 * $mx) -or ($mn -le 0.0065)
         if ($k.Chapa -and $k.Espessura -gt 0) { $plana = ($mn -le $k.Espessura * 1.1 + 0.0001) }
+        # sem chapa metálica e a menor medida = espessura da descrição: chapa GROSSA plana cortada no laser
+        # (ex.: 02115197, ESP 5/8" = 15,88 x 40 x 47,25 - era tratada como dobrada)
+        elseif (-not $k.Chapa -and $k.Espessura -gt 0 -and [math]::Abs($mn - $k.Espessura) -le [math]::Max(0.0005, 0.05 * $k.Espessura)) { $plana = $true }
         $k.Plana = $plana; $k.Dobrada = -not $plana
         if ($plana) { $k.Classe = $(if ($u) { "1.1.1" } else { "1.1" }); $k.Fluxo = $(if ($u) { "usinada" } else { "chapa-plana" }) }
         else { $k.Classe = $(if ($u) { "1.2.1" } else { "1.2" }); $k.Fluxo = "chapa-dobrada" }
